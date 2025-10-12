@@ -69,7 +69,9 @@ function generateIV(): Uint8Array {
 async function getMasterKey(): Promise<CryptoKey> {
   try {
     // Try to get existing key from storage
-    const stored = await chrome.storage.local.get(ENCRYPTION_KEY_STORAGE_KEY)
+    const stored = await new Promise<any>((resolve) => {
+      chrome.storage.local.get(ENCRYPTION_KEY_STORAGE_KEY, resolve)
+    })
 
     if (stored[ENCRYPTION_KEY_STORAGE_KEY]) {
       const keyData = stored[ENCRYPTION_KEY_STORAGE_KEY]
@@ -95,8 +97,13 @@ async function getMasterKey(): Promise<CryptoKey> {
 
     // Export and store the key
     const exportedKey = await crypto.subtle.exportKey("jwk", key)
-    await chrome.storage.local.set({
-      [ENCRYPTION_KEY_STORAGE_KEY]: exportedKey
+    await new Promise<void>((resolve) => {
+      chrome.storage.local.set(
+        {
+          [ENCRYPTION_KEY_STORAGE_KEY]: exportedKey
+        },
+        resolve
+      )
     })
 
     return key

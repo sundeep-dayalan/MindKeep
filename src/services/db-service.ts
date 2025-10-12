@@ -1,19 +1,16 @@
 /**
  * Database service for MindKeep
- * Manages all database interactions using ChromaDB for vector storage
+ * Manages all database interactions using IndexedDB for storage
  * Integrates with crypto.ts for encryption/decryption
  */
 
-import type { Collection } from "chromadb"
-import { ChromaClient } from "chromadb"
-
-import { decrypt, encrypt } from "~util/crypto"
+import { encrypt, decrypt } from "~util/crypto"
 
 // Note interface
 export interface Note {
   id: string
   title: string
-  content: string // Stored encrypted
+  content: string
   category: string
   embedding?: number[]
   createdAt: number
@@ -27,51 +24,70 @@ interface StoredNote {
   title: string
   encryptedContent: string
   category: string
+  embedding?: number[]
   createdAt: number
   updatedAt: number
   sourceUrl?: string
 }
 
-// ChromaDB collection name
-const COLLECTION_NAME = "mindkeep_notes"
+// IndexedDB database name
+const DB_NAME = "mindkeep_db"
+const DB_VERSION = 1
+const STORE_NAME = "notes"
 
-// Initialize ChromaDB client
-let chromaClient: ChromaClient | null = null
-let notesCollection: Collection | null = null
+let dbInstance: IDBDatabase | null = null
 
 /**
- * Initialize the ChromaDB client and collection
+ * Initialize IndexedDB
  */
-async function initializeDB(): Promise<Collection> {
-  if (notesCollection) {
-    return notesCollection
+async function initializeDB(): Promise<IDBDatabase> {
+  if (dbInstance) {
+    return dbInstance
   }
 
-  try {
-    // Initialize ChromaDB client
-    chromaClient = new ChromaClient()
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION)
 
-    // Get or create the notes collection
-    try {
-      notesCollection = await chromaClient.getOrCreateCollection({
-        name: COLLECTION_NAME,
-        metadata: { description: "MindKeep notes with embeddings" }
-      })
-    } catch (error) {
-      console.error("Error getting collection:", error)
-      // Fallback: try to create collection
-      notesCollection = await chromaClient.createCollection({
-        name: COLLECTION_NAME,
-        metadata: { description: "MindKeep notes with embeddings" }
-      })
+    request.onerror = () => reject(request.error)
+    request.onsuccess = () => {
+      dbInstance = request.result
+      resolve(dbInstance)
     }
 
-    console.log("ChromaDB initialized successfully")
-    return notesCollection
-  } catch (error) {
-    console.error("Failed to initialize ChromaDB:", error)
-    throw new Error("Database initialization failed")
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result
+
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        const objectStore = db.createObjectStore(STORE_NAME, { keyPath: "id" })
+        objectStore.createIndex("category", "category", { unique: false })
+        objectStore.createIndex("updatedAt", "updatedAt", { unique: false })
+      }
+    }
+  })
+}
+
+/**
+ * Calculate cosine similarity between two vectors
+ */
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length) return 0
+
+  let dotProduct = 0
+  let magnitudeA = 0
+  let magnitudeB = 0
+
+  for (let i = 0; i < a.length; i++) {
+    dotProduct += a[i] * b[i]
+    magnitudeA += a[i] * a[i]
+    magnitudeB += b[i] * b[i]
   }
+
+  magnitudeA = Math.sqrt(magnitudeA)
+  magnitudeB = Math.sqrt(magnitudeB)
+
+  if (magnitudeA === 0 || magnitudeB === 0) return 0
+
+  return dotProduct / (magnitudeA * magnitudeB)
 }
 
 /**
@@ -79,50 +95,6 @@ async function initializeDB(): Promise<Collection> {
  */
 function generateId(): string {
   return `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-}
-
-/**
- * Store note metadata in Chrome storage
- */
-async function storeNoteMetadata(note: StoredNote): Promise<void> {
-  const storageKey = `note_${note.id}`
-  await chrome.storage.local.set({ [storageKey]: note })
-}
-
-/**
- * Get note metadata from Chrome storage
- */
-async function getNoteMetadata(id: string): Promise<StoredNote | null> {
-  const storageKey = `note_${id}`
-  const result = await chrome.storage.local.get(storageKey)
-  return result[storageKey] || null
-}
-
-/**
- * Get all note metadata from Chrome storage
- */
-async function getAllNoteMetadata(): Promise<StoredNote[]> {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(null, (result) => {
-      const notes: StoredNote[] = []
-
-      for (const key in result) {
-        if (key.startsWith("note_note_")) {
-          notes.push(result[key])
-        }
-      }
-
-      resolve(notes)
-    })
-  })
-}
-
-/**
- * Delete note metadata from Chrome storage
- */
-async function deleteNoteMetadata(id: string): Promise<void> {
-  const storageKey = `note_${id}`
-  await chrome.storage.local.remove(storageKey)
 }
 
 /**
@@ -136,55 +108,42 @@ export async function addNote(noteData: {
   embedding?: number[]
 }): Promise<Note> {
   try {
-    const collection = await initializeDB()
-
-    // Generate ID and encrypt content
+    const db = await initializeDB()
     const id = generateId()
     const encryptedContent = await encrypt(noteData.content)
     const now = Date.now()
 
-    // Create stored note
     const storedNote: StoredNote = {
       id,
       title: noteData.title,
       encryptedContent,
       category: noteData.category || "general",
-      createdAt: now,
-      updatedAt: now,
-      sourceUrl: noteData.sourceUrl
-    }
-
-    // Store metadata in Chrome storage
-    await storeNoteMetadata(storedNote)
-
-    // If embedding is provided, add to ChromaDB
-    if (noteData.embedding && noteData.embedding.length > 0) {
-      await collection.add({
-        ids: [id],
-        embeddings: [noteData.embedding],
-        metadatas: [
-          {
-            title: noteData.title,
-            category: storedNote.category,
-            createdAt: now.toString(),
-            sourceUrl: noteData.sourceUrl || ""
-          }
-        ],
-        documents: [noteData.title] // Use title as document for search
-      })
-    }
-
-    // Return decrypted note
-    return {
-      id,
-      title: noteData.title,
-      content: noteData.content,
-      category: storedNote.category,
       embedding: noteData.embedding,
       createdAt: now,
       updatedAt: now,
       sourceUrl: noteData.sourceUrl
     }
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME], "readwrite")
+      const store = transaction.objectStore(STORE_NAME)
+      const request = store.add(storedNote)
+
+      request.onsuccess = () => {
+        resolve({
+          id,
+          title: noteData.title,
+          content: noteData.content,
+          category: storedNote.category,
+          embedding: noteData.embedding,
+          createdAt: now,
+          updatedAt: now,
+          sourceUrl: noteData.sourceUrl
+        })
+      }
+
+      request.onerror = () => reject(request.error)
+    })
   } catch (error) {
     console.error("Error adding note:", error)
     throw new Error("Failed to add note")
@@ -196,24 +155,41 @@ export async function addNote(noteData: {
  */
 export async function getNote(id: string): Promise<Note | null> {
   try {
-    const storedNote = await getNoteMetadata(id)
+    const db = await initializeDB()
 
-    if (!storedNote) {
-      return null
-    }
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME], "readonly")
+      const store = transaction.objectStore(STORE_NAME)
+      const request = store.get(id)
 
-    // Decrypt content
-    const content = await decrypt(storedNote.encryptedContent)
+      request.onsuccess = async () => {
+        const storedNote = request.result as StoredNote | undefined
 
-    return {
-      id: storedNote.id,
-      title: storedNote.title,
-      content,
-      category: storedNote.category,
-      createdAt: storedNote.createdAt,
-      updatedAt: storedNote.updatedAt,
-      sourceUrl: storedNote.sourceUrl
-    }
+        if (!storedNote) {
+          resolve(null)
+          return
+        }
+
+        try {
+          const content = await decrypt(storedNote.encryptedContent)
+          resolve({
+            id: storedNote.id,
+            title: storedNote.title,
+            content,
+            category: storedNote.category,
+            embedding: storedNote.embedding,
+            createdAt: storedNote.createdAt,
+            updatedAt: storedNote.updatedAt,
+            sourceUrl: storedNote.sourceUrl
+          })
+        } catch (error) {
+          console.error("Error decrypting note:", error)
+          resolve(null)
+        }
+      }
+
+      request.onerror = () => reject(request.error)
+    })
   } catch (error) {
     console.error("Error getting note:", error)
     return null
@@ -233,79 +209,64 @@ export async function updateNote(
   }
 ): Promise<Note | null> {
   try {
-    const storedNote = await getNoteMetadata(id)
+    const db = await initializeDB()
+    const existingNote = await getNote(id)
 
-    if (!storedNote) {
+    if (!existingNote) {
       return null
     }
 
-    const collection = await initializeDB()
+    const encryptedContent =
+      updates.content !== undefined
+        ? await encrypt(updates.content)
+        : (await new Promise<string>((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAME], "readonly")
+            const store = transaction.objectStore(STORE_NAME)
+            const request = store.get(id)
 
-    // Update fields
-    if (updates.title !== undefined) {
-      storedNote.title = updates.title
-    }
-
-    if (updates.content !== undefined) {
-      storedNote.encryptedContent = await encrypt(updates.content)
-    }
-
-    if (updates.category !== undefined) {
-      storedNote.category = updates.category
-    }
-
-    storedNote.updatedAt = Date.now()
-
-    // Update metadata in Chrome storage
-    await storeNoteMetadata(storedNote)
-
-    // Update ChromaDB if embedding is provided
-    if (updates.embedding && updates.embedding.length > 0) {
-      try {
-        // Check if exists in ChromaDB
-        await collection.update({
-          ids: [id],
-          embeddings: [updates.embedding],
-          metadatas: [
-            {
-              title: storedNote.title,
-              category: storedNote.category,
-              createdAt: storedNote.createdAt.toString(),
-              sourceUrl: storedNote.sourceUrl || ""
+            request.onsuccess = () => {
+              const storedNote = request.result as StoredNote
+              resolve(storedNote.encryptedContent)
             }
-          ],
-          documents: [storedNote.title]
-        })
-      } catch (error) {
-        // If doesn't exist, add it
-        await collection.add({
-          ids: [id],
-          embeddings: [updates.embedding],
-          metadatas: [
-            {
-              title: storedNote.title,
-              category: storedNote.category,
-              createdAt: storedNote.createdAt.toString(),
-              sourceUrl: storedNote.sourceUrl || ""
-            }
-          ],
-          documents: [storedNote.title]
+            request.onerror = () => reject(request.error)
+          }))
+
+    const updatedNote: StoredNote = {
+      id,
+      title: updates.title ?? existingNote.title,
+      encryptedContent,
+      category: updates.category ?? existingNote.category,
+      embedding: updates.embedding ?? existingNote.embedding,
+      createdAt: existingNote.createdAt,
+      updatedAt: Date.now(),
+      sourceUrl: existingNote.sourceUrl
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME], "readwrite")
+      const store = transaction.objectStore(STORE_NAME)
+      const request = store.put(updatedNote)
+
+      request.onsuccess = async () => {
+        const content =
+          updates.content !== undefined
+            ? updates.content
+            : await decrypt(updatedNote.encryptedContent)
+
+        resolve({
+          id: updatedNote.id,
+          title: updatedNote.title,
+          content,
+          category: updatedNote.category,
+          embedding: updatedNote.embedding,
+          createdAt: updatedNote.createdAt,
+          updatedAt: updatedNote.updatedAt,
+          sourceUrl: updatedNote.sourceUrl
         })
       }
-    }
 
-    // Return decrypted note
-    const content = await decrypt(storedNote.encryptedContent)
-    return {
-      id: storedNote.id,
-      title: storedNote.title,
-      content,
-      category: storedNote.category,
-      createdAt: storedNote.createdAt,
-      updatedAt: storedNote.updatedAt,
-      sourceUrl: storedNote.sourceUrl,
-      embedding: updates.embedding
-    }
+      request.onerror = () => reject(request.error)
+    })
   } catch (error) {
     console.error("Error updating note:", error)
     return null
@@ -317,19 +278,16 @@ export async function updateNote(
  */
 export async function deleteNote(id: string): Promise<boolean> {
   try {
-    const collection = await initializeDB()
+    const db = await initializeDB()
 
-    // Delete from ChromaDB
-    try {
-      await collection.delete({ ids: [id] })
-    } catch (error) {
-      console.log("Note not found in ChromaDB (may not have embedding)")
-    }
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME], "readwrite")
+      const store = transaction.objectStore(STORE_NAME)
+      const request = store.delete(id)
 
-    // Delete from Chrome storage
-    await deleteNoteMetadata(id)
-
-    return true
+      request.onsuccess = () => resolve(true)
+      request.onerror = () => reject(request.error)
+    })
   } catch (error) {
     console.error("Error deleting note:", error)
     return false
@@ -341,28 +299,41 @@ export async function deleteNote(id: string): Promise<boolean> {
  */
 export async function getAllNotes(): Promise<Note[]> {
   try {
-    const storedNotes = await getAllNoteMetadata()
-    const notes: Note[] = []
+    const db = await initializeDB()
 
-    for (const storedNote of storedNotes) {
-      try {
-        const content = await decrypt(storedNote.encryptedContent)
-        notes.push({
-          id: storedNote.id,
-          title: storedNote.title,
-          content,
-          category: storedNote.category,
-          createdAt: storedNote.createdAt,
-          updatedAt: storedNote.updatedAt,
-          sourceUrl: storedNote.sourceUrl
-        })
-      } catch (error) {
-        console.error(`Error decrypting note ${storedNote.id}:`, error)
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME], "readonly")
+      const store = transaction.objectStore(STORE_NAME)
+      const request = store.getAll()
+
+      request.onsuccess = async () => {
+        const storedNotes = request.result as StoredNote[]
+        const notes: Note[] = []
+
+        for (const storedNote of storedNotes) {
+          try {
+            const content = await decrypt(storedNote.encryptedContent)
+            notes.push({
+              id: storedNote.id,
+              title: storedNote.title,
+              content,
+              category: storedNote.category,
+              embedding: storedNote.embedding,
+              createdAt: storedNote.createdAt,
+              updatedAt: storedNote.updatedAt,
+              sourceUrl: storedNote.sourceUrl
+            })
+          } catch (error) {
+            console.error(`Error decrypting note ${storedNote.id}:`, error)
+          }
+        }
+
+        notes.sort((a, b) => b.updatedAt - a.updatedAt)
+        resolve(notes)
       }
-    }
 
-    // Sort by updatedAt descending
-    return notes.sort((a, b) => b.updatedAt - a.updatedAt)
+      request.onerror = () => reject(request.error)
+    })
   } catch (error) {
     console.error("Error getting all notes:", error)
     return []
@@ -377,28 +348,21 @@ export async function searchNotesByVector(
   limit: number = 5
 ): Promise<Note[]> {
   try {
-    const collection = await initializeDB()
+    const allNotes = await getAllNotes()
+    const notesWithEmbeddings = allNotes.filter((note) => note.embedding)
 
-    // Query ChromaDB
-    const results = await collection.query({
-      queryEmbeddings: [vector],
-      nResults: limit
-    })
-
-    if (!results.ids || !results.ids[0] || results.ids[0].length === 0) {
+    if (notesWithEmbeddings.length === 0) {
       return []
     }
 
-    // Get full notes from storage
-    const notes: Note[] = []
-    for (const id of results.ids[0]) {
-      const note = await getNote(id as string)
-      if (note) {
-        notes.push(note)
-      }
-    }
+    const scored = notesWithEmbeddings.map((note) => ({
+      note,
+      score: cosineSimilarity(vector, note.embedding!)
+    }))
 
-    return notes
+    scored.sort((a, b) => b.score - a.score)
+
+    return scored.slice(0, limit).map((item) => item.note)
   } catch (error) {
     console.error("Error searching notes by vector:", error)
     return []
@@ -406,7 +370,7 @@ export async function searchNotesByVector(
 }
 
 /**
- * Search notes by title (simple text search)
+ * Search notes by title
  */
 export async function searchNotesByTitle(query: string): Promise<Note[]> {
   try {
@@ -459,40 +423,135 @@ export async function getAllCategories(): Promise<string[]> {
 }
 
 /**
- * Clear all notes (use with caution!)
+ * Create a new category
+ */
+export function createCategory(categoryName: string): string {
+  const trimmed = categoryName.trim().toLowerCase()
+
+  if (!trimmed) {
+    throw new Error("Category name cannot be empty")
+  }
+
+  if (trimmed.length > 50) {
+    throw new Error("Category name too long (max 50 characters)")
+  }
+
+  return trimmed
+}
+
+/**
+ * Update category for multiple notes
+ */
+export async function updateCategory(
+  oldCategory: string,
+  newCategory: string
+): Promise<number> {
+  try {
+    const notes = await getNotesByCategory(oldCategory)
+    let updatedCount = 0
+
+    for (const note of notes) {
+      const updated = await updateNote(note.id, { category: newCategory })
+      if (updated) {
+        updatedCount++
+      }
+    }
+
+    return updatedCount
+  } catch (error) {
+    console.error("Error updating category:", error)
+    return 0
+  }
+}
+
+/**
+ * Delete a category and reassign notes
+ */
+export async function deleteCategory(
+  category: string,
+  reassignTo: string = "general"
+): Promise<number> {
+  try {
+    const notes = await getNotesByCategory(category)
+    let deletedCount = 0
+
+    for (const note of notes) {
+      const updated = await updateNote(note.id, { category: reassignTo })
+      if (updated) {
+        deletedCount++
+      }
+    }
+
+    return deletedCount
+  } catch (error) {
+    console.error("Error deleting category:", error)
+    return 0
+  }
+}
+
+/**
+ * Clear all notes
  */
 export async function clearAllNotes(): Promise<void> {
   try {
-    const collection = await initializeDB()
+    const db = await initializeDB()
 
-    // Delete collection from ChromaDB
-    if (chromaClient) {
-      await chromaClient.deleteCollection({ name: COLLECTION_NAME })
-      notesCollection = null
-    }
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME], "readwrite")
+      const store = transaction.objectStore(STORE_NAME)
+      const request = store.clear()
 
-    // Clear all note metadata from Chrome storage
-    const keysToRemove: string[] = await new Promise((resolve) => {
-      chrome.storage.local.get(null, (allData) => {
-        const keys: string[] = []
+      request.onsuccess = () => {
+        console.log("All notes cleared")
+        resolve()
+      }
 
-        for (const key in allData) {
-          if (key.startsWith("note_")) {
-            keys.push(key)
-          }
-        }
-
-        resolve(keys)
-      })
+      request.onerror = () => reject(request.error)
     })
-
-    if (keysToRemove.length > 0) {
-      await chrome.storage.local.remove(keysToRemove)
-    }
-
-    console.log("All notes cleared")
   } catch (error) {
     console.error("Error clearing notes:", error)
     throw new Error("Failed to clear notes")
+  }
+}
+
+/**
+ * Debug function to verify IndexedDB connection and data
+ */
+export async function debugIndexedDB(): Promise<void> {
+  console.log("=== IndexedDB Debug Info ===")
+  
+  try {
+    // List all databases
+    const databases = await indexedDB.databases()
+    console.log("Available databases:", databases)
+    
+    // Check our database
+    const db = await initializeDB()
+    console.log("Connected to database:", DB_NAME)
+    console.log("Object stores:", Array.from(db.objectStoreNames))
+    
+    // Count notes
+    const count = await new Promise<number>((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME], "readonly")
+      const store = transaction.objectStore(STORE_NAME)
+      const request = store.count()
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    console.log(`Total notes in database: ${count}`)
+    
+    // Get all raw stored notes (encrypted)
+    const rawNotes = await new Promise<StoredNote[]>((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME], "readonly")
+      const store = transaction.objectStore(STORE_NAME)
+      const request = store.getAll()
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    console.log("Raw stored notes (encrypted):", rawNotes)
+    
+    console.log("=== End Debug Info ===")
+  } catch (error) {
+    console.error("Debug error:", error)
   }
 }
