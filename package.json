@@ -34,7 +34,8 @@
     "permissions": [
       "sidePanel",
       "contextMenus",
-      "storage"
+      "storage",
+      "ai"
     ],
     "side_panel": {
       "default_path": "sidepanel.html"

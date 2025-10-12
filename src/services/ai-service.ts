@@ -346,3 +346,149 @@ export async function checkAIAvailability(): Promise<{
     }
   }
 }
+
+/**
+ * Summarize text using chrome.ai API (Gemini Nano)
+ * Generates a concise summary of the provided text
+ */
+export async function summarizeText(text: string): Promise<string> {
+  try {
+    // Check if chrome.ai exists at all
+    if (!("ai" in chrome)) {
+      throw new Error(
+        "Chrome AI is not supported in this browser. You need Chrome 127+ with AI features enabled.\n\n" +
+        "Steps to enable:\n" +
+        "1. Update Chrome to version 127 or later\n" +
+        "2. Go to chrome://flags/#optimization-guide-on-device-model\n" +
+        "3. Set to 'Enabled BypassPerfRequirement'\n" +
+        "4. Go to chrome://flags/#prompt-api-for-gemini-nano\n" +
+        "5. Set to 'Enabled'\n" +
+        "6. Restart Chrome"
+      )
+    }
+
+    const ai = (chrome as any).ai
+    if (!ai || !ai.languageModel) {
+      throw new Error(
+        "Chrome AI language model is not available.\n\n" +
+        "Please enable it in:\n" +
+        "chrome://flags/#prompt-api-for-gemini-nano"
+      )
+    }
+
+    // Check capability
+    const capabilities = await ai.languageModel.capabilities()
+    if (capabilities.available === "no") {
+      throw new Error(
+        "Chrome AI is not available on this device. It may not meet the system requirements."
+      )
+    }
+
+    if (capabilities.available === "after-download") {
+      throw new Error(
+        "Chrome AI model is downloading. Please wait a few minutes and try again."
+      )
+    }
+
+    // Create a session with Gemini Nano
+    const session = await ai.languageModel.create({
+      systemPrompt: `You are a text summarizer. Your task is to create concise, clear summaries.
+
+Rules:
+- Keep summaries brief and to the point (1-3 sentences max)
+- Capture the main idea or key points
+- Use clear, simple language
+- Don't add information not in the original text
+- Don't use phrases like "This text is about" or "The summary is"
+- Just provide the summary directly`
+    })
+
+    // Get the response
+    const prompt = `Summarize this text:\n\n${text}`
+    const response = await session.prompt(prompt)
+
+    // Clean up session
+    session.destroy()
+
+    return response.trim()
+  } catch (error) {
+    console.error("Error summarizing text:", error)
+    if (error.message) {
+      throw error
+    }
+    throw new Error("Failed to generate summary. Please check Chrome AI settings.")
+  }
+}
+
+/**
+ * Generate a title from content using chrome.ai API (Gemini Nano)
+ * Creates a short, descriptive title based on the content
+ */
+export async function generateTitle(content: string): Promise<string> {
+  try {
+    // Check if chrome.ai exists at all
+    if (!("ai" in chrome)) {
+      throw new Error(
+        "Chrome AI is not supported in this browser. You need Chrome 127+ with AI features enabled.\n\n" +
+        "Steps to enable:\n" +
+        "1. Update Chrome to version 127 or later\n" +
+        "2. Go to chrome://flags/#optimization-guide-on-device-model\n" +
+        "3. Set to 'Enabled BypassPerfRequirement'\n" +
+        "4. Go to chrome://flags/#prompt-api-for-gemini-nano\n" +
+        "5. Set to 'Enabled'\n" +
+        "6. Restart Chrome"
+      )
+    }
+
+    const ai = (chrome as any).ai
+    if (!ai || !ai.languageModel) {
+      throw new Error(
+        "Chrome AI language model is not available.\n\n" +
+        "Please enable it in:\n" +
+        "chrome://flags/#prompt-api-for-gemini-nano"
+      )
+    }
+
+    // Check capability
+    const capabilities = await ai.languageModel.capabilities()
+    if (capabilities.available === "no") {
+      throw new Error(
+        "Chrome AI is not available on this device. It may not meet the system requirements."
+      )
+    }
+
+    if (capabilities.available === "after-download") {
+      throw new Error(
+        "Chrome AI model is downloading. Please wait a few minutes and try again."
+      )
+    }
+
+    // Create a session with Gemini Nano
+    const session = await ai.languageModel.create({
+      systemPrompt: `You are a title generator. Your task is to create short, descriptive titles.
+
+Rules:
+- Keep titles very brief (3-7 words max)
+- Capture the main topic or subject
+- Use title case (capitalize main words)
+- Don't use punctuation at the end
+- Don't use quotes
+- Just provide the title directly`
+    })
+
+    // Get the response
+    const prompt = `Generate a title for this content:\n\n${content}`
+    const response = await session.prompt(prompt)
+
+    // Clean up session
+    session.destroy()
+
+    return response.trim()
+  } catch (error) {
+    console.error("Error generating title:", error)
+    if (error.message) {
+      throw error
+    }
+    throw new Error("Failed to generate title. Please check Chrome AI settings.")
+  }
+}

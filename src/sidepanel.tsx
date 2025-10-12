@@ -9,6 +9,8 @@ import {
   searchNotesByTitle,
   type Note
 } from "~services/db-service"
+import { generateTitle, summarizeText } from "~services/ai-service"
+import { AIStatusBanner } from "~components/AIStatusBanner"
 
 type View = "list" | "editor"
 
@@ -27,6 +29,8 @@ function SidePanel() {
   const [noteCategory, setNoteCategory] = useState("general")
   const [newCategoryName, setNewCategoryName] = useState("")
   const [showNewCategory, setShowNewCategory] = useState(false)
+  const [isGeneratingTitle, setIsGeneratingTitle] = useState(false)
+  const [isSummarizing, setIsSummarizing] = useState(false)
 
   // Load notes and categories
   useEffect(() => {
@@ -194,6 +198,48 @@ function SidePanel() {
     }
   }
 
+  const handleGenerateTitle = async () => {
+    if (!noteContent.trim()) {
+      alert("Please enter some content first")
+      return
+    }
+
+    setIsGeneratingTitle(true)
+    try {
+      const generatedTitle = await generateTitle(noteContent)
+      setNoteTitle(generatedTitle)
+    } catch (error) {
+      console.error("Error generating title:", error)
+      // Show detailed error message
+      const errorMessage = error.message || "Failed to generate title"
+      if (confirm(errorMessage + "\n\nWould you like to open Chrome flags to enable AI features?")) {
+        chrome.tabs.create({ url: "chrome://flags/#optimization-guide-on-device-model" })
+      }
+    }
+    setIsGeneratingTitle(false)
+  }
+
+  const handleSummarizeContent = async () => {
+    if (!noteContent.trim()) {
+      alert("Please enter some content first")
+      return
+    }
+
+    setIsSummarizing(true)
+    try {
+      const summary = await summarizeText(noteContent)
+      setNoteContent(summary)
+    } catch (error) {
+      console.error("Error summarizing content:", error)
+      // Show detailed error message
+      const errorMessage = error.message || "Failed to summarize content"
+      if (confirm(errorMessage + "\n\nWould you like to open Chrome flags to enable AI features?")) {
+        chrome.tabs.create({ url: "chrome://flags/#optimization-guide-on-device-model" })
+      }
+    }
+    setIsSummarizing(false)
+  }
+
   return (
     <div className="plasmo-w-full plasmo-h-screen plasmo-bg-slate-50 plasmo-overflow-hidden">
       <div className="plasmo-h-full plasmo-flex plasmo-flex-col">
@@ -225,6 +271,9 @@ function SidePanel() {
 
         {/* Content */}
         <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-p-4">
+          {/* AI Status Banner */}
+          <AIStatusBanner />
+          
           {view === "list" ? (
             <>
               {/* Search and Filters */}
@@ -364,21 +413,113 @@ function SidePanel() {
                 </h2>
               </div>
 
-              <input
-                type="text"
-                value={noteTitle}
-                onChange={(e) => setNoteTitle(e.target.value)}
-                placeholder="Note title"
-                className="plasmo-w-full plasmo-px-3 plasmo-py-2 plasmo-border plasmo-border-slate-300 plasmo-rounded-lg focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-blue-500"
-              />
+              <div className="plasmo-space-y-2">
+                <label className="plasmo-text-sm plasmo-font-medium plasmo-text-slate-700">
+                  Title
+                </label>
+                <div className="plasmo-relative">
+                  <input
+                    type="text"
+                    value={noteTitle}
+                    onChange={(e) => setNoteTitle(e.target.value)}
+                    placeholder="Note title"
+                    className="plasmo-w-full plasmo-px-3 plasmo-py-2 plasmo-pr-10 plasmo-border plasmo-border-slate-300 plasmo-rounded-lg focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-blue-500"
+                  />
+                  <button
+                    onClick={handleGenerateTitle}
+                    disabled={isGeneratingTitle || !noteContent.trim()}
+                    className="plasmo-absolute plasmo-right-2 plasmo-top-1/2 plasmo--translate-y-1/2 plasmo-p-1.5 plasmo-text-purple-600 hover:plasmo-bg-purple-50 plasmo-rounded disabled:plasmo-opacity-40 disabled:plasmo-cursor-not-allowed plasmo-transition-colors"
+                    title="Generate title from content using AI">
+                    {isGeneratingTitle ? (
+                      <svg
+                        className="plasmo-w-5 plasmo-h-5 plasmo-animate-spin"
+                        fill="none"
+                        viewBox="0 0 24 24">
+                        <circle
+                          className="plasmo-opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="plasmo-opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        className="plasmo-w-5 plasmo-h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
 
-              <textarea
-                value={noteContent}
-                onChange={(e) => setNoteContent(e.target.value)}
-                placeholder="Note content"
-                rows={10}
-                className="plasmo-w-full plasmo-px-3 plasmo-py-2 plasmo-border plasmo-border-slate-300 plasmo-rounded-lg plasmo-resize-none focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-blue-500"
-              />
+              <div className="plasmo-space-y-2">
+                <label className="plasmo-text-sm plasmo-font-medium plasmo-text-slate-700">
+                  Content
+                </label>
+                <div className="plasmo-relative">
+                  <textarea
+                    value={noteContent}
+                    onChange={(e) => setNoteContent(e.target.value)}
+                    placeholder="Note content"
+                    rows={10}
+                    className="plasmo-w-full plasmo-px-3 plasmo-py-2 plasmo-pr-10 plasmo-border plasmo-border-slate-300 plasmo-rounded-lg plasmo-resize-none focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-blue-500"
+                  />
+                  <button
+                    onClick={handleSummarizeContent}
+                    disabled={isSummarizing || !noteContent.trim()}
+                    className="plasmo-absolute plasmo-right-2 plasmo-top-2 plasmo-p-1.5 plasmo-text-purple-600 hover:plasmo-bg-purple-50 plasmo-rounded disabled:plasmo-opacity-40 disabled:plasmo-cursor-not-allowed plasmo-transition-colors"
+                    title="Summarize content using AI">
+                    {isSummarizing ? (
+                      <svg
+                        className="plasmo-w-5 plasmo-h-5 plasmo-animate-spin"
+                        fill="none"
+                        viewBox="0 0 24 24">
+                        <circle
+                          className="plasmo-opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="plasmo-opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        className="plasmo-w-5 plasmo-h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
 
               {showNewCategory ? (
                 <div className="plasmo-space-y-2">

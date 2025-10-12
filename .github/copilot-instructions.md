@@ -182,3 +182,259 @@ Verify the following functionality:
 - [ ] Typing a query like fill my ssn pastes the result into a text field.
 - [ ] All user data is verifiably stored in IndexedDB and is not human-readable (encrypted).
 - [ ] The extension works correctly offline.
+
+Here is your requested documentation, rewritten in Markdown format for direct use in Copilot or as a developer reference file:
+
+```markdown
+# Chrome's Built-in AI APIs
+
+This documentation provides an overview of the suite of built-in AI APIs available in Google Chrome. These APIs leverage on-device models, primarily Gemini Nano, to provide powerful AI capabilities directly in the browser, ensuring user privacy and low latency by processing data locally.
+
+**Before using these APIs, review:**
+
+- [Google's Generative AI Prohibited Uses Policy](https://ai.google/policies/prohibited-use/)
+- [People + AI Guidebook (PAIR)](https://pair.withgoogle.com/guidebook/) for best practices in AI-powered feature design.
+
+---
+
+## General Hardware & System Requirements
+
+### Most Gemini Nano APIs (Prompt, Summarizer, Writer, Rewriter, Proofreader)
+
+- **Operating System:** Windows 10/11, macOS 13+ (Ventura or later), Linux, or ChromeOS on Chromebook Plus devices
+- **CPU:** 4 cores or more
+- **RAM:** 16 GB or more
+- **GPU:** More than 4 GB of VRAM
+- **Storage:** At least 22 GB free disk space for Chrome profile
+- **Network:** Unmetered connection recommended for initial model download
+
+### Translator and Language Detector APIs
+
+- Less stringent requirements; works on Chrome desktop.
+
+---
+
+## API Reference
+
+### 1. Translator API
+
+Translates text from a source language to a target language, entirely on-device.
+
+- **Status:** Stable in Chrome 138+
+- **Use Cases:**
+  - Real-time translation for user-generated content (e.g., support chat)
+  - On-demand translation in social media feeds
+
+**Core Methods**
+
+- `Translator.availability({ sourceLanguage, targetLanguage })`: Check if the pair is available.
+- `Translator.create({ sourceLanguage, targetLanguage })`: Create a translator instance.
+- `translator.translate(text)`: Translate a string.
+- `translator.translateStreaming(text)`: Stream translation for longer content.
+
+**Example**
+```
+
+if ('Translator' in self) {
+const translator = await Translator.create({
+sourceLanguage: 'en',
+targetLanguage: 'fr',
+});
+const result = await translator.translate('Where is the next bus stop, please?');
+console.log(result); // "Où est le prochain arrêt de bus, s'il vous plaît ?"
+}
+
+```
+
+---
+
+### 2. Language Detector API
+
+Detects the language of a text, often used before translation.
+
+- **Status:** Stable in Chrome 138+
+- **Use Cases:**
+  - Auto-detect language for translation
+  - Label text for screen reader pronunciation
+
+---
+
+### 3. Summarizer API
+
+Condenses long-form content into concise summaries with various styles and lengths.
+
+- **Status:** Stable in Chrome 138+
+- **Use Cases:**
+  - Key points from transcripts or articles
+  - Draft "TL;DR" or titles
+  - Summarize product reviews
+
+**Core Methods**
+- `Summarizer.availability()`: Check if ready.
+- `Summarizer.create(options)`: Create a summarizer instance.
+- `summarizer.summarize(text)`: Get a summary.
+
+**Options**
+- `type`: 'key-points' (default), 'tldr', 'teaser', 'headline'
+- `format`: 'markdown' (default), 'plain-text'
+- `length`: 'short', 'medium' (default), 'long'
+
+**Example**
+```
+
+if ('Summarizer' in self) {
+const summarizer = await Summarizer.create({
+type: 'key-points',
+length: 'short',
+format: 'markdown'
+});
+const articleText = document.querySelector('article').innerText;
+const summary = await summarizer.summarize(articleText);
+console.log(summary); // ~3 bullet points in markdown
+}
+
+```
+
+---
+
+### 4. Writer API
+
+Generates new text content based on a prompt and context.
+
+- **Status:** Origin Trial (Chrome 137–142)
+- **Use Cases:**
+  - Assist drafting emails, posts, reviews
+  - Help users write/formulate requests
+
+**Core Methods**
+- `Writer.availability()`
+- `Writer.create(options)`
+- `writer.write(prompt, { context })`
+
+**Options**
+- `tone`: 'formal', 'neutral' (default), 'casual'
+- `format`: 'markdown' (default), 'plain-text'
+- `length`: 'short', 'medium' (default), 'long'
+
+**Example**
+```
+
+if ('Writer' in self) {
+const writer = await Writer.create({ tone: 'formal' });
+const result = await writer.write(
+"An inquiry to my bank about enabling wire transfers on my account.",
+{ context: "I'm a longstanding customer" }
+);
+console.log(result);
+}
+
+```
+
+---
+
+### 5. Rewriter API
+
+Revises and restructures existing text to alter tone, length, or style.
+
+- **Status:** Origin Trial (Chrome 137–142)
+- **Use Cases:**
+  - Rewrite messages/emails for different formality/tone
+  - Edit customer reviews for clarity
+
+**Core Methods**
+- `Rewriter.availability()`
+- `Rewriter.create(options)`
+- `rewriter.rewrite(text, { context })`
+
+**Options**
+- `tone`: 'more-formal', 'as-is' (default), 'more-casual'
+- `length`: 'shorter', 'as-is' (default), 'longer'
+
+**Example**
+```
+
+if ('Rewriter' in self) {
+const rewriter = await Rewriter.create({ tone: "more-casual", length: "shorter" });
+const originalText = "I require immediate assistance with the defective product I received.";
+const result = await rewriter.rewrite(originalText);
+console.log(result); // Shorter, more casual version
+}
+
+```
+
+---
+
+### 6. Prompt API
+
+General-purpose, direct access to Gemini Nano for natural language prompts.
+
+- **Status:** Origin Trial (Web); Stable for Chrome Extensions (Chrome 138+)
+- **Use Cases:**
+  - AI query-powered search
+  - Content categorization
+  - Extracting structured data
+
+**Core Methods**
+- `LanguageModel.availability()`
+- `LanguageModel.create()`
+- `session.prompt(text)`
+- `session.promptStreaming(text)`
+
+**Features**
+- Multimodality (text/image/audio, in Origin Trial)
+- Structured output via JSON schema
+- Session context/history
+
+**Example**
+```
+
+if ('LanguageModel' in self && await LanguageModel.availability() !== 'unavailable') {
+const session = await LanguageModel.create();
+const result = await session.prompt('Create a short, funny tagline for a coffee shop.');
+console.log(result);
+}
+
+```
+
+---
+
+### 7. Proofreader API
+
+Checks and corrects grammar, spelling, and punctuation.
+
+- **Status:** Origin Trial (Chrome 141–145)
+- **Use Cases:**
+  - Real-time correction suggestions
+  - Spellcheck for note apps or comment boxes
+
+**Core Methods**
+- `Proofreader.availability()`
+- `Proofreader.create()`
+- `proofreader.proofread(text)`
+
+**Example**
+```
+
+if ('Proofreader' in self) {
+const proofreader = await Proofreader.create();
+const result = await proofreader.proofread(
+'I seen him yesterday at the store, and he bought two loafs of bread.'
+);
+console.log(result.corrected); // "I saw him yesterday..."
+console.log(result.corrections); // [{ start, end, suggestion, ... }]
+}
+
+```
+
+---
+
+## References
+
+- [Google's Generative AI Prohibited Uses Policy](https://ai.google/policies/prohibited-use/)
+- [PAIR Guidebook](https://pair.withgoogle.com/guidebook/)
+
+```
+
+This Markdown file can be copy-pasted directly into Copilot or other developer tools for quick reference and searchability.
+
+Sources
