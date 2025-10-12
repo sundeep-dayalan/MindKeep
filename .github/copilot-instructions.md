@@ -159,6 +159,21 @@ mind-keep/
 Verify the following functionality:
 
 - [ ] Extension icon click opens the side panel.
+- [ ] Implement crypto.ts (encryption utilities)
+- [ ] Implement db-service.ts (database operations)
+- [ ] Implement ai-service.ts (AI and embeddings)
+- [ ] Build full Side Panel UI with note management
+- [ ] Add context menu integration
+
+- [ ] Side panel correctly displays, creates, edits, and deletes notes
+- [ ] Highlighting text and right-clicking shows "Save to MindKeep"
+- [ ] Clicking the context menu item opens the side panel with text pre-filled
+- [ ] The keyboard shortcut (Ctrl+Shift+Space) opens the Command Palette
+- [ ] Typing a query like "my ssn" displays the result in the palette
+- [ ] Typing a query like "fill my ssn" pastes the result into a text field
+- [ ] All user data is verifiably stored in IndexedDB and encrypted
+- [ ] The extension works correctly offline
+
 - [ ] Side panel correctly displays, creates, edits, and deletes notes.
 - [ ] Highlighting text and right-clicking shows "Save to MindKeep."
 - [ ] Clicking the context menu item opens the side panel with the text pre-filled.
