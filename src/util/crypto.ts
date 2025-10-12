@@ -2,11 +2,11 @@
  * Crypto utilities for MindKeep
  * Handles encryption and decryption of note content using SubtleCrypto API
  * All operations happen client-side to ensure 100% privacy
- * 
+ *
  * CRITICAL: This service only encrypts/decrypts the content field.
  * It does NOT handle embeddings - that is done by ai-service.ts
  * It does NOT handle storage - that is done by db-service.ts
- * 
+ *
  * Pipeline position:
  * - Encryption: Step 3 (after embedding generation, before storage)
  * - Decryption: Step 3 of retrieval (after database fetch, before display)
@@ -147,11 +147,11 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
 
 /**
  * Encrypts a plaintext string
- * 
+ *
  * IMPORTANT: This function should be called AFTER embedding generation
  * in the save pipeline. Only the content field is encrypted, not the
  * title, category, or embedding vector.
- * 
+ *
  * @param text - The plaintext content to encrypt
  * @returns A base64-encoded string containing the IV and encrypted data
  */
@@ -188,10 +188,10 @@ export async function encrypt(text: string): Promise<string> {
 
 /**
  * Decrypts an encrypted string back to plaintext
- * 
+ *
  * IMPORTANT: This function should be called AFTER database retrieval
  * in the search pipeline. It only decrypts the content field.
- * 
+ *
  * @param encryptedText - The base64-encoded encrypted string
  * @returns The decrypted plaintext content
  */

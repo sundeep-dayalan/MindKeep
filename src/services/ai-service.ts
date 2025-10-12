@@ -2,7 +2,7 @@
  * AI Service for MindKeep
  * Handles embeddings generation and intent classification
  * Uses @xenova/transformers for embeddings and chrome.ai for intent
- * 
+ *
  * CRITICAL: This service only generates embeddings and classifies intent.
  * It does NOT handle encryption - that is done by crypto.ts
  * It does NOT handle storage - that is done by db-service.ts
@@ -39,10 +39,10 @@ export class EmbeddingPipeline {
 
   /**
    * Generate embedding for plaintext content
-   * 
+   *
    * IMPORTANT: This function expects PLAINTEXT input.
    * It should be called BEFORE encryption in the pipeline.
-   * 
+   *
    * @param text - The plaintext content to generate embedding for
    * @returns An array of numbers representing the embedding vector
    */
@@ -70,9 +70,9 @@ export class EmbeddingPipeline {
 /**
  * Generate embedding for a plaintext string
  * This is the primary function used by the background script.
- * 
+ *
  * Pipeline position: Step 2 (after data reception, before encryption)
- * 
+ *
  * @param text - The plaintext content to generate embedding for
  * @returns A promise that resolves to the embedding vector
  */
