@@ -347,78 +347,148 @@ export async function checkAIAvailability(): Promise<{
   }
 }
 
-/**
- * Summarize text using chrome.ai API (Gemini Nano)
- * Generates a concise summary of the provided text
- */
-export async function summarizeText(text: string): Promise<string> {
+const getAiOriginTrialStatus = async () => {
   try {
-    // Check if chrome.ai exists at all
-    if (!("ai" in chrome)) {
-      throw new Error(
-        "Chrome AI is not supported in this browser. You need Chrome 127+ with AI features enabled.\n\n" +
-          "Steps to enable:\n" +
-          "1. Update Chrome to version 127 or later\n" +
-          "2. Go to chrome://flags/#optimization-guide-on-device-model\n" +
-          "3. Set to 'Enabled BypassPerfRequirement'\n" +
-          "4. Go to chrome://flags/#prompt-api-for-gemini-nano\n" +
-          "5. Set to 'Enabled'\n" +
-          "6. Restart Chrome"
-      )
+    if (!("aiOriginTrial" in chrome)) {
+      console.error("Error: chrome.aiOriginTrial not supported in this browser")
+      return
     }
-
-    const ai = (chrome as any).ai
-    if (!ai || !ai.languageModel) {
-      throw new Error(
-        "Chrome AI language model is not available.\n\n" +
-          "Please enable it in:\n" +
-          "chrome://flags/#prompt-api-for-gemini-nano"
+    const defaults = await chrome.aiOriginTrial.languageModel.capabilities()
+    console.log("Model default:", defaults)
+    if (defaults.available !== "readily") {
+      console.error(
+        `Model not yet available (current state: "${defaults.available}")`
       )
+      return
     }
+  } catch (error) {
+    console.error(error)
+  }
+}
+/**
+ * Summarizes text using ONLY the experimental Summarizer API.
+ *
+ * NOTE: This function does not have a fallback. It will fail on any
+ * browser that does not support the API or have it enabled via flags.
+ *
+ * @param textToSummarize The text content to summarize.
+ * @returns A promise that resolves to the summary string.
+ * @throws An error if the API is unavailable or the summarization fails.
+ */
+export async function summarizeText(textToSummarize: string): Promise<string> {
+  // 1. Check if the API exists in the browser at all
+  if (!("Summarizer" in self)) {
+    throw new Error("Summarizer API is not supported in this browser.")
+  }
 
-    // Check capability
-    const capabilities = await ai.languageModel.capabilities()
-    if (capabilities.available === "no") {
-      throw new Error(
-        "Chrome AI is not available on this device. It may not meet the system requirements."
-      )
-    }
+  // 2. Check for a recent user gesture, which is often required
+  if (!navigator.userActivation.isActive) {
+    throw new Error(
+      "Summarization requires a recent user action (e.g., a click)."
+    )
+  }
 
-    if (capabilities.available === "after-download") {
-      throw new Error(
-        "Chrome AI model is downloading. Please wait a few minutes and try again."
-      )
-    }
+  // 3. Check if the on-device model is ready to be used
+  const availability = await Summarizer.availability()
+  if (availability === "unavailable") {
+    throw new Error("Summarizer model is not available on this device.")
+  }
 
-    // Create a session with Gemini Nano
-    const session = await ai.languageModel.create({
-      systemPrompt: `You are a text summarizer. Your task is to create concise, clear summaries.
+  // If all checks pass, proceed with summarization.
+  // A try...finally block ensures we always clean up the summarizer instance.
+  let summarizer
+  try {
+    summarizer = await Summarizer.create()
 
+    const summary = await summarizer.summarize(textToSummarize, {
+      // It's best to put all instructions here for clarity
+      context: `You are a summarizer for a notes app. Create concise, clear summaries. Fix spelling mistakes. Use bullet points for readability if needed.
 Rules:
-- Keep summaries brief and to the point (1-3 sentences max)
-- Capture the main idea or key points
-- Use clear, simple language
-- Don't add information not in the original text
-- Don't use phrases like "This text is about" or "The summary is"
-- Just provide the summary directly`
+- Keep summaries brief and to the point.
+- Capture the main idea or key points.
+- Use clear, simple language.
+- Do not add information not present in the original text.
+- Do not use phrases like "This text is about" or "The summary is".
+- Provide only the summary directly.`
     })
 
-    // Get the response
-    const prompt = `Summarize this text:\n\n${text}`
-    const response = await session.prompt(prompt)
-
-    // Clean up session
-    session.destroy()
-
-    return response.trim()
+    return summary
   } catch (error) {
-    console.error("Error summarizing text:", error)
-    if (error.message) {
-      throw error
+    console.error("An error occurred during summarization:", error)
+    // Re-throw the error to be handled by the calling function
+    throw new Error("Failed to generate summary.")
+  } finally {
+    // 4. IMPORTANT: Always destroy the instance to free up memory
+    if (summarizer) {
+      summarizer.destroy()
     }
-    throw new Error(
-      "Failed to generate summary. Please check Chrome AI settings."
-    )
+  }
+}
+
+/**
+ * Rewrites text using ONLY the experimental Rewriter API.
+ *
+ * NOTE: This function does not have a fallback. It will fail on any
+ * browser that does not support the API or have it enabled via flags.
+ *
+ * @param textToRewrite The text content to rewrite.
+ * @returns A promise that resolves to the rewritten string.
+ * @throws An error if the API is unavailable or the rewrite fails.
+ */
+export async function rewriteText(
+  textToRewrite: string,
+  sharedContext: string
+): Promise<string> {
+  // 1. Check if the API exists in the browser at all
+  if (!("Rewriter" in self)) {
+    throw new Error("Rewriter API is not supported in this browser.")
+  }
+
+  // 2. Check for a recent user gesture, which is often required
+  if (!navigator.userActivation.isActive) {
+    throw new Error("Rewriting requires a recent user action (e.g., a click).")
+  }
+
+  // 3. Check if the on-device model is ready to be used
+  const availability = await Rewriter.availability()
+  if (availability === "unavailable") {
+    throw new Error("Rewriter model is not available on this device.")
+  }
+
+  // If all checks pass, proceed with rewriting.
+  let rewriter
+  try {
+    // Define the core rewriting parameters
+    const options = {
+      length: "shorter", // 'shorter', 'longer', or 'as-is'
+      tone: "more-casual" // 'more-formal', 'more-casual', or 'as-is'
+    }
+
+    if (sharedContext && sharedContext.trim().length > 0) {
+      options.sharedContext = sharedContext
+    }
+
+    rewriter = await Rewriter.create(options)
+
+    // Perform the actual rewrite operation with a specific prompt
+    const result = await rewriter.rewrite(textToRewrite, {
+      context: `You are a text rewriter. Your task is to improve the provided title for the notes. Fix spelling and grammar mistakes.
+Rules:
+- Use clear, simple language. Give simple titles to notes.
+- Do not add new information.
+- Provide only the rewritten title directly.`
+    })
+
+    return result
+  } catch (error) {
+    console.error("An error occurred during rewriting:", error)
+    // Re-throw the error to be handled by the calling function
+    throw new Error("Failed to rewrite text.")
+  } finally {
+    // 4. IMPORTANT: Always destroy the instance to free up memory
+    if (rewriter) {
+      rewriter.destroy()
+    }
   }
 }
 
@@ -426,66 +496,17 @@ Rules:
  * Generate a title from content using chrome.ai API (Gemini Nano)
  * Creates a short, descriptive title based on the content
  */
-export async function generateTitle(content: string): Promise<string> {
+export async function generateTitle(
+  titleContent: string,
+  noteContent: string
+): Promise<string> {
   try {
-    // Check if chrome.ai exists at all
-    if (!("ai" in chrome)) {
-      throw new Error(
-        "Chrome AI is not supported in this browser. You need Chrome 127+ with AI features enabled.\n\n" +
-          "Steps to enable:\n" +
-          "1. Update Chrome to version 127 or later\n" +
-          "2. Go to chrome://flags/#optimization-guide-on-device-model\n" +
-          "3. Set to 'Enabled BypassPerfRequirement'\n" +
-          "4. Go to chrome://flags/#prompt-api-for-gemini-nano\n" +
-          "5. Set to 'Enabled'\n" +
-          "6. Restart Chrome"
-      )
-    }
+    alert(titleContent)
+    alert(noteContent)
 
-    const ai = (chrome as any).ai
-    if (!ai || !ai.languageModel) {
-      throw new Error(
-        "Chrome AI language model is not available.\n\n" +
-          "Please enable it in:\n" +
-          "chrome://flags/#prompt-api-for-gemini-nano"
-      )
-    }
+    const rewrittenContent = await rewriteText(titleContent, noteContent)
 
-    // Check capability
-    const capabilities = await ai.languageModel.capabilities()
-    if (capabilities.available === "no") {
-      throw new Error(
-        "Chrome AI is not available on this device. It may not meet the system requirements."
-      )
-    }
-
-    if (capabilities.available === "after-download") {
-      throw new Error(
-        "Chrome AI model is downloading. Please wait a few minutes and try again."
-      )
-    }
-
-    // Create a session with Gemini Nano
-    const session = await ai.languageModel.create({
-      systemPrompt: `You are a title generator. Your task is to create short, descriptive titles.
-
-Rules:
-- Keep titles very brief (3-7 words max)
-- Capture the main topic or subject
-- Use title case (capitalize main words)
-- Don't use punctuation at the end
-- Don't use quotes
-- Just provide the title directly`
-    })
-
-    // Get the response
-    const prompt = `Generate a title for this content:\n\n${content}`
-    const response = await session.prompt(prompt)
-
-    // Clean up session
-    session.destroy()
-
-    return response.trim()
+    return rewrittenContent
   } catch (error) {
     console.error("Error generating title:", error)
     if (error.message) {

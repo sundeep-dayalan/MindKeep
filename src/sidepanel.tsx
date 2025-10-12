@@ -82,7 +82,7 @@ function SidePanel() {
   }
 
   const handleSaveNote = async () => {
-    if (!noteTitle.trim() || !noteContent.trim()) {
+    if (!noteTitle.trim() || !noteContent?.trim()) {
       alert("Title and content are required")
       return
     }
@@ -199,14 +199,14 @@ function SidePanel() {
   }
 
   const handleGenerateTitle = async () => {
-    if (!noteContent.trim()) {
+    if (!noteContent?.trim()) {
       alert("Please enter some content first")
       return
     }
 
     setIsGeneratingTitle(true)
     try {
-      const generatedTitle = await generateTitle(noteContent)
+      const generatedTitle = await generateTitle(noteTitle, noteContent)
       setNoteTitle(generatedTitle)
     } catch (error) {
       console.error("Error generating title:", error)
@@ -227,7 +227,7 @@ function SidePanel() {
   }
 
   const handleSummarizeContent = async () => {
-    if (!noteContent.trim()) {
+    if (!noteContent?.trim()) {
       alert("Please enter some content first")
       return
     }
@@ -238,18 +238,7 @@ function SidePanel() {
       setNoteContent(summary)
     } catch (error) {
       console.error("Error summarizing content:", error)
-      // Show detailed error message
-      const errorMessage = error.message || "Failed to summarize content"
-      if (
-        confirm(
-          errorMessage +
-            "\n\nWould you like to open Chrome flags to enable AI features?"
-        )
-      ) {
-        chrome.tabs.create({
-          url: "chrome://flags/#optimization-guide-on-device-model"
-        })
-      }
+      alert("Failed to summarize content")
     }
     setIsSummarizing(false)
   }
@@ -441,7 +430,7 @@ function SidePanel() {
                   />
                   <button
                     onClick={handleGenerateTitle}
-                    disabled={isGeneratingTitle || !noteContent.trim()}
+                    disabled={isGeneratingTitle || !noteContent?.trim()}
                     className="plasmo-absolute plasmo-right-2 plasmo-top-1/2 plasmo--translate-y-1/2 plasmo-p-1.5 plasmo-text-purple-600 hover:plasmo-bg-purple-50 plasmo-rounded disabled:plasmo-opacity-40 disabled:plasmo-cursor-not-allowed plasmo-transition-colors"
                     title="Generate title from content using AI">
                     {isGeneratingTitle ? (
@@ -495,7 +484,7 @@ function SidePanel() {
                   />
                   <button
                     onClick={handleSummarizeContent}
-                    disabled={isSummarizing || !noteContent.trim()}
+                    disabled={isSummarizing || !noteContent?.trim()}
                     className="plasmo-absolute plasmo-right-2 plasmo-top-2 plasmo-p-1.5 plasmo-text-purple-600 hover:plasmo-bg-purple-50 plasmo-rounded disabled:plasmo-opacity-40 disabled:plasmo-cursor-not-allowed plasmo-transition-colors"
                     title="Summarize content using AI">
                     {isSummarizing ? (
