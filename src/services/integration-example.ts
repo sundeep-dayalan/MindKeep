@@ -3,8 +3,12 @@
  * This demonstrates the complete workflow for MindKeep
  */
 
-import { addNote, getNote, searchNotesByVector, searchNotesByTitle } from "~services/db-service"
-import { generateEmbedding, getIntent, processQuery } from "~services/ai-service"
+import { generateEmbedding, processQuery } from "~services/ai-service"
+import {
+  addNote,
+  searchNotesByTitle,
+  searchNotesByVector
+} from "~services/db-service"
 
 /**
  * Example 1: Save a new note with embedding

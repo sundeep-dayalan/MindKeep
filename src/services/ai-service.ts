@@ -4,8 +4,8 @@
  * Uses @xenova/transformers for embeddings and chrome.ai for intent
  */
 
-import { pipeline } from "@xenova/transformers"
 import type { FeatureExtractionPipeline } from "@xenova/transformers"
+import { pipeline } from "@xenova/transformers"
 
 // Embedding model
 const EMBEDDING_MODEL = "Xenova/all-MiniLM-L6-v2"
@@ -87,7 +87,10 @@ async function isChromeAIAvailable(): Promise<boolean> {
 
     // Check capability
     const capabilities = await ai.languageModel.capabilities()
-    return capabilities.available === "readily" || capabilities.available === "after-download"
+    return (
+      capabilities.available === "readily" ||
+      capabilities.available === "after-download"
+    )
   } catch (error) {
     console.error("Chrome AI not available:", error)
     return false

@@ -4,9 +4,10 @@
  * Integrates with crypto.ts for encryption/decryption
  */
 
-import { ChromaClient } from "chromadb"
 import type { Collection } from "chromadb"
-import { encrypt, decrypt } from "~util/crypto"
+import { ChromaClient } from "chromadb"
+
+import { decrypt, encrypt } from "~util/crypto"
 
 // Note interface
 export interface Note {
