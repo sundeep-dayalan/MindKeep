@@ -1,27 +1,30 @@
 import { useEffect, useState } from "react"
 
-import { checkAIAvailability } from "~services/ai-service"
+import {
+  checkAllAIServices,
+  type HealthCheckStatus
+} from "~services/ai-service"
 
 export function AIStatusBanner() {
-  const [aiStatus, setAiStatus] = useState<{
-    available: boolean
-    status: string
-    message: string
-  } | null>(null)
+  const [aiStatus, setAiStatus] = useState<HealthCheckStatus[]>(null)
   const [dismissed, setDismissed] = useState(false)
   const [showDebug, setShowDebug] = useState(false)
 
   useEffect(() => {
-    checkAIAvailability().then(setAiStatus)
+    checkAllAIServices().then(setAiStatus)
   }, [])
 
   const recheckStatus = async () => {
-    const status = await checkAIAvailability()
+    const status = await checkAllAIServices()
     setAiStatus(status)
     console.log("AI Status:", status)
   }
 
-  if (!aiStatus || dismissed || aiStatus.available) {
+  if (
+    !aiStatus ||
+    dismissed ||
+    aiStatus.every((service) => service.available)
+  ) {
     return null
   }
 
@@ -63,9 +66,9 @@ export function AIStatusBanner() {
             AI Features Not Available
           </h3>
           <p className="plasmo-text-xs plasmo-text-yellow-700 plasmo-mt-1">
-            {aiStatus.message}
+            {aiStatus[0].message}
           </p>
-          {aiStatus.status === "not-supported" && (
+          {aiStatus[0].status === "not-supported" && (
             <div className="plasmo-mt-2 plasmo-p-2 plasmo-bg-blue-50 plasmo-border plasmo-border-blue-200 plasmo-rounded plasmo-text-xs">
               <p className="plasmo-text-blue-900 plasmo-font-medium plasmo-mb-1">
                 💡 Chrome AI may not be available on your platform yet
@@ -75,16 +78,19 @@ export function AIStatusBanner() {
                 <strong>Chrome Canary</strong> which have better AI support.
                 MindKeep will work fine without AI features - you'll just need
                 to write titles and summaries manually.
+                <pre className="plasmo-mt-2 plasmo-text-xs plasmo-text-blue-900 plasmo-bg-blue-100 plasmo-rounded plasmo-p-2 plasmo-overflow-x-auto">
+                  {JSON.stringify(aiStatus, null, 2)}
+                </pre>
               </p>
             </div>
           )}
           {showDebug && (
             <div className="plasmo-mt-2 plasmo-p-2 plasmo-bg-yellow-100 plasmo-rounded plasmo-text-xs plasmo-font-mono">
               <div>
-                <strong>Status:</strong> {aiStatus.status}
+                <strong>Status:</strong> {aiStatus[0].status}
               </div>
               <div>
-                <strong>Available:</strong> {String(aiStatus.available)}
+                <strong>Available:</strong> {String(aiStatus[0].available)}
               </div>
               <div>
                 <strong>Chrome AI API:</strong> {String("ai" in chrome)}
@@ -104,7 +110,7 @@ export function AIStatusBanner() {
               className="plasmo-text-xs plasmo-px-3 plasmo-py-1 plasmo-bg-blue-600 plasmo-text-white plasmo-rounded hover:plasmo-bg-blue-700 plasmo-transition-colors">
               ↻ Recheck
             </button>
-            {aiStatus.status === "not-supported" ? (
+            {aiStatus[0].status === "not-supported" ? (
               <>
                 <button
                   onClick={handleDownloadChromeDev}

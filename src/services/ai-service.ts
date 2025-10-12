@@ -291,80 +291,135 @@ export async function generateBatchEmbeddings(
   }
 }
 
-/**
- * Check chrome.ai availability and download status
- */
-export async function checkAIAvailability(): Promise<{
+// Define a shared type for the status object for consistency
+export type HealthCheckStatus = {
+  api: string
   available: boolean
   status: string
   message: string
-}> {
+}
+
+/**
+ * Checks the availability of the experimental Summarizer API.
+ */
+export async function checkSummarizerAvailability(): Promise<HealthCheckStatus> {
+  const apiName = "Summarizer"
   try {
-    if (!("ai" in chrome)) {
+    if (!("Summarizer" in self)) {
       return {
+        api: apiName,
         available: false,
         status: "not-supported",
-        message: "Chrome AI API is not supported in this browser"
+        message: "Not supported. Enable #summarizer-api flag."
       }
     }
 
-    const ai = (chrome as any).ai
-    if (!ai || !ai.languageModel) {
+    const availability = await Summarizer.availability()
+    if (availability === "unavailable") {
       return {
+        api: apiName,
         available: false,
-        status: "not-supported",
-        message: "Language model API is not available"
+        status: "unavailable",
+        message: "Not available on this device."
       }
-    }
-
-    const capabilities = await ai.languageModel.capabilities()
-
-    if (capabilities.available === "readily") {
+    } else if (availability === "available-after-download") {
       return {
-        available: true,
-        status: "ready",
-        message: "Chrome AI is ready to use"
-      }
-    } else if (capabilities.available === "after-download") {
-      return {
+        api: apiName,
         available: true,
         status: "downloading",
-        message: "Chrome AI model is downloading. It will be available soon."
+        message: "Model is downloading."
       }
     } else {
       return {
-        available: false,
-        status: "no",
-        message: "Chrome AI is not available on this device"
+        api: apiName,
+        available: true,
+        status: "ready",
+        message: "Ready to use."
       }
     }
   } catch (error) {
     return {
+      api: apiName,
       available: false,
       status: "error",
-      message: `Error checking availability: ${error}`
+      message: `Error: ${error}`
     }
   }
 }
 
-const getAiOriginTrialStatus = async () => {
+/**
+ * Checks the availability of the experimental Rewriter API.
+ */
+export async function checkRewriterAvailability(): Promise<HealthCheckStatus> {
+  const apiName = "Rewriter"
   try {
-    if (!("aiOriginTrial" in chrome)) {
-      console.error("Error: chrome.aiOriginTrial not supported in this browser")
-      return
+    if (!("Rewriter" in self)) {
+      return {
+        api: apiName,
+        available: false,
+        status: "not-supported",
+        message: "Not supported. Enable #rewriter-api flag."
+      }
     }
-    const defaults = await chrome.aiOriginTrial.languageModel.capabilities()
-    console.log("Model default:", defaults)
-    if (defaults.available !== "readily") {
-      console.error(
-        `Model not yet available (current state: "${defaults.available}")`
-      )
-      return
+
+    const availability = await Rewriter.availability()
+    if (availability === "unavailable") {
+      return {
+        api: apiName,
+        available: false,
+        status: "unavailable",
+        message: "Not available on this device."
+      }
+    } else if (availability === "available-after-download") {
+      return {
+        api: apiName,
+        available: true,
+        status: "downloading",
+        message: "Model is downloading."
+      }
+    } else {
+      return {
+        api: apiName,
+        available: true,
+        status: "ready",
+        message: "Ready to use."
+      }
     }
   } catch (error) {
-    console.error(error)
+    return {
+      api: apiName,
+      available: false,
+      status: "error",
+      message: `Error: ${error}`
+    }
   }
 }
+
+/**
+ * Runs a health check on all available on-device AI services.
+ * @returns A promise that resolves to an array of status objects.
+ */
+export async function checkAllAIServices(): Promise<HealthCheckStatus[]> {
+  try {
+    const statuses = await Promise.all([
+      checkSummarizerAvailability(),
+      checkRewriterAvailability()
+    ])
+    return statuses
+  } catch (error) {
+    console.error("A critical error occurred during AI health checks:", error)
+    // Return a single error object if the Promise.all itself fails
+    return [
+      {
+        api: "System",
+        available: false,
+        status: "error",
+        message: "Failed to check AI services."
+      }
+    ]
+  }
+}
+
 /**
  * Summarizes text using ONLY the experimental Summarizer API.
  *
@@ -377,21 +432,9 @@ const getAiOriginTrialStatus = async () => {
  */
 export async function summarizeText(textToSummarize: string): Promise<string> {
   // 1. Check if the API exists in the browser at all
-  if (!("Summarizer" in self)) {
-    throw new Error("Summarizer API is not supported in this browser.")
-  }
-
-  // 2. Check for a recent user gesture, which is often required
-  if (!navigator.userActivation.isActive) {
-    throw new Error(
-      "Summarization requires a recent user action (e.g., a click)."
-    )
-  }
-
-  // 3. Check if the on-device model is ready to be used
-  const availability = await Summarizer.availability()
-  if (availability === "unavailable") {
-    throw new Error("Summarizer model is not available on this device.")
+  const status = await checkSummarizerAvailability()
+  if (status.available === false) {
+    throw new Error(`Summarizer API is not available: ${status.message}`)
   }
 
   // If all checks pass, proceed with summarization.
@@ -440,19 +483,9 @@ export async function rewriteText(
   sharedContext: string
 ): Promise<string> {
   // 1. Check if the API exists in the browser at all
-  if (!("Rewriter" in self)) {
-    throw new Error("Rewriter API is not supported in this browser.")
-  }
-
-  // 2. Check for a recent user gesture, which is often required
-  if (!navigator.userActivation.isActive) {
-    throw new Error("Rewriting requires a recent user action (e.g., a click).")
-  }
-
-  // 3. Check if the on-device model is ready to be used
-  const availability = await Rewriter.availability()
-  if (availability === "unavailable") {
-    throw new Error("Rewriter model is not available on this device.")
+  const status = await checkRewriterAvailability()
+  if (status.available === false) {
+    throw new Error(`Rewriter API is not available: ${status.message}`)
   }
 
   // If all checks pass, proceed with rewriting.
