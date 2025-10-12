@@ -29,7 +29,7 @@ export interface Note {
 export interface StoredNote {
   id: string
   title: string // Plaintext for searching/filtering
-  content: string // ENCRYPTED content (base64 string)
+  encryptedContent: string // ENCRYPTED content (base64 string)
   category: string // Plaintext for filtering
   embedding?: number[] // Plaintext vector for semantic search
   createdAt: number
@@ -43,6 +43,7 @@ const DB_VERSION = 1
 const STORE_NAME = "notes"
 
 let dbInstance: IDBDatabase | null = null
+let migrationRun = false
 
 /**
  * Initialize IndexedDB
@@ -52,12 +53,13 @@ async function initializeDB(): Promise<IDBDatabase> {
     return dbInstance
   }
 
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
 
     request.onerror = () => reject(request.error)
-    request.onsuccess = () => {
+    request.onsuccess = async () => {
       dbInstance = request.result
+
       resolve(dbInstance)
     }
 
@@ -357,7 +359,7 @@ export async function getAllNotes(): Promise<Note[]> {
     for (const storedNote of storedNotes) {
       try {
         // Decrypt the content field
-        const content = await decrypt(storedNote.content)
+        const content = await decrypt(storedNote.encryptedContent)
         notes.push({
           id: storedNote.id,
           title: storedNote.title,
