@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+
 import { checkAIAvailability } from "~services/ai-service"
 
 export function AIStatusBanner() {
@@ -25,7 +26,9 @@ export function AIStatusBanner() {
   }
 
   const handleEnableAI = () => {
-    chrome.tabs.create({ url: "chrome://flags/#optimization-guide-on-device-model" })
+    chrome.tabs.create({
+      url: "chrome://flags/#optimization-guide-on-device-model"
+    })
   }
 
   const handleCheckComponents = () => {
@@ -68,18 +71,31 @@ export function AIStatusBanner() {
                 💡 Chrome AI may not be available on your platform yet
               </p>
               <p className="plasmo-text-blue-700">
-                Try <strong>Chrome Dev</strong> or <strong>Chrome Canary</strong> which have better AI support. 
-                MindKeep will work fine without AI features - you'll just need to write titles and summaries manually.
+                Try <strong>Chrome Dev</strong> or{" "}
+                <strong>Chrome Canary</strong> which have better AI support.
+                MindKeep will work fine without AI features - you'll just need
+                to write titles and summaries manually.
               </p>
             </div>
           )}
           {showDebug && (
             <div className="plasmo-mt-2 plasmo-p-2 plasmo-bg-yellow-100 plasmo-rounded plasmo-text-xs plasmo-font-mono">
-              <div><strong>Status:</strong> {aiStatus.status}</div>
-              <div><strong>Available:</strong> {String(aiStatus.available)}</div>
-              <div><strong>Chrome AI API:</strong> {String("ai" in chrome)}</div>
-              <div><strong>Chrome Version:</strong> {navigator.userAgent.match(/Chrome\/(\d+)/)?.[1]}</div>
-              <div><strong>Platform:</strong> {navigator.platform}</div>
+              <div>
+                <strong>Status:</strong> {aiStatus.status}
+              </div>
+              <div>
+                <strong>Available:</strong> {String(aiStatus.available)}
+              </div>
+              <div>
+                <strong>Chrome AI API:</strong> {String("ai" in chrome)}
+              </div>
+              <div>
+                <strong>Chrome Version:</strong>{" "}
+                {navigator.userAgent.match(/Chrome\/(\d+)/)?.[1]}
+              </div>
+              <div>
+                <strong>Platform:</strong> {navigator.platform}
+              </div>
             </div>
           )}
           <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-2 plasmo-mt-2">
@@ -130,7 +146,10 @@ export function AIStatusBanner() {
         <button
           onClick={() => setDismissed(true)}
           className="plasmo-flex-shrink-0 plasmo-text-yellow-600 hover:plasmo-text-yellow-800">
-          <svg className="plasmo-w-4 plasmo-h-4" fill="currentColor" viewBox="0 0 20 20">
+          <svg
+            className="plasmo-w-4 plasmo-h-4"
+            fill="currentColor"
+            viewBox="0 0 20 20">
             <path
               fillRule="evenodd"
               d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"

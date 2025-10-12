@@ -2,6 +2,8 @@ import { useEffect, useState } from "react"
 
 import "~style.css"
 
+import { AIStatusBanner } from "~components/AIStatusBanner"
+import { generateTitle, summarizeText } from "~services/ai-service"
 import {
   deleteNote,
   getAllCategories,
@@ -9,8 +11,6 @@ import {
   searchNotesByTitle,
   type Note
 } from "~services/db-service"
-import { generateTitle, summarizeText } from "~services/ai-service"
-import { AIStatusBanner } from "~components/AIStatusBanner"
 
 type View = "list" | "editor"
 
@@ -212,8 +212,15 @@ function SidePanel() {
       console.error("Error generating title:", error)
       // Show detailed error message
       const errorMessage = error.message || "Failed to generate title"
-      if (confirm(errorMessage + "\n\nWould you like to open Chrome flags to enable AI features?")) {
-        chrome.tabs.create({ url: "chrome://flags/#optimization-guide-on-device-model" })
+      if (
+        confirm(
+          errorMessage +
+            "\n\nWould you like to open Chrome flags to enable AI features?"
+        )
+      ) {
+        chrome.tabs.create({
+          url: "chrome://flags/#optimization-guide-on-device-model"
+        })
       }
     }
     setIsGeneratingTitle(false)
@@ -233,8 +240,15 @@ function SidePanel() {
       console.error("Error summarizing content:", error)
       // Show detailed error message
       const errorMessage = error.message || "Failed to summarize content"
-      if (confirm(errorMessage + "\n\nWould you like to open Chrome flags to enable AI features?")) {
-        chrome.tabs.create({ url: "chrome://flags/#optimization-guide-on-device-model" })
+      if (
+        confirm(
+          errorMessage +
+            "\n\nWould you like to open Chrome flags to enable AI features?"
+        )
+      ) {
+        chrome.tabs.create({
+          url: "chrome://flags/#optimization-guide-on-device-model"
+        })
       }
     }
     setIsSummarizing(false)
@@ -273,7 +287,7 @@ function SidePanel() {
         <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-p-4">
           {/* AI Status Banner */}
           <AIStatusBanner />
-          
+
           {view === "list" ? (
             <>
               {/* Search and Filters */}

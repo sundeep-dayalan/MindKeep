@@ -357,13 +357,13 @@ export async function summarizeText(text: string): Promise<string> {
     if (!("ai" in chrome)) {
       throw new Error(
         "Chrome AI is not supported in this browser. You need Chrome 127+ with AI features enabled.\n\n" +
-        "Steps to enable:\n" +
-        "1. Update Chrome to version 127 or later\n" +
-        "2. Go to chrome://flags/#optimization-guide-on-device-model\n" +
-        "3. Set to 'Enabled BypassPerfRequirement'\n" +
-        "4. Go to chrome://flags/#prompt-api-for-gemini-nano\n" +
-        "5. Set to 'Enabled'\n" +
-        "6. Restart Chrome"
+          "Steps to enable:\n" +
+          "1. Update Chrome to version 127 or later\n" +
+          "2. Go to chrome://flags/#optimization-guide-on-device-model\n" +
+          "3. Set to 'Enabled BypassPerfRequirement'\n" +
+          "4. Go to chrome://flags/#prompt-api-for-gemini-nano\n" +
+          "5. Set to 'Enabled'\n" +
+          "6. Restart Chrome"
       )
     }
 
@@ -371,8 +371,8 @@ export async function summarizeText(text: string): Promise<string> {
     if (!ai || !ai.languageModel) {
       throw new Error(
         "Chrome AI language model is not available.\n\n" +
-        "Please enable it in:\n" +
-        "chrome://flags/#prompt-api-for-gemini-nano"
+          "Please enable it in:\n" +
+          "chrome://flags/#prompt-api-for-gemini-nano"
       )
     }
 
@@ -416,7 +416,9 @@ Rules:
     if (error.message) {
       throw error
     }
-    throw new Error("Failed to generate summary. Please check Chrome AI settings.")
+    throw new Error(
+      "Failed to generate summary. Please check Chrome AI settings."
+    )
   }
 }
 
@@ -430,13 +432,13 @@ export async function generateTitle(content: string): Promise<string> {
     if (!("ai" in chrome)) {
       throw new Error(
         "Chrome AI is not supported in this browser. You need Chrome 127+ with AI features enabled.\n\n" +
-        "Steps to enable:\n" +
-        "1. Update Chrome to version 127 or later\n" +
-        "2. Go to chrome://flags/#optimization-guide-on-device-model\n" +
-        "3. Set to 'Enabled BypassPerfRequirement'\n" +
-        "4. Go to chrome://flags/#prompt-api-for-gemini-nano\n" +
-        "5. Set to 'Enabled'\n" +
-        "6. Restart Chrome"
+          "Steps to enable:\n" +
+          "1. Update Chrome to version 127 or later\n" +
+          "2. Go to chrome://flags/#optimization-guide-on-device-model\n" +
+          "3. Set to 'Enabled BypassPerfRequirement'\n" +
+          "4. Go to chrome://flags/#prompt-api-for-gemini-nano\n" +
+          "5. Set to 'Enabled'\n" +
+          "6. Restart Chrome"
       )
     }
 
@@ -444,8 +446,8 @@ export async function generateTitle(content: string): Promise<string> {
     if (!ai || !ai.languageModel) {
       throw new Error(
         "Chrome AI language model is not available.\n\n" +
-        "Please enable it in:\n" +
-        "chrome://flags/#prompt-api-for-gemini-nano"
+          "Please enable it in:\n" +
+          "chrome://flags/#prompt-api-for-gemini-nano"
       )
     }
 
@@ -489,6 +491,8 @@ Rules:
     if (error.message) {
       throw error
     }
-    throw new Error("Failed to generate title. Please check Chrome AI settings.")
+    throw new Error(
+      "Failed to generate title. Please check Chrome AI settings."
+    )
   }
 }
