@@ -2,16 +2,13 @@ import { useEffect, useState } from "react"
 import "~style.css"
 
 import {
-  addNote,
   deleteNote,
   getAllCategories,
   getAllNotes,
   getNotesByCategory,
   searchNotesByTitle,
-  updateNote,
   type Note
 } from "~services/db-service"
-import { generateEmbedding } from "~services/ai-service"
 
 type View = "list" | "editor"
 
@@ -98,37 +95,54 @@ function SidePanel() {
         return
       }
 
-      // Generate embedding (optional - note will save even if this fails)
-      let embedding: number[] | undefined
-      try {
-        console.log("Generating embedding...")
-        embedding = await generateEmbedding(`${noteTitle} ${noteContent}`)
-        console.log("Embedding generated successfully:", embedding?.length, "dimensions")
-      } catch (embeddingError) {
-        console.warn("Failed to generate embedding, saving without it:", embeddingError)
-        // Continue without embedding
-      }
-
-      console.log("Saving note:", { title: noteTitle, category: finalCategory, hasEmbedding: !!embedding })
-
       if (editingNote) {
+        // For updates, we need to handle encryption/embedding in background
         console.log("Updating existing note:", editingNote.id)
-        const result = await updateNote(editingNote.id, {
-          title: noteTitle,
-          content: noteContent,
-          category: finalCategory,
-          embedding
+        
+        // Send update request to background script
+        const response = await chrome.runtime.sendMessage({
+          type: "UPDATE_NOTE",
+          data: {
+            id: editingNote.id,
+            title: noteTitle,
+            content: noteContent,
+            category: finalCategory
+          }
         })
-        console.log("Update result:", result)
+
+        if (!response.success) {
+          throw new Error(response.error || "Update failed")
+        }
+        console.log("Update result:", response.note)
       } else {
-        console.log("Adding new note")
-        const result = await addNote({
-          title: noteTitle,
-          content: noteContent,
-          category: finalCategory,
-          embedding
+        // For new notes, use background script pipeline
+        console.log("📝 Creating new note via background script...")
+        
+        // Get current tab URL for sourceUrl
+        let sourceUrl: string | undefined
+        try {
+          const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+          sourceUrl = tabs[0]?.url
+        } catch (e) {
+          console.warn("Could not get tab URL:", e)
+        }
+
+        // Send to background script for processing
+        const response = await chrome.runtime.sendMessage({
+          type: "SAVE_NOTE",
+          data: {
+            title: noteTitle,
+            content: noteContent, // Send PLAINTEXT - background will encrypt
+            category: finalCategory,
+            sourceUrl
+          }
         })
-        console.log("Add result:", result)
+
+        if (!response.success) {
+          throw new Error(response.error || "Save failed")
+        }
+        
+        console.log("✅ Note saved successfully:", response.note)
       }
 
       console.log("Reloading data...")
@@ -136,7 +150,7 @@ function SidePanel() {
       console.log("Switching to list view")
       setView("list")
     } catch (error) {
-      console.error("Error saving note:", error)
+      console.error("❌ Error saving note:", error)
       alert(`Failed to save note: ${error.message || error}`)
     }
     setLoading(false)

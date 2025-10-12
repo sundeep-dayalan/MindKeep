@@ -9,7 +9,11 @@
  */
 
 import type { FeatureExtractionPipeline } from "@xenova/transformers"
-import { pipeline } from "@xenova/transformers"
+import { pipeline, env } from "@xenova/transformers"
+
+// Configure transformers.js for Chrome extension environment
+env.allowLocalModels = false
+env.useBrowserCache = true
 
 // Embedding model
 const EMBEDDING_MODEL = "Xenova/all-MiniLM-L6-v2"
