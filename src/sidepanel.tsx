@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react"
+
 import "~style.css"
 
 import {
   deleteNote,
   getAllCategories,
   getAllNotes,
-  getNotesByCategory,
   searchNotesByTitle,
   type Note
 } from "~services/db-service"
@@ -98,7 +98,7 @@ function SidePanel() {
       if (editingNote) {
         // For updates, we need to handle encryption/embedding in background
         console.log("Updating existing note:", editingNote.id)
-        
+
         // Send update request to background script
         const response = await chrome.runtime.sendMessage({
           type: "UPDATE_NOTE",
@@ -117,11 +117,14 @@ function SidePanel() {
       } else {
         // For new notes, use background script pipeline
         console.log("📝 Creating new note via background script...")
-        
+
         // Get current tab URL for sourceUrl
         let sourceUrl: string | undefined
         try {
-          const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+          const tabs = await chrome.tabs.query({
+            active: true,
+            currentWindow: true
+          })
           sourceUrl = tabs[0]?.url
         } catch (e) {
           console.warn("Could not get tab URL:", e)
@@ -141,7 +144,7 @@ function SidePanel() {
         if (!response.success) {
           throw new Error(response.error || "Save failed")
         }
-        
+
         console.log("✅ Note saved successfully:", response.note)
       }
 

@@ -20,7 +20,7 @@
  */
 
 import { generateEmbedding, getIntent } from "~services/ai-service"
-import { addNote, updateNote, searchNotesByVector, searchNotesByTitle } from "~services/db-service"
+import { addNote, searchNotesByVector, updateNote } from "~services/db-service"
 import { encrypt } from "~util/crypto"
 
 export {}
@@ -181,7 +181,7 @@ async function handleSaveNote(data: {
 
 /**
  * UPDATE PIPELINE ORCHESTRATOR
- * 
+ *
  * Steps:
  * 1. Receive note ID and update data
  * 2. Generate new embedding if content changed (from PLAINTEXT)
@@ -196,37 +196,39 @@ async function handleUpdateNote(data: {
 }): Promise<{ success: boolean; note?: any; error?: string }> {
   try {
     console.log("✏️ Starting update pipeline for note:", data.id)
-    
+
     const { id, title, category, content } = data
     const updates: any = {}
-    
+
     // Update title/category if provided (no processing needed)
     if (title !== undefined) updates.title = title
     if (category !== undefined) updates.category = category
-    
+
     // If content is being updated, process it through the pipeline
     if (content !== undefined) {
       console.log("🔢 Generating new embedding from plaintext content...")
       const embeddingVector = await generateEmbedding(content)
-      console.log(`✅ Embedding generated: ${embeddingVector.length} dimensions`)
-      
+      console.log(
+        `✅ Embedding generated: ${embeddingVector.length} dimensions`
+      )
+
       console.log("🔒 Encrypting new content...")
       const encryptedContent = await encrypt(content)
       console.log("✅ Content encrypted")
-      
+
       updates.content = encryptedContent
       updates.embedding = embeddingVector
     }
-    
+
     console.log("💾 Updating in database...")
     const updatedNote = await updateNote(id, updates)
-    
+
     if (!updatedNote) {
       throw new Error("Note not found")
     }
-    
+
     console.log("✅ Note updated successfully:", updatedNote.id)
-    
+
     return {
       success: true,
       note: updatedNote

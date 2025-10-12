@@ -9,7 +9,7 @@
  */
 
 import type { FeatureExtractionPipeline } from "@xenova/transformers"
-import { pipeline, env } from "@xenova/transformers"
+import { env, pipeline } from "@xenova/transformers"
 
 // Configure transformers.js for Chrome extension environment
 env.allowLocalModels = false
