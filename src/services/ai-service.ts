@@ -2,6 +2,10 @@
  * AI Service for MindKeep
  * Handles embeddings generation and intent classification
  * Uses @xenova/transformers for embeddings and chrome.ai for intent
+ * 
+ * CRITICAL: This service only generates embeddings and classifies intent.
+ * It does NOT handle encryption - that is done by crypto.ts
+ * It does NOT handle storage - that is done by db-service.ts
  */
 
 import type { FeatureExtractionPipeline } from "@xenova/transformers"
@@ -34,13 +38,19 @@ export class EmbeddingPipeline {
   }
 
   /**
-   * Generate embedding for a text
+   * Generate embedding for plaintext content
+   * 
+   * IMPORTANT: This function expects PLAINTEXT input.
+   * It should be called BEFORE encryption in the pipeline.
+   * 
+   * @param text - The plaintext content to generate embedding for
+   * @returns An array of numbers representing the embedding vector
    */
   static async generateEmbedding(text: string): Promise<number[]> {
     try {
       const pipeline = await this.getInstance()
 
-      // Generate embedding
+      // Generate embedding from plaintext
       const output = await pipeline(text, {
         pooling: "mean",
         normalize: true
@@ -58,7 +68,13 @@ export class EmbeddingPipeline {
 }
 
 /**
- * Generate embedding for a text string
+ * Generate embedding for a plaintext string
+ * This is the primary function used by the background script.
+ * 
+ * Pipeline position: Step 2 (after data reception, before encryption)
+ * 
+ * @param text - The plaintext content to generate embedding for
+ * @returns A promise that resolves to the embedding vector
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
   return EmbeddingPipeline.generateEmbedding(text)
@@ -268,52 +284,6 @@ export async function generateBatchEmbeddings(
   } catch (error) {
     console.error("Error generating batch embeddings:", error)
     throw new Error("Failed to generate batch embeddings")
-  }
-}
-
-/**
- * Test the AI service functionality
- */
-export async function testAIService(): Promise<void> {
-  console.log("🧪 Testing AI Service...")
-
-  try {
-    // Test embedding generation
-    console.log("\n1. Testing embedding generation...")
-    const testText = "Hello, MindKeep!"
-    const embedding = await generateEmbedding(testText)
-    console.log(`✅ Generated embedding with ${embedding.length} dimensions`)
-    console.log(`   First 5 values: [${embedding.slice(0, 5).join(", ")}...]`)
-
-    // Test intent classification - display
-    console.log("\n2. Testing intent classification (display)...")
-    const displayQuery = "show me my password"
-    const displayIntent = await getIntent(displayQuery)
-    console.log(`   Query: "${displayQuery}"`)
-    console.log(`   Intent: ${displayIntent}`)
-    console.log(
-      displayIntent === "display" ? "   ✅ Correct!" : "   ❌ Incorrect"
-    )
-
-    // Test intent classification - fill
-    console.log("\n3. Testing intent classification (fill)...")
-    const fillQuery = "fill my email address"
-    const fillIntent = await getIntent(fillQuery)
-    console.log(`   Query: "${fillQuery}"`)
-    console.log(`   Intent: ${fillIntent}`)
-    console.log(fillIntent === "fill" ? "   ✅ Correct!" : "   ❌ Incorrect")
-
-    // Test process query
-    console.log("\n4. Testing processQuery...")
-    const result = await processQuery("what is my ssn")
-    console.log(`   Query: "${result.query}"`)
-    console.log(`   Intent: ${result.intent}`)
-    console.log(`   Embedding dimensions: ${result.embedding.length}`)
-    console.log("   ✅ Success!")
-
-    console.log("\n✅ All AI service tests passed!")
-  } catch (error) {
-    console.error("\n❌ AI service test failed:", error)
   }
 }
 
