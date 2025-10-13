@@ -445,6 +445,38 @@ export async function searchNotesByVector(
 }
 
 /**
+ * Search notes semantically and return with full decrypted content
+ * This is specifically for AI search where we need all content to summarize
+ *
+ * @param vector - The query embedding vector
+ * @param limit - Maximum number of results to return
+ * @returns Array of notes with decrypted content and combined text for summarization
+ */
+export async function searchNotesSemanticWithContent(
+  vector: number[],
+  limit: number = 5
+): Promise<{ notes: Note[]; combinedContent: string }> {
+  try {
+    const matchingNotes = await searchNotesByVector(vector, limit)
+    
+    if (matchingNotes.length === 0) {
+      return { notes: [], combinedContent: "" }
+    }
+
+    const combinedContent = matchingNotes
+      .map((note, idx) => {
+        return `Note ${idx + 1}: ${note.title}\n${note.content}\n---`
+      })
+      .join("\n\n")
+
+    return { notes: matchingNotes, combinedContent }
+  } catch (error) {
+    console.error("Error in semantic search with content:", error)
+    return { notes: [], combinedContent: "" }
+  }
+}
+
+/**
  * Search notes by title
  */
 export async function searchNotesByTitle(query: string): Promise<Note[]> {

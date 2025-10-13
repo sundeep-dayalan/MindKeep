@@ -14,6 +14,7 @@ import {
   getAllCategories,
   getAllNotes,
   searchNotesByTitle,
+  searchNotesSemanticWithContent,
   type Note
 } from "~services/db-service"
 
@@ -288,6 +289,40 @@ function SidePanel() {
       alert("Failed to summarize content")
     }
     setIsSummarizing(false)
+  }
+
+  const handleAISearch = async (query: string): Promise<string> => {
+    try {
+      console.log("🔍 AI Search started for query:", query)
+
+      console.log("🔢 Generating embedding for query...")
+      const queryEmbedding = await generateEmbedding(query)
+      console.log(
+        `✅ Query embedding generated: ${queryEmbedding.length} dimensions`
+      )
+
+      console.log("🔎 Searching for similar notes...")
+      const { notes: matchingNotes, combinedContent } =
+        await searchNotesSemanticWithContent(queryEmbedding, 5)
+
+      if (matchingNotes.length === 0) {
+        return "I couldn't find any notes related to your query. Try adding more notes or rephrasing your question."
+      }
+
+      console.log(`📝 Found ${matchingNotes.length} matching notes`)
+      console.log("📄 Combined content length:", combinedContent.length)
+
+      console.log("🤖 Summarizing results using AI...")
+      const prompt = `Based on the following notes, answer this question: "${query}"\n\n${combinedContent}\n\nProvide a clear, concise answer based only on the information in these notes.`
+
+      const summary = await summarizeText(prompt)
+      console.log("✅ AI Search completed successfully")
+
+      return summary
+    } catch (error) {
+      console.error("❌ AI Search error:", error)
+      return "I encountered an error while searching. Please try again."
+    }
   }
 
   return (
@@ -822,10 +857,7 @@ function SidePanel() {
         <div className="plasmo-fixed plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-bg-white plasmo-border-t plasmo-border-slate-200 plasmo-shadow-lg plasmo-p-4">
           <AISearchBar
             placeholder="Ask me anything..."
-            onSearch={(query) => {
-              // TODO: Handle AI search
-              console.log("AI Search query:", query)
-            }}
+            onSearch={handleAISearch}
           />
         </div>
       </div>
