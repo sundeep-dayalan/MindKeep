@@ -79,7 +79,8 @@ export function AISearchBar({
   }
 
   return (
-    <div className={`plasmo-flex plasmo-flex-col plasmo-space-y-2 ${className}`}>
+    <div
+      className={`plasmo-flex plasmo-flex-col plasmo-space-y-2 ${className}`}>
       {/* Ask AI Label with Toggle */}
       <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-px-1">
         <div className="plasmo-flex plasmo-items-center plasmo-gap-1.5">
@@ -93,7 +94,7 @@ export function AISearchBar({
             Ask AI
           </span>
         </div>
-        
+
         {messages.length > 0 && (
           <button
             onClick={() => setIsChatExpanded(!isChatExpanded)}

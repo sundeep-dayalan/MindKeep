@@ -458,7 +458,7 @@ export async function searchNotesSemanticWithContent(
 ): Promise<{ notes: Note[]; combinedContent: string }> {
   try {
     const matchingNotes = await searchNotesByVector(vector, limit)
-    
+
     if (matchingNotes.length === 0) {
       return { notes: [], combinedContent: "" }
     }
