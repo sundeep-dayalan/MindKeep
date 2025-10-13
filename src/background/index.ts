@@ -19,8 +19,8 @@
  * 5. Return complete, readable notes to UI
  */
 
-import { generateEmbedding, getIntent } from "~services/ai-service"
-import { addNote, searchNotesByVector, updateNote } from "~services/db-service"
+import { generateEmbedding } from "~services/ai-service"
+import { addNote, updateNote } from "~services/db-service"
 import { encrypt } from "~util/crypto"
 
 export {}
@@ -103,9 +103,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         case "UPDATE_NOTE":
           return await handleUpdateNote(message.data)
-
-        case "SEARCH_NOTES":
-          return await handleSearchNotes(message.data)
 
         default:
           return { success: false, error: "Unknown message type" }
@@ -257,61 +254,6 @@ async function handleUpdateNote(data: {
     }
   } catch (error) {
     console.error("❌ Update pipeline failed:", error)
-    return {
-      success: false,
-      error: String(error)
-    }
-  }
-}
-
-/**
- * SEARCH PIPELINE ORCHESTRATOR
- *
- * Steps:
- * 1. Receive search query
- * 2. Classify intent (fill vs display)
- * 3. Generate embedding from query
- * 4. Search database by vector
- * 5. Database returns decrypted notes
- * 6. Return results
- */
-async function handleSearchNotes(data: {
-  query: string
-  limit?: number
-}): Promise<{
-  success: boolean
-  intent?: string
-  results?: any[]
-  error?: string
-}> {
-  try {
-    console.log("🔍 Starting search pipeline...")
-
-    const { query, limit = 5 } = data
-
-    // Step 1: Intent Classification (parallel with embedding)
-    console.log("🤔 Classifying intent...")
-    const [intent, queryEmbedding] = await Promise.all([
-      getIntent(query),
-      generateEmbedding(query)
-    ])
-    console.log(`✅ Intent: ${intent}`)
-    console.log(
-      `✅ Query embedding generated: ${queryEmbedding.length} dimensions`
-    )
-
-    // Step 2: Vector Search
-    console.log("🔍 Searching database...")
-    const results = await searchNotesByVector(queryEmbedding, limit)
-    console.log(`✅ Found ${results.length} results`)
-
-    return {
-      success: true,
-      intent,
-      results
-    }
-  } catch (error) {
-    console.error("❌ Search pipeline failed:", error)
     return {
       success: false,
       error: String(error)

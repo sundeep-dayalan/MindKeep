@@ -85,205 +85,17 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 }
 
 /**
- * Intent classification types
- */
-export type Intent = "fill" | "display"
-
-/**
- * Check if chrome.ai API is available
- */
-async function isChromeAIAvailable(): Promise<boolean> {
-  try {
-    // Check if chrome.ai exists
-    if (!("ai" in chrome)) {
-      return false
-    }
-
-    // Check if languageModel is available
-    const ai = (chrome as any).ai
-    if (!ai || !ai.languageModel) {
-      return false
-    }
-
-    // Check capability
-    const capabilities = await ai.languageModel.capabilities()
-    return (
-      capabilities.available === "readily" ||
-      capabilities.available === "after-download"
-    )
-  } catch (error) {
-    console.error("Chrome AI not available:", error)
-    return false
-  }
-}
-
-/**
- * Get intent using chrome.ai API (Gemini Nano)
- * Classifies user query as either "fill" or "display"
- */
-export async function getIntent(query: string): Promise<Intent> {
-  try {
-    // Check if chrome.ai is available
-    const isAvailable = await isChromeAIAvailable()
-
-    if (!isAvailable) {
-      console.warn("Chrome AI not available, using fallback")
-      return fallbackIntentClassification(query)
-    }
-
-    // Create a session with Gemini Nano
-    const ai = (chrome as any).ai
-    const session = await ai.languageModel.create({
-      systemPrompt: `You are an intent classifier. Analyze the user's query and respond with ONLY one word: either "fill" or "display".
-
-Rules:
-- Respond "fill" if the user wants to fill/paste/insert/enter/type data into a form or field
-- Respond "display" if the user wants to see/view/show/retrieve/find information
-- Look for action words like: fill, paste, enter, type, insert, put (return "fill")
-- Look for action words like: show, display, view, find, get, what, retrieve (return "display")
-- Return ONLY the word "fill" or "display", nothing else
-
-Examples:
-Query: "fill my email" → fill
-Query: "show me my email" → display
-Query: "what is my password" → display
-Query: "enter my ssn" → fill
-Query: "my address" → display`
-    })
-
-    // Get the response
-    const response = await session.prompt(query)
-
-    // Clean up session
-    session.destroy()
-
-    // Parse response
-    const intent = response.toLowerCase().trim()
-
-    if (intent.includes("fill")) {
-      return "fill"
-    } else if (intent.includes("display")) {
-      return "display"
-    }
-
-    // Default to display if unclear
-    return "display"
-  } catch (error) {
-    console.error("Error getting intent from chrome.ai:", error)
-    return fallbackIntentClassification(query)
-  }
-}
-
-/**
- * Fallback intent classification using simple pattern matching
- * Used when chrome.ai is not available
- */
-function fallbackIntentClassification(query: string): Intent {
-  const lowerQuery = query.toLowerCase()
-
-  // Keywords that suggest "fill" action
-  const fillKeywords = [
-    "fill",
-    "paste",
-    "enter",
-    "type",
-    "insert",
-    "put",
-    "input",
-    "write"
-  ]
-
-  // Keywords that suggest "display" action
-  const displayKeywords = [
-    "show",
-    "display",
-    "view",
-    "find",
-    "get",
-    "what",
-    "retrieve",
-    "search",
-    "tell",
-    "give"
-  ]
-
-  // Check for fill keywords
-  for (const keyword of fillKeywords) {
-    if (lowerQuery.includes(keyword)) {
-      return "fill"
-    }
-  }
-
-  // Check for display keywords
-  for (const keyword of displayKeywords) {
-    if (lowerQuery.includes(keyword)) {
-      return "display"
-    }
-  }
-
-  // Default to display if no clear intent
-  return "display"
-}
-
-/**
- * Generate embedding for a query and search similar notes
- * Convenience function that combines embedding generation with search
- */
-export async function searchByQuery(
-  query: string,
-  searchFunction: (embedding: number[]) => Promise<any[]>
-): Promise<any[]> {
-  try {
-    const embedding = await generateEmbedding(query)
-    return await searchFunction(embedding)
-  } catch (error) {
-    console.error("Error searching by query:", error)
-    return []
-  }
-}
-
-/**
- * Process a user query and return intent + embedding
- * Useful for the command palette workflow
- */
-export async function processQuery(query: string): Promise<{
-  intent: Intent
-  embedding: number[]
-  query: string
-}> {
-  try {
-    // Run intent classification and embedding generation in parallel
-    const [intent, embedding] = await Promise.all([
-      getIntent(query),
-      generateEmbedding(query)
-    ])
-
-    return {
-      intent,
-      embedding,
-      query
-    }
-  } catch (error) {
-    console.error("Error processing query:", error)
-    throw new Error("Failed to process query")
-  }
-}
-
-/**
  * Batch generate embeddings for multiple texts
  * Useful for initial setup or bulk operations
  */
+// A more performant version
 export async function generateBatchEmbeddings(
   texts: string[]
 ): Promise<number[][]> {
   try {
-    const embeddings: number[][] = []
-
-    for (const text of texts) {
-      const embedding = await generateEmbedding(text)
-      embeddings.push(embedding)
-    }
-
+    // Use Promise.all to run all embedding tasks concurrently
+    const embeddingPromises = texts.map((text) => generateEmbedding(text))
+    const embeddings = await Promise.all(embeddingPromises)
     return embeddings
   } catch (error) {
     console.error("Error generating batch embeddings:", error)
@@ -455,16 +267,14 @@ Rules:
 - Provide only the summary directly.`
     })
 
-    return summary
-  } catch (error) {
-    console.error("An error occurred during summarization:", error)
-    // Re-throw the error to be handled by the calling function
-    throw new Error("Failed to generate summary.")
-  } finally {
-    // 4. IMPORTANT: Always destroy the instance to free up memory
     if (summarizer) {
       summarizer.destroy()
     }
+
+    return summary
+  } catch (error) {
+    console.error("An error occurred during summarization:", error)
+    return textToSummarize
   }
 }
 
@@ -534,19 +344,14 @@ export async function generateTitle(
   noteContent: string
 ): Promise<string> {
   try {
-    alert(titleContent)
-    alert(noteContent)
-
     const rewrittenContent = await rewriteText(titleContent, noteContent)
-
     return rewrittenContent
   } catch (error) {
-    console.error("Error generating title:", error)
-    if (error.message) {
-      throw error
-    }
-    throw new Error(
-      "Failed to generate title. Please check Chrome AI settings."
+    console.warn(
+      "Could not generate title using Rewriter API, falling back to original.",
+      error
     )
+    // Fallback: just return the original content if rewriting fails
+    return titleContent
   }
 }
