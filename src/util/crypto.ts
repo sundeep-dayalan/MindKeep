@@ -76,23 +76,29 @@ function generateIV(): Uint8Array {
  */
 async function getMasterKey(): Promise<CryptoKey> {
   try {
+    console.log("🔑 Getting master key...")
     // Try to get existing key from storage
     const stored = await new Promise<any>((resolve) => {
       chrome.storage.local.get(ENCRYPTION_KEY_STORAGE_KEY, resolve)
     })
 
     if (stored[ENCRYPTION_KEY_STORAGE_KEY]) {
+      console.log("🔑 Found existing key in storage, importing...")
       const keyData = stored[ENCRYPTION_KEY_STORAGE_KEY]
 
       // Import the stored key
-      return await crypto.subtle.importKey(
+      const importedKey = await crypto.subtle.importKey(
         "jwk",
         keyData,
         { name: ALGORITHM, length: KEY_LENGTH },
         true,
         ["encrypt", "decrypt"]
       )
+      console.log("🔑 Key imported successfully:", importedKey.type)
+      return importedKey
     }
+
+    console.log("🔑 No existing key found, generating new one...")
 
     // Generate a new key if none exists
     const salt = generateSalt()
@@ -101,9 +107,12 @@ async function getMasterKey(): Promise<CryptoKey> {
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("")
 
+    console.log("🔑 Deriving new key from random password...")
     const key = await deriveKey(passwordString, salt)
+    console.log("🔑 Key derived successfully:", key.type)
 
     // Export and store the key
+    console.log("🔑 Exporting and storing key...")
     const exportedKey = await crypto.subtle.exportKey("jwk", key)
     await new Promise<void>((resolve) => {
       chrome.storage.local.set(
@@ -113,11 +122,12 @@ async function getMasterKey(): Promise<CryptoKey> {
         resolve
       )
     })
+    console.log("🔑 Key stored successfully")
 
     return key
   } catch (error) {
-    console.error("Error getting master key:", error)
-    throw new Error("Failed to initialize encryption key")
+    console.error("❌ Error getting master key:", error)
+    throw new Error("Failed to initialize encryption key: " + (error instanceof Error ? error.message : String(error)))
   }
 }
 
@@ -161,6 +171,12 @@ export async function encrypt(text: string): Promise<string> {
     const data = encoder.encode(text)
 
     const key = await getMasterKey()
+    
+    if (!key) {
+      throw new Error("Failed to get encryption key")
+    }
+    
+    console.log("🔑 Key obtained:", key.type, key.algorithm)
     const iv = generateIV()
 
     // Encrypt the data

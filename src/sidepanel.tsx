@@ -303,7 +303,7 @@ function SidePanel() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                    placeholder="Search notes..."
+                    placeholder="Search with keywords..."
                     className="plasmo-flex-1 plasmo-px-3 plasmo-py-2 plasmo-border plasmo-border-slate-300 plasmo-rounded-lg plasmo-text-sm focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-blue-500"
                   />
                   <button
