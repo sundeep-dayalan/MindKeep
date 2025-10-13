@@ -397,7 +397,9 @@ function SidePanel() {
                           />
                         </svg>
                         <span className="plasmo-truncate">
-                          {selectedCategory === "all" ? "All" : selectedCategory}
+                          {selectedCategory === "all"
+                            ? "All"
+                            : selectedCategory}
                         </span>
                       </span>
                       <svg
