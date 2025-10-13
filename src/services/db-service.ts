@@ -29,7 +29,7 @@ export interface Note {
 export interface StoredNote {
   id: string
   title: string // Plaintext for searching/filtering
-  encryptedContent: string // ENCRYPTED content (base64 string)
+  content: string // ENCRYPTED content (base64 string) - stored as "content" in DB
   category: string // Plaintext for filtering
   embedding?: number[] // Plaintext vector for semantic search
   createdAt: number
@@ -359,7 +359,7 @@ export async function getAllNotes(): Promise<Note[]> {
     for (const storedNote of storedNotes) {
       try {
         // Decrypt the content field
-        const content = await decrypt(storedNote.encryptedContent)
+        const content = await decrypt(storedNote.content)
         notes.push({
           id: storedNote.id,
           title: storedNote.title,

@@ -3,7 +3,11 @@ import { useEffect, useState } from "react"
 import "~style.css"
 
 import { AIStatusBanner } from "~components/AIStatusBanner"
-import { generateTitle, summarizeText } from "~services/ai-service"
+import {
+  generateEmbedding,
+  generateTitle,
+  summarizeText
+} from "~services/ai-service"
 import {
   deleteNote,
   getAllCategories,
@@ -100,27 +104,38 @@ function SidePanel() {
       }
 
       if (editingNote) {
-        // For updates, we need to handle encryption/embedding in background
-        console.log("Updating existing note:", editingNote.id)
+        // For updates, generate embedding here (in DOM context with full Web APIs)
+        console.log("✏️ Updating existing note:", editingNote.id)
 
-        // Send update request to background script
+        // Generate new embedding for updated content
+        console.log("🔢 Generating embedding from updated content...")
+        const embedding = await generateEmbedding(noteContent)
+        console.log(`✅ Embedding generated: ${embedding.length} dimensions`)
+
+        // Send update request to background script with pre-generated embedding
         const response = await chrome.runtime.sendMessage({
           type: "UPDATE_NOTE",
           data: {
             id: editingNote.id,
             title: noteTitle,
             content: noteContent,
-            category: finalCategory
+            category: finalCategory,
+            embedding // Pass the pre-generated embedding
           }
         })
 
         if (!response.success) {
           throw new Error(response.error || "Update failed")
         }
-        console.log("Update result:", response.note)
+        console.log("✅ Update result:", response.note)
       } else {
-        // For new notes, use background script pipeline
-        console.log("📝 Creating new note via background script...")
+        // For new notes, generate embedding here (in DOM context with full Web APIs)
+        console.log("📝 Creating new note...")
+
+        // Step 1: Generate embedding from plaintext content (HERE in side panel)
+        console.log("🔢 Generating embedding from plaintext content...")
+        const embedding = await generateEmbedding(noteContent)
+        console.log(`✅ Embedding generated: ${embedding.length} dimensions`)
 
         // Get current tab URL for sourceUrl
         let sourceUrl: string | undefined
@@ -134,14 +149,15 @@ function SidePanel() {
           console.warn("Could not get tab URL:", e)
         }
 
-        // Send to background script for processing
+        // Step 2: Send to background script with pre-generated embedding
         const response = await chrome.runtime.sendMessage({
           type: "SAVE_NOTE",
           data: {
             title: noteTitle,
             content: noteContent, // Send PLAINTEXT - background will encrypt
             category: finalCategory,
-            sourceUrl
+            sourceUrl,
+            embedding // Pass the pre-generated embedding
           }
         })
 

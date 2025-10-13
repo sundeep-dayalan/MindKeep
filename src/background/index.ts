@@ -124,8 +124,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  * SAVE PIPELINE ORCHESTRATOR
  *
  * Steps:
- * 1. Receive raw note data
- * 2. Generate embedding from PLAINTEXT content
+ * 1. Receive raw note data (with optional pre-generated embedding)
+ * 2. Generate embedding from PLAINTEXT content (if not provided)
  * 3. Encrypt the content
  * 4. Assemble final object
  * 5. Save to database
@@ -135,17 +135,27 @@ async function handleSaveNote(data: {
   category?: string
   content: string
   sourceUrl?: string
+  embedding?: number[] // Optional pre-generated embedding from side panel
 }): Promise<{ success: boolean; note?: any; error?: string }> {
   try {
     console.log("📝 Starting save pipeline...")
 
     // Step 1: Data Reception (already done via message)
-    const { title, category, content, sourceUrl } = data
+    const { title, category, content, sourceUrl, embedding } = data
 
     // Step 2: Embedding Generation (from PLAINTEXT)
-    console.log("🔢 Generating embedding from plaintext content...")
-    const embeddingVector = await generateEmbedding(content)
-    console.log(`✅ Embedding generated: ${embeddingVector.length} dimensions`)
+    // Use pre-generated embedding if provided, otherwise generate here
+    let embeddingVector: number[]
+    if (embedding && embedding.length > 0) {
+      console.log(
+        `✅ Using pre-generated embedding: ${embedding.length} dimensions`
+      )
+      embeddingVector = embedding
+    } else {
+      console.log("🔢 Generating embedding from plaintext content...")
+      embeddingVector = await generateEmbedding(content)
+      console.log(`✅ Embedding generated: ${embeddingVector.length} dimensions`)
+    }
 
     // Step 3: Content Encryption
     console.log("🔒 Encrypting content...")
@@ -183,8 +193,8 @@ async function handleSaveNote(data: {
  * UPDATE PIPELINE ORCHESTRATOR
  *
  * Steps:
- * 1. Receive note ID and update data
- * 2. Generate new embedding if content changed (from PLAINTEXT)
+ * 1. Receive note ID and update data (with optional pre-generated embedding)
+ * 2. Generate new embedding if content changed (from PLAINTEXT, if not provided)
  * 3. Encrypt new content if changed
  * 4. Update in database
  */
@@ -193,11 +203,12 @@ async function handleUpdateNote(data: {
   title?: string
   category?: string
   content?: string
+  embedding?: number[] // Optional pre-generated embedding from side panel
 }): Promise<{ success: boolean; note?: any; error?: string }> {
   try {
     console.log("✏️ Starting update pipeline for note:", data.id)
 
-    const { id, title, category, content } = data
+    const { id, title, category, content, embedding } = data
     const updates: any = {}
 
     // Update title/category if provided (no processing needed)
@@ -206,11 +217,20 @@ async function handleUpdateNote(data: {
 
     // If content is being updated, process it through the pipeline
     if (content !== undefined) {
-      console.log("🔢 Generating new embedding from plaintext content...")
-      const embeddingVector = await generateEmbedding(content)
-      console.log(
-        `✅ Embedding generated: ${embeddingVector.length} dimensions`
-      )
+      // Use pre-generated embedding if provided, otherwise generate here
+      let embeddingVector: number[]
+      if (embedding && embedding.length > 0) {
+        console.log(
+          `✅ Using pre-generated embedding: ${embedding.length} dimensions`
+        )
+        embeddingVector = embedding
+      } else {
+        console.log("🔢 Generating new embedding from plaintext content...")
+        embeddingVector = await generateEmbedding(content)
+        console.log(
+          `✅ Embedding generated: ${embeddingVector.length} dimensions`
+        )
+      }
 
       console.log("🔒 Encrypting new content...")
       const encryptedContent = await encrypt(content)
