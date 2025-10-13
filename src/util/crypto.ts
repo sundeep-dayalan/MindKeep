@@ -127,7 +127,10 @@ async function getMasterKey(): Promise<CryptoKey> {
     return key
   } catch (error) {
     console.error("❌ Error getting master key:", error)
-    throw new Error("Failed to initialize encryption key: " + (error instanceof Error ? error.message : String(error)))
+    throw new Error(
+      "Failed to initialize encryption key: " +
+        (error instanceof Error ? error.message : String(error))
+    )
   }
 }
 
@@ -171,11 +174,11 @@ export async function encrypt(text: string): Promise<string> {
     const data = encoder.encode(text)
 
     const key = await getMasterKey()
-    
+
     if (!key) {
       throw new Error("Failed to get encryption key")
     }
-    
+
     console.log("🔑 Key obtained:", key.type, key.algorithm)
     const iv = generateIV()
 
