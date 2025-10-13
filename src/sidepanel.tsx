@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 
 import "~style.css"
 
+import { AISearchBar } from "~components/AISearchBar"
 import { AIStatusBanner } from "~components/AIStatusBanner"
 import {
   generateEmbedding,
@@ -319,7 +320,7 @@ function SidePanel() {
         </div>
 
         {/* Content */}
-        <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-p-4">
+        <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-p-4 plasmo-pb-20">
           {/* AI Status Banner */}
           <AIStatusBanner />
 
@@ -815,6 +816,17 @@ function SidePanel() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Fixed Bottom Search Bar */}
+        <div className="plasmo-fixed plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-bg-white plasmo-border-t plasmo-border-slate-200 plasmo-shadow-lg plasmo-p-4">
+          <AISearchBar
+            placeholder="Ask me anything..."
+            onSearch={(query) => {
+              // TODO: Handle AI search
+              console.log("AI Search query:", query)
+            }}
+          />
         </div>
       </div>
     </div>
