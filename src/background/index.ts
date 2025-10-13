@@ -154,7 +154,9 @@ async function handleSaveNote(data: {
     } else {
       console.log("🔢 Generating embedding from plaintext content...")
       embeddingVector = await generateEmbedding(content)
-      console.log(`✅ Embedding generated: ${embeddingVector.length} dimensions`)
+      console.log(
+        `✅ Embedding generated: ${embeddingVector.length} dimensions`
+      )
     }
 
     // Step 3: Content Encryption
