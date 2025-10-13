@@ -24,7 +24,15 @@ function SidePanel() {
   const [categories, setCategories] = useState<string[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
+  const [categorySearchQuery, setCategorySearchQuery] = useState("")
+  const [isCategoryExpanded, setIsCategoryExpanded] = useState(false)
   const [loading, setLoading] = useState(false)
+
+  // Generic clear search method
+  const clearSearchQuery = () => {
+    setSearchQuery("")
+    loadData() // Reload all notes
+  }
 
   // Editor state
   const [editingNote, setEditingNote] = useState<Note | null>(null)
@@ -56,6 +64,11 @@ function SidePanel() {
     setLoading(false)
   }
 
+  // Filter categories based on search
+  const filteredCategories = categories.filter((cat) =>
+    cat.toLowerCase().includes(categorySearchQuery.toLowerCase())
+  )
+
   // Filter notes
   const filteredNotes = notes.filter((note) => {
     const matchesCategory =
@@ -73,6 +86,7 @@ function SidePanel() {
     setNoteContent("")
     setNoteCategory("general")
     setShowNewCategory(false)
+    clearSearchQuery() // Clear search when creating new note
     setView("editor")
   }
 
@@ -82,6 +96,7 @@ function SidePanel() {
     setNoteContent(note.content)
     setNoteCategory(note.category)
     setShowNewCategory(false)
+    clearSearchQuery() // Clear search when editing a note
     setView("editor")
   }
 
@@ -170,6 +185,7 @@ function SidePanel() {
 
       console.log("Reloading data...")
       await loadData()
+      clearSearchQuery() // Clear search when returning to list view
       console.log("Switching to list view")
       setView("list")
     } catch (error) {
@@ -209,6 +225,20 @@ function SidePanel() {
         console.error("Error searching:", error)
       }
       setLoading(false)
+    } else {
+      loadData()
+    }
+  }
+
+  // Handle search input change with auto-search
+  const handleSearchInput = (value: string) => {
+    setSearchQuery(value)
+    // Auto-search as user types (debounced effect would be better in production)
+    if (value.trim()) {
+      // Trigger search automatically
+      setTimeout(() => {
+        searchNotesByTitle(value).then(setNotes).catch(console.error)
+      }, 300)
     } else {
       loadData()
     }
@@ -297,33 +327,219 @@ function SidePanel() {
             <>
               {/* Search and Filters */}
               <div className="plasmo-mb-4 plasmo-space-y-3">
-                <div className="plasmo-flex plasmo-gap-2">
+                {/* Modern Search Input */}
+                <div className="plasmo-relative">
+                  <svg
+                    className="plasmo-w-4 plasmo-h-4 plasmo-absolute plasmo-left-3 plasmo-top-1/2 plasmo-transform -plasmo-translate-y-1/2 plasmo-text-slate-400 plasmo-pointer-events-none"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
                   <input
                     type="text"
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => handleSearchInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                    placeholder="Search with keywords..."
-                    className="plasmo-flex-1 plasmo-px-3 plasmo-py-2 plasmo-border plasmo-border-slate-300 plasmo-rounded-lg plasmo-text-sm focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-blue-500"
+                    placeholder="Search notes..."
+                    className="plasmo-w-full plasmo-pl-10 plasmo-pr-10 plasmo-py-2.5 plasmo-border plasmo-border-slate-300 plasmo-rounded-lg plasmo-text-sm plasmo-bg-white focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-blue-500 focus:plasmo-border-blue-500 plasmo-transition-all"
                   />
-                  <button
-                    onClick={handleSearch}
-                    className="plasmo-px-4 plasmo-py-2 plasmo-bg-blue-500 plasmo-text-white plasmo-rounded-lg plasmo-text-sm hover:plasmo-bg-blue-600 plasmo-transition-colors">
-                    Search
-                  </button>
+                  {searchQuery && (
+                    <button
+                      onClick={clearSearchQuery}
+                      className="plasmo-absolute plasmo-right-3 plasmo-top-1/2 plasmo-transform -plasmo-translate-y-1/2 plasmo-text-slate-400 hover:plasmo-text-slate-600 plasmo-transition-colors plasmo-p-0.5"
+                      title="Clear search">
+                      <svg
+                        className="plasmo-w-4 plasmo-h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  )}
                 </div>
 
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="plasmo-w-full plasmo-px-3 plasmo-py-2 plasmo-border plasmo-border-slate-300 plasmo-rounded-lg plasmo-text-sm focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-blue-500">
-                  <option value="all">All Categories</option>
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
+                {/* Category Filter - Collapsible */}
+                <div className="plasmo-bg-white plasmo-border plasmo-border-slate-200 plasmo-rounded-lg plasmo-overflow-hidden">
+                  {/* Header - Always Visible */}
+                  <button
+                    onClick={() => setIsCategoryExpanded(!isCategoryExpanded)}
+                    className="plasmo-w-full plasmo-p-3 plasmo-flex plasmo-items-center plasmo-justify-between hover:plasmo-bg-slate-50 plasmo-transition-colors">
+                    <div className="plasmo-flex plasmo-items-center plasmo-gap-2">
+                      <h3 className="plasmo-text-xs plasmo-font-semibold plasmo-text-slate-500 plasmo-uppercase plasmo-tracking-wide">
+                        Categories
+                      </h3>
+                      <span className="plasmo-inline-flex plasmo-items-center plasmo-justify-center plasmo-min-w-[20px] plasmo-h-5 plasmo-px-1.5 plasmo-bg-slate-100 plasmo-text-slate-700 plasmo-text-xs plasmo-font-medium plasmo-rounded">
+                        {categories.length}
+                      </span>
+                    </div>
+                    <div className="plasmo-flex plasmo-items-center plasmo-gap-2">
+                      <span className="plasmo-inline-flex plasmo-items-center plasmo-gap-1.5 plasmo-px-3 plasmo-py-1.5 plasmo-bg-slate-900 plasmo-text-white plasmo-rounded-full plasmo-text-xs plasmo-font-medium plasmo-shadow-sm plasmo-capitalize plasmo-max-w-[140px] plasmo-truncate">
+                        <svg
+                          className="plasmo-w-3.5 plasmo-h-3.5 plasmo-flex-shrink-0"
+                          fill="currentColor"
+                          viewBox="0 0 20 20">
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        <span className="plasmo-truncate">
+                          {selectedCategory === "all" ? "All" : selectedCategory}
+                        </span>
+                      </span>
+                      <svg
+                        className={`plasmo-w-4 plasmo-h-4 plasmo-text-slate-500 plasmo-transition-transform plasmo-duration-200 plasmo-flex-shrink-0 ${
+                          isCategoryExpanded ? "plasmo-rotate-180" : ""
+                        }`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </div>
+                  </button>
+
+                  {/* Expandable Content */}
+                  {isCategoryExpanded && (
+                    <div className="plasmo-border-t plasmo-border-slate-200 plasmo-p-3 plasmo-pt-2">
+                      {/* Category Search (only show if more than 10 categories) */}
+                      {categories.length > 10 && (
+                        <div className="plasmo-mb-2">
+                          <div className="plasmo-relative">
+                            <input
+                              type="text"
+                              value={categorySearchQuery}
+                              onChange={(e) =>
+                                setCategorySearchQuery(e.target.value)
+                              }
+                              placeholder="Search categories..."
+                              className="plasmo-w-full plasmo-px-3 plasmo-py-1.5 plasmo-pl-8 plasmo-text-xs plasmo-border plasmo-border-slate-200 plasmo-rounded-md focus:plasmo-outline-none focus:plasmo-ring-1 focus:plasmo-ring-blue-500 focus:plasmo-border-blue-500"
+                            />
+                            <svg
+                              className="plasmo-w-3.5 plasmo-h-3.5 plasmo-absolute plasmo-left-2.5 plasmo-top-1/2 plasmo-transform -plasmo-translate-y-1/2 plasmo-text-slate-400"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24">
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                              />
+                            </svg>
+                            {categorySearchQuery && (
+                              <button
+                                onClick={() => setCategorySearchQuery("")}
+                                className="plasmo-absolute plasmo-right-2 plasmo-top-1/2 plasmo-transform -plasmo-translate-y-1/2 plasmo-text-slate-400 hover:plasmo-text-slate-600">
+                                <svg
+                                  className="plasmo-w-3.5 plasmo-h-3.5"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24">
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M6 18L18 6M6 6l12 12"
+                                  />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Scrollable Category Pills Container */}
+                      <div
+                        className="plasmo-overflow-y-auto"
+                        style={{
+                          maxHeight: "150px"
+                        }}>
+                        <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedCategory("all")
+                              setCategorySearchQuery("")
+                              setIsCategoryExpanded(false)
+                              clearSearchQuery() // Clear main search when changing category
+                            }}
+                            className={`plasmo-inline-flex plasmo-items-center plasmo-gap-1.5 plasmo-px-3 plasmo-py-1.5 plasmo-rounded-full plasmo-text-xs plasmo-font-medium plasmo-transition-all plasmo-duration-200 plasmo-flex-shrink-0 ${
+                              selectedCategory === "all"
+                                ? "plasmo-bg-slate-900 plasmo-text-white plasmo-shadow-sm"
+                                : "plasmo-bg-slate-100 plasmo-text-slate-700 hover:plasmo-bg-slate-200"
+                            }`}>
+                            {selectedCategory === "all" && (
+                              <svg
+                                className="plasmo-w-3.5 plasmo-h-3.5"
+                                fill="currentColor"
+                                viewBox="0 0 20 20">
+                                <path
+                                  fillRule="evenodd"
+                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            )}
+                            <span>All</span>
+                          </button>
+                          {filteredCategories.length === 0 ? (
+                            <div className="plasmo-text-xs plasmo-text-slate-400 plasmo-py-1">
+                              No categories found
+                            </div>
+                          ) : (
+                            filteredCategories.map((cat) => (
+                              <button
+                                key={cat}
+                                onClick={() => {
+                                  setSelectedCategory(cat)
+                                  setCategorySearchQuery("")
+                                  setIsCategoryExpanded(false)
+                                  clearSearchQuery() // Clear main search when changing category
+                                }}
+                                className={`plasmo-inline-flex plasmo-items-center plasmo-gap-1.5 plasmo-px-3 plasmo-py-1.5 plasmo-rounded-full plasmo-text-xs plasmo-font-medium plasmo-transition-all plasmo-duration-200 plasmo-capitalize plasmo-flex-shrink-0 ${
+                                  selectedCategory === cat
+                                    ? "plasmo-bg-slate-900 plasmo-text-white plasmo-shadow-sm"
+                                    : "plasmo-bg-slate-100 plasmo-text-slate-700 hover:plasmo-bg-slate-200"
+                                }`}>
+                                {selectedCategory === cat && (
+                                  <svg
+                                    className="plasmo-w-3.5 plasmo-h-3.5"
+                                    fill="currentColor"
+                                    viewBox="0 0 20 20">
+                                    <path
+                                      fillRule="evenodd"
+                                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                      clipRule="evenodd"
+                                    />
+                                  </svg>
+                                )}
+                                <span>{cat}</span>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 <button
                   onClick={handleCreateNew}
