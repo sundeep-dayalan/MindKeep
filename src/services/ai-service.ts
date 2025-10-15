@@ -51,21 +51,46 @@ export class EmbeddingPipeline {
    * @returns An array of numbers representing the embedding vector
    */
   static async generateEmbedding(text: string): Promise<number[]> {
+    const startTime = performance.now()
     try {
+      const pipelineStartTime = performance.now()
       const pipeline = await this.getInstance()
+      const pipelineTime = performance.now() - pipelineStartTime
+      console.log(
+        `⏱️ [Embedding] Pipeline initialization: ${pipelineTime.toFixed(2)}ms`
+      )
 
       // Generate embedding from plaintext
+      const embeddingStartTime = performance.now()
       const output = await pipeline(text, {
         pooling: "mean",
         normalize: true
       })
+      const embeddingTime = performance.now() - embeddingStartTime
+      console.log(
+        `⏱️ [Embedding] Generation time: ${embeddingTime.toFixed(2)}ms`
+      )
 
       // Convert tensor to array
+      const conversionStartTime = performance.now()
       const embedding = Array.from(output.data) as number[]
+      const conversionTime = performance.now() - conversionStartTime
+      console.log(
+        `⏱️ [Embedding] Tensor to array conversion: ${conversionTime.toFixed(2)}ms`
+      )
+
+      const totalTime = performance.now() - startTime
+      console.log(
+        `⏱️ [Embedding] TOTAL time: ${totalTime.toFixed(2)}ms (${embedding.length} dimensions)`
+      )
 
       return embedding
     } catch (error) {
-      console.error("Error generating embedding:", error)
+      const totalTime = performance.now() - startTime
+      console.error(
+        `❌ [Embedding] Failed after ${totalTime.toFixed(2)}ms:`,
+        error
+      )
       throw new Error("Failed to generate embedding")
     }
   }
@@ -243,8 +268,16 @@ export async function checkAllAIServices(): Promise<HealthCheckStatus[]> {
  * @throws An error if the API is unavailable or the summarization fails.
  */
 export async function summarizeText(textToSummarize: string): Promise<string> {
+  const startTime = performance.now()
+
   // 1. Check if the API exists in the browser at all
+  const checkStartTime = performance.now()
   const status = await checkSummarizerAvailability()
+  const checkTime = performance.now() - checkStartTime
+  console.log(
+    `⏱️ [Summarizer] API availability check: ${checkTime.toFixed(2)}ms`
+  )
+
   if (status.available === false) {
     throw new Error(`Summarizer API is not available: ${status.message}`)
   }
@@ -253,8 +286,12 @@ export async function summarizeText(textToSummarize: string): Promise<string> {
   // A try...finally block ensures we always clean up the summarizer instance.
   let summarizer
   try {
+    const createStartTime = performance.now()
     summarizer = await Summarizer.create()
+    const createTime = performance.now() - createStartTime
+    console.log(`⏱️ [Summarizer] Model creation: ${createTime.toFixed(2)}ms`)
 
+    const summarizeStartTime = performance.now()
     const summary = await summarizer.summarize(textToSummarize, {
       // It's best to put all instructions here for clarity
       context: `You are a summarizer for a notes app. Create concise, clear summaries. Fix spelling mistakes. Use bullet points for readability if needed.
@@ -266,14 +303,25 @@ Rules:
 - Do not use phrases like "This text is about" or "The summary is".
 - Provide only the summary directly.`
     })
+    const summarizeTime = performance.now() - summarizeStartTime
+    console.log(
+      `⏱️ [Summarizer] Summarization time: ${summarizeTime.toFixed(2)}ms (input: ${textToSummarize.length} chars, output: ${summary.length} chars)`
+    )
 
     if (summarizer) {
       summarizer.destroy()
     }
 
+    const totalTime = performance.now() - startTime
+    console.log(`⏱️ [Summarizer] TOTAL time: ${totalTime.toFixed(2)}ms`)
+
     return summary
   } catch (error) {
-    console.error("An error occurred during summarization:", error)
+    const totalTime = performance.now() - startTime
+    console.error(
+      `❌ [Summarizer] Failed after ${totalTime.toFixed(2)}ms:`,
+      error
+    )
     return textToSummarize
   }
 }
@@ -292,8 +340,14 @@ export async function rewriteText(
   textToRewrite: string,
   sharedContext: string
 ): Promise<string> {
+  const startTime = performance.now()
+
   // 1. Check if the API exists in the browser at all
+  const checkStartTime = performance.now()
   const status = await checkRewriterAvailability()
+  const checkTime = performance.now() - checkStartTime
+  console.log(`⏱️ [Rewriter] API availability check: ${checkTime.toFixed(2)}ms`)
+
   if (status.available === false) {
     throw new Error(`Rewriter API is not available: ${status.message}`)
   }
@@ -311,9 +365,13 @@ export async function rewriteText(
       options.sharedContext = sharedContext
     }
 
+    const createStartTime = performance.now()
     rewriter = await Rewriter.create(options)
+    const createTime = performance.now() - createStartTime
+    console.log(`⏱️ [Rewriter] Model creation: ${createTime.toFixed(2)}ms`)
 
     // Perform the actual rewrite operation with a specific prompt
+    const rewriteStartTime = performance.now()
     const result = await rewriter.rewrite(textToRewrite, {
       context: `You are a text rewriter. Your task is to improve the provided title for the notes. Fix spelling and grammar mistakes.
 Rules:
@@ -321,10 +379,21 @@ Rules:
 - Do not add new information.
 - Provide only the rewritten title directly.`
     })
+    const rewriteTime = performance.now() - rewriteStartTime
+    console.log(
+      `⏱️ [Rewriter] Rewriting time: ${rewriteTime.toFixed(2)}ms (input: ${textToRewrite.length} chars, output: ${result.length} chars)`
+    )
+
+    const totalTime = performance.now() - startTime
+    console.log(`⏱️ [Rewriter] TOTAL time: ${totalTime.toFixed(2)}ms`)
 
     return result
   } catch (error) {
-    console.error("An error occurred during rewriting:", error)
+    const totalTime = performance.now() - startTime
+    console.error(
+      `❌ [Rewriter] Failed after ${totalTime.toFixed(2)}ms:`,
+      error
+    )
     // Re-throw the error to be handled by the calling function
     throw new Error("Failed to rewrite text.")
   } finally {
@@ -343,12 +412,20 @@ export async function generateTitle(
   titleContent: string,
   noteContent: string
 ): Promise<string> {
+  const startTime = performance.now()
+  console.log(`🎯 [Generate Title] Starting title generation...`)
+
   try {
     const rewrittenContent = await rewriteText(titleContent, noteContent)
+
+    const totalTime = performance.now() - startTime
+    console.log(`⏱️ [Generate Title] TOTAL time: ${totalTime.toFixed(2)}ms`)
+
     return rewrittenContent
   } catch (error) {
+    const totalTime = performance.now() - startTime
     console.warn(
-      "Could not generate title using Rewriter API, falling back to original.",
+      `⚠️ [Generate Title] Could not generate title after ${totalTime.toFixed(2)}ms, falling back to original.`,
       error
     )
     // Fallback: just return the original content if rewriting fails

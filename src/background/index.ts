@@ -134,8 +134,10 @@ async function handleSaveNote(data: {
   sourceUrl?: string
   embedding?: number[] // Optional pre-generated embedding from side panel
 }): Promise<{ success: boolean; note?: any; error?: string }> {
+  const startTime = performance.now()
+
   try {
-    console.log("📝 Starting save pipeline...")
+    console.log("📝 [BG Save] Starting save pipeline...")
 
     // Step 1: Data Reception (already done via message)
     const { title, category, content, sourceUrl, embedding } = data
@@ -145,21 +147,24 @@ async function handleSaveNote(data: {
     let embeddingVector: number[]
     if (embedding && embedding.length > 0) {
       console.log(
-        `✅ Using pre-generated embedding: ${embedding.length} dimensions`
+        `✅ [BG Save] Using pre-generated embedding: ${embedding.length} dimensions`
       )
       embeddingVector = embedding
     } else {
-      console.log("🔢 Generating embedding from plaintext content...")
+      const embeddingStartTime = performance.now()
+      console.log("🔢 [BG Save] Generating embedding from plaintext content...")
       embeddingVector = await generateEmbedding(content)
+      const embeddingTime = performance.now() - embeddingStartTime
       console.log(
-        `✅ Embedding generated: ${embeddingVector.length} dimensions`
+        `⏱️ [BG Save] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embeddingVector.length} dimensions)`
       )
     }
 
     // Step 3: Content Encryption
-    console.log("🔒 Encrypting content...")
+    const encryptStartTime = performance.now()
     const encryptedContent = await encrypt(content)
-    console.log("✅ Content encrypted")
+    const encryptTime = performance.now() - encryptStartTime
+    console.log(`⏱️ [BG Save] Content encryption: ${encryptTime.toFixed(2)}ms`)
 
     // Step 4: Final Data Assembly
     const noteObject = {
@@ -171,16 +176,29 @@ async function handleSaveNote(data: {
     }
 
     // Step 5: Database Storage
-    console.log("💾 Saving to database...")
+    const dbStartTime = performance.now()
     const savedNote = await addNote(noteObject)
-    console.log("✅ Note saved successfully:", savedNote.id)
+    const dbTime = performance.now() - dbStartTime
+    console.log(`⏱️ [BG Save] Database storage: ${dbTime.toFixed(2)}ms`)
+
+    const totalTime = performance.now() - startTime
+    console.log(
+      `⏱️ [BG Save] TOTAL background save time: ${totalTime.toFixed(2)}ms`
+    )
+    console.log(
+      `📊 [BG Save] Breakdown: Encrypt=${encryptTime.toFixed(2)}ms, DB=${dbTime.toFixed(2)}ms`
+    )
 
     return {
       success: true,
       note: savedNote
     }
   } catch (error) {
-    console.error("❌ Save pipeline failed:", error)
+    const totalTime = performance.now() - startTime
+    console.error(
+      `❌ [BG Save] Save pipeline failed after ${totalTime.toFixed(2)}ms:`,
+      error
+    )
     return {
       success: false,
       error: String(error)
@@ -204,8 +222,10 @@ async function handleUpdateNote(data: {
   content?: string
   embedding?: number[] // Optional pre-generated embedding from side panel
 }): Promise<{ success: boolean; note?: any; error?: string }> {
+  const startTime = performance.now()
+
   try {
-    console.log("✏️ Starting update pipeline for note:", data.id)
+    console.log("✏️ [BG Update] Starting update pipeline for note:", data.id)
 
     const { id, title, category, content, embedding } = data
     const updates: any = {}
@@ -220,40 +240,56 @@ async function handleUpdateNote(data: {
       let embeddingVector: number[]
       if (embedding && embedding.length > 0) {
         console.log(
-          `✅ Using pre-generated embedding: ${embedding.length} dimensions`
+          `✅ [BG Update] Using pre-generated embedding: ${embedding.length} dimensions`
         )
         embeddingVector = embedding
       } else {
-        console.log("🔢 Generating new embedding from plaintext content...")
-        embeddingVector = await generateEmbedding(content)
+        const embeddingStartTime = performance.now()
         console.log(
-          `✅ Embedding generated: ${embeddingVector.length} dimensions`
+          "🔢 [BG Update] Generating new embedding from plaintext content..."
+        )
+        embeddingVector = await generateEmbedding(content)
+        const embeddingTime = performance.now() - embeddingStartTime
+        console.log(
+          `⏱️ [BG Update] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embeddingVector.length} dimensions)`
         )
       }
 
-      console.log("🔒 Encrypting new content...")
+      const encryptStartTime = performance.now()
       const encryptedContent = await encrypt(content)
-      console.log("✅ Content encrypted")
+      const encryptTime = performance.now() - encryptStartTime
+      console.log(
+        `⏱️ [BG Update] Content encryption: ${encryptTime.toFixed(2)}ms`
+      )
 
       updates.content = encryptedContent
       updates.embedding = embeddingVector
     }
 
-    console.log("💾 Updating in database...")
+    const dbStartTime = performance.now()
     const updatedNote = await updateNote(id, updates)
+    const dbTime = performance.now() - dbStartTime
+    console.log(`⏱️ [BG Update] Database update: ${dbTime.toFixed(2)}ms`)
 
     if (!updatedNote) {
       throw new Error("Note not found")
     }
 
-    console.log("✅ Note updated successfully:", updatedNote.id)
+    const totalTime = performance.now() - startTime
+    console.log(
+      `⏱️ [BG Update] TOTAL background update time: ${totalTime.toFixed(2)}ms`
+    )
 
     return {
       success: true,
       note: updatedNote
     }
   } catch (error) {
-    console.error("❌ Update pipeline failed:", error)
+    const totalTime = performance.now() - startTime
+    console.error(
+      `❌ [BG Update] Update pipeline failed after ${totalTime.toFixed(2)}ms:`,
+      error
+    )
     return {
       success: false,
       error: String(error)

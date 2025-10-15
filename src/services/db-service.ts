@@ -318,29 +318,48 @@ export async function searchNotesByVector(
   vector: number[],
   limit: number = 5
 ): Promise<Note[]> {
+  const startTime = performance.now()
+
   try {
     // Efficiently get all stored notes with Dexie (returns encrypted content)
+    const fetchStartTime = performance.now()
     const storedNotes = await db.notes
       .filter((note) => note.embedding && note.embedding.length > 0)
       .toArray()
+    const fetchTime = performance.now() - fetchStartTime
+    console.log(
+      `⏱️ [DB Vector Search] Fetch notes from DB: ${fetchTime.toFixed(2)}ms (${storedNotes.length} notes)`
+    )
 
     if (storedNotes.length === 0) {
+      console.log(`⏱️ [DB Vector Search] No notes with embeddings found`)
       return []
     }
 
     // Calculate similarity scores (fast, in-memory operation)
+    const scoreStartTime = performance.now()
     const scored = storedNotes.map((note) => ({
       note,
       score: cosineSimilarity(vector, note.embedding!)
     }))
+    const scoreTime = performance.now() - scoreStartTime
+    console.log(
+      `⏱️ [DB Vector Search] Calculate similarity scores: ${scoreTime.toFixed(2)}ms`
+    )
 
     // Sort by score (descending) and take top results
+    const sortStartTime = performance.now()
     scored.sort((a, b) => b.score - a.score)
     const topResults = scored.slice(0, limit)
+    const sortTime = performance.now() - sortStartTime
+    console.log(
+      `⏱️ [DB Vector Search] Sort and slice top ${limit} results: ${sortTime.toFixed(2)}ms`
+    )
 
     // Decrypt ONLY the top matching notes (critical optimization)
+    const decryptStartTime = performance.now()
     const decryptedNotes: Note[] = []
-    for (const { note } of topResults) {
+    for (const { note, score } of topResults) {
       try {
         const content = await decrypt(note.content)
         decryptedNotes.push({
@@ -353,14 +372,26 @@ export async function searchNotesByVector(
           updatedAt: note.updatedAt,
           sourceUrl: note.sourceUrl
         })
+        console.log(`  📄 Note "${note.title}" (score: ${score.toFixed(4)})`)
       } catch (error) {
         console.error(`Error decrypting note ${note.id}:`, error)
       }
     }
+    const decryptTime = performance.now() - decryptStartTime
+    console.log(
+      `⏱️ [DB Vector Search] Decrypt top ${limit} notes: ${decryptTime.toFixed(2)}ms`
+    )
+
+    const totalTime = performance.now() - startTime
+    console.log(`⏱️ [DB Vector Search] TOTAL time: ${totalTime.toFixed(2)}ms`)
 
     return decryptedNotes
   } catch (error) {
-    console.error("Error searching notes by vector:", error)
+    const totalTime = performance.now() - startTime
+    console.error(
+      `❌ [DB Vector Search] Failed after ${totalTime.toFixed(2)}ms:`,
+      error
+    )
     return []
   }
 }
@@ -377,22 +408,44 @@ export async function searchNotesSemanticWithContent(
   vector: number[],
   limit: number = 5
 ): Promise<{ notes: Note[]; combinedContent: string }> {
+  const startTime = performance.now()
+
   try {
+    const searchStartTime = performance.now()
     const matchingNotes = await searchNotesByVector(vector, limit)
+    const searchTime = performance.now() - searchStartTime
+    console.log(
+      `⏱️ [Semantic Search With Content] Vector search: ${searchTime.toFixed(2)}ms`
+    )
 
     if (matchingNotes.length === 0) {
+      console.log(`⏱️ [Semantic Search With Content] No matching notes found`)
       return { notes: [], combinedContent: "" }
     }
 
+    const combineStartTime = performance.now()
     const combinedContent = matchingNotes
       .map((note, idx) => {
         return `Note ${idx + 1}: ${note.title}\n${note.content}\n---`
       })
       .join("\n\n")
+    const combineTime = performance.now() - combineStartTime
+    console.log(
+      `⏱️ [Semantic Search With Content] Combine content: ${combineTime.toFixed(2)}ms (${combinedContent.length} chars)`
+    )
+
+    const totalTime = performance.now() - startTime
+    console.log(
+      `⏱️ [Semantic Search With Content] TOTAL time: ${totalTime.toFixed(2)}ms`
+    )
 
     return { notes: matchingNotes, combinedContent }
   } catch (error) {
-    console.error("Error in semantic search with content:", error)
+    const totalTime = performance.now() - startTime
+    console.error(
+      `❌ [Semantic Search With Content] Failed after ${totalTime.toFixed(2)}ms:`,
+      error
+    )
     return { notes: [], combinedContent: "" }
   }
 }

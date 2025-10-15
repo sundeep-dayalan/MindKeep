@@ -134,14 +134,19 @@ function SidePanel() {
 
       if (editingNote) {
         // For updates, generate embedding here (in DOM context with full Web APIs)
-        console.log("✏️ Updating existing note:", editingNote.id)
+        const updateStartTime = performance.now()
+        console.log("✏️ [UI Update] Updating existing note:", editingNote.id)
 
         // Generate new embedding for updated content
-        console.log("🔢 Generating embedding from updated content...")
+        const embeddingStartTime = performance.now()
         const embedding = await generateEmbedding(noteContent)
-        console.log(`✅ Embedding generated: ${embedding.length} dimensions`)
+        const embeddingTime = performance.now() - embeddingStartTime
+        console.log(
+          `⏱️ [UI Update] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embedding.length} dimensions)`
+        )
 
         // Send update request to background script with pre-generated embedding
+        const messageStartTime = performance.now()
         const response = await chrome.runtime.sendMessage({
           type: "UPDATE_NOTE",
           data: {
@@ -152,19 +157,34 @@ function SidePanel() {
             embedding // Pass the pre-generated embedding
           }
         })
+        const messageTime = performance.now() - messageStartTime
+        console.log(
+          `⏱️ [UI Update] Background processing (encrypt + DB): ${messageTime.toFixed(2)}ms`
+        )
 
         if (!response.success) {
           throw new Error(response.error || "Update failed")
         }
-        console.log("✅ Update result:", response.note)
+
+        const totalTime = performance.now() - updateStartTime
+        console.log(
+          `⏱️ [UI Update] TOTAL update time: ${totalTime.toFixed(2)}ms`
+        )
+        console.log(
+          `📊 [UI Update] Breakdown: Embedding=${embeddingTime.toFixed(2)}ms, Background=${messageTime.toFixed(2)}ms`
+        )
       } else {
         // For new notes, generate embedding here (in DOM context with full Web APIs)
-        console.log("📝 Creating new note...")
+        const saveStartTime = performance.now()
+        console.log("📝 [UI Save] Creating new note...")
 
         // Step 1: Generate embedding from plaintext content (HERE in side panel)
-        console.log("🔢 Generating embedding from plaintext content...")
+        const embeddingStartTime = performance.now()
         const embedding = await generateEmbedding(noteContent)
-        console.log(`✅ Embedding generated: ${embedding.length} dimensions`)
+        const embeddingTime = performance.now() - embeddingStartTime
+        console.log(
+          `⏱️ [UI Save] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embedding.length} dimensions)`
+        )
 
         // Get current tab URL for sourceUrl
         let sourceUrl: string | undefined
@@ -179,6 +199,7 @@ function SidePanel() {
         }
 
         // Step 2: Send to background script with pre-generated embedding
+        const messageStartTime = performance.now()
         const response = await chrome.runtime.sendMessage({
           type: "SAVE_NOTE",
           data: {
@@ -189,12 +210,20 @@ function SidePanel() {
             embedding // Pass the pre-generated embedding
           }
         })
+        const messageTime = performance.now() - messageStartTime
+        console.log(
+          `⏱️ [UI Save] Background processing (encrypt + DB): ${messageTime.toFixed(2)}ms`
+        )
 
         if (!response.success) {
           throw new Error(response.error || "Save failed")
         }
 
-        console.log("✅ Note saved successfully:", response.note)
+        const totalTime = performance.now() - saveStartTime
+        console.log(`⏱️ [UI Save] TOTAL save time: ${totalTime.toFixed(2)}ms`)
+        console.log(
+          `📊 [UI Save] Breakdown: Embedding=${embeddingTime.toFixed(2)}ms, Background=${messageTime.toFixed(2)}ms`
+        )
       }
 
       console.log("Reloading data...")
@@ -264,12 +293,24 @@ function SidePanel() {
       return
     }
 
+    const startTime = performance.now()
+    console.log("🎯 [UI] Starting title generation...")
+
     setIsGeneratingTitle(true)
     try {
       const generatedTitle = await generateTitle(noteTitle, noteContent)
       setNoteTitle(generatedTitle)
+
+      const totalTime = performance.now() - startTime
+      console.log(
+        `⏱️ [UI] Title generation completed: ${totalTime.toFixed(2)}ms`
+      )
     } catch (error) {
-      console.error("Error generating title:", error)
+      const totalTime = performance.now() - startTime
+      console.error(
+        `❌ [UI] Title generation failed after ${totalTime.toFixed(2)}ms:`,
+        error
+      )
       // Show detailed error message
       const errorMessage = error.message || "Failed to generate title"
       if (
@@ -292,47 +333,86 @@ function SidePanel() {
       return
     }
 
+    const startTime = performance.now()
+    console.log("📝 [UI] Starting content summarization...")
+
     setIsSummarizing(true)
     try {
       const summary = await summarizeText(noteContent)
       setNoteContent(summary)
+
+      const totalTime = performance.now() - startTime
+      console.log(
+        `⏱️ [UI] Content summarization completed: ${totalTime.toFixed(2)}ms`
+      )
     } catch (error) {
-      console.error("Error summarizing content:", error)
+      const totalTime = performance.now() - startTime
+      console.error(
+        `❌ [UI] Content summarization failed after ${totalTime.toFixed(2)}ms:`,
+        error
+      )
       alert("Failed to summarize content")
     }
     setIsSummarizing(false)
   }
 
   const handleAISearch = async (query: string): Promise<string> => {
-    try {
-      console.log("🔍 AI Search started for query:", query)
+    const startTime = performance.now()
 
-      console.log("🔢 Generating embedding for query...")
+    try {
+      console.log("🔍 [UI AI Search] Started for query:", query)
+
+      // Step 1: Generate embedding for query
+      const embeddingStartTime = performance.now()
       const queryEmbedding = await generateEmbedding(query)
+      const embeddingTime = performance.now() - embeddingStartTime
       console.log(
-        `✅ Query embedding generated: ${queryEmbedding.length} dimensions`
+        `⏱️ [UI AI Search] Query embedding generation: ${embeddingTime.toFixed(2)}ms (${queryEmbedding.length} dimensions)`
       )
 
-      console.log("🔎 Searching for similar notes...")
+      // Step 2: Search for similar notes
+      const searchStartTime = performance.now()
       const { notes: matchingNotes, combinedContent } =
         await searchNotesSemanticWithContent(queryEmbedding, 5)
+      const searchTime = performance.now() - searchStartTime
+      console.log(
+        `⏱️ [UI AI Search] Database search: ${searchTime.toFixed(2)}ms (found ${matchingNotes.length} notes)`
+      )
 
       if (matchingNotes.length === 0) {
+        const totalTime = performance.now() - startTime
+        console.log(
+          `⏱️ [UI AI Search] No results found - TOTAL time: ${totalTime.toFixed(2)}ms`
+        )
         return "I couldn't find any notes related to your query. Try adding more notes or rephrasing your question."
       }
 
-      console.log(`📝 Found ${matchingNotes.length} matching notes`)
-      console.log("📄 Combined content length:", combinedContent.length)
+      console.log(
+        `� [UI AI Search] Combined content length: ${combinedContent.length} chars`
+      )
 
-      console.log("🤖 Summarizing results using AI...")
+      // Step 3: Summarize results using AI
+      const summarizeStartTime = performance.now()
       const prompt = `Based on the following notes, answer this question: "${query}"\n\n${combinedContent}\n\nProvide a clear, concise answer based only on the information in these notes.`
-
       const summary = await summarizeText(prompt)
-      console.log("✅ AI Search completed successfully")
+      const summarizeTime = performance.now() - summarizeStartTime
+      console.log(
+        `⏱️ [UI AI Search] AI summarization: ${summarizeTime.toFixed(2)}ms`
+      )
+
+      const totalTime = performance.now() - startTime
+      console.log(`⏱️ [UI AI Search] TOTAL time: ${totalTime.toFixed(2)}ms`)
+      console.log(
+        `📊 [UI AI Search] Breakdown: Embedding=${embeddingTime.toFixed(2)}ms, Search=${searchTime.toFixed(2)}ms, Summarize=${summarizeTime.toFixed(2)}ms`
+      )
 
       return summary
     } catch (error) {
-      console.error("❌ AI Search error:", error)
+      const totalTime = performance.now() - startTime
+      console.error(
+        `❌ [UI AI Search] Failed after ${totalTime.toFixed(2)}ms:`,
+        error
+      )
       return "I encountered an error while searching. Please try again."
     }
   }
