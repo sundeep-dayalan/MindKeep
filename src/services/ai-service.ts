@@ -416,7 +416,14 @@ export async function generateTitle(
   console.log(`🎯 [Generate Title] Starting title generation...`)
 
   try {
-    const rewrittenContent = await rewriteText(titleContent, noteContent)
+    // If title is empty, generate from content; otherwise improve the existing title
+    const textToProcess = titleContent.trim() || noteContent.trim()
+    
+    if (!textToProcess) {
+      throw new Error("No content available to generate title from")
+    }
+
+    const rewrittenContent = await rewriteText(textToProcess, noteContent)
 
     const totalTime = performance.now() - startTime
     console.log(`⏱️ [Generate Title] TOTAL time: ${totalTime.toFixed(2)}ms`)
@@ -428,7 +435,7 @@ export async function generateTitle(
       `⚠️ [Generate Title] Could not generate title after ${totalTime.toFixed(2)}ms, falling back to original.`,
       error
     )
-    // Fallback: just return the original content if rewriting fails
-    return titleContent
+    // Fallback: return the original title if it exists, otherwise return a truncated version of content
+    return titleContent.trim() || noteContent.trim().substring(0, 50)
   }
 }
