@@ -399,11 +399,11 @@ export async function searchNotesSemanticWithContent(
 
 /**
  * Search notes by title (OPTIMIZED: uses indexed prefix search)
- * 
+ *
  * This function uses a hybrid approach:
  * 1. For title search: Uses the indexed 'title' field for fast prefix matching
  * 2. For content search: Falls back to full scan (can't avoid since content is encrypted)
- * 
+ *
  * Note: Since content is encrypted, we can't search it without decryption.
  * For best performance, prefer searching by title when possible.
  */
@@ -425,13 +425,13 @@ export async function searchNotesByTitle(query: string): Promise<Note[]> {
 
     // Also check for title substring matches (not as fast, but covers more cases)
     const titleSubstringMatches = await db.notes
-      .filter(note => note.title.toLowerCase().includes(lowerQuery))
+      .filter((note) => note.title.toLowerCase().includes(lowerQuery))
       .toArray()
 
     // Combine and decrypt title matches
     const allTitleMatches = [...titleMatches, ...titleSubstringMatches]
     const uniqueTitleMatches = Array.from(
-      new Map(allTitleMatches.map(note => [note.id, note])).values()
+      new Map(allTitleMatches.map((note) => [note.id, note])).values()
     )
 
     for (const storedNote of uniqueTitleMatches) {
@@ -457,7 +457,7 @@ export async function searchNotesByTitle(query: string): Promise<Note[]> {
     if (results.size < 10) {
       // Get notes not already found by title search
       const remainingNotes = await db.notes
-        .filter(note => !results.has(note.id))
+        .filter((note) => !results.has(note.id))
         .toArray()
 
       for (const storedNote of remainingNotes) {
@@ -528,7 +528,7 @@ export async function getNotesByCategory(category: string): Promise<Note[]> {
 
 /**
  * Get all unique categories (OPTIMIZED: uses index, no decryption needed)
- * 
+ *
  * This function is extremely fast because it reads ONLY from the category index
  * without touching any note objects or decrypting any content.
  */
