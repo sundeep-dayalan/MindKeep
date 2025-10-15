@@ -53,7 +53,7 @@ class MindKeepDatabase extends Dexie {
     // The string after the & symbol defines indexes
     // Primary key (id) is automatically indexed
     this.version(1).stores({
-      notes: "id, category, updatedAt, createdAt" // indexed fields
+      notes: "id, category, updatedAt, createdAt, title" // indexed fields for fast queries
     })
   }
 }
@@ -398,18 +398,90 @@ export async function searchNotesSemanticWithContent(
 }
 
 /**
- * Search notes by title
+ * Search notes by title (OPTIMIZED: uses indexed prefix search)
+ * 
+ * This function uses a hybrid approach:
+ * 1. For title search: Uses the indexed 'title' field for fast prefix matching
+ * 2. For content search: Falls back to full scan (can't avoid since content is encrypted)
+ * 
+ * Note: Since content is encrypted, we can't search it without decryption.
+ * For best performance, prefer searching by title when possible.
  */
 export async function searchNotesByTitle(query: string): Promise<Note[]> {
   try {
-    const allNotes = await getAllNotes()
-    const lowerQuery = query.toLowerCase()
+    if (!query || query.trim() === "") {
+      return []
+    }
 
-    return allNotes.filter(
-      (note) =>
-        note.title.toLowerCase().includes(lowerQuery) ||
-        note.content.toLowerCase().includes(lowerQuery)
+    const lowerQuery = query.toLowerCase()
+    const results = new Map<string, Note>() // Use Map to avoid duplicates
+
+    // OPTIMIZATION 1: Search by title using the index (fast!)
+    // This uses case-insensitive prefix matching on the indexed title field
+    const titleMatches = await db.notes
+      .where("title")
+      .startsWithIgnoreCase(query)
+      .toArray()
+
+    // Also check for title substring matches (not as fast, but covers more cases)
+    const titleSubstringMatches = await db.notes
+      .filter(note => note.title.toLowerCase().includes(lowerQuery))
+      .toArray()
+
+    // Combine and decrypt title matches
+    const allTitleMatches = [...titleMatches, ...titleSubstringMatches]
+    const uniqueTitleMatches = Array.from(
+      new Map(allTitleMatches.map(note => [note.id, note])).values()
     )
+
+    for (const storedNote of uniqueTitleMatches) {
+      try {
+        const content = await decrypt(storedNote.content)
+        results.set(storedNote.id, {
+          id: storedNote.id,
+          title: storedNote.title,
+          content,
+          category: storedNote.category,
+          embedding: storedNote.embedding,
+          createdAt: storedNote.createdAt,
+          updatedAt: storedNote.updatedAt,
+          sourceUrl: storedNote.sourceUrl
+        })
+      } catch (error) {
+        console.error(`Error decrypting note ${storedNote.id}:`, error)
+      }
+    }
+
+    // OPTIMIZATION 2: For content search, we need to decrypt
+    // Only do this if the title search didn't find many results
+    if (results.size < 10) {
+      // Get notes not already found by title search
+      const remainingNotes = await db.notes
+        .filter(note => !results.has(note.id))
+        .toArray()
+
+      for (const storedNote of remainingNotes) {
+        try {
+          const content = await decrypt(storedNote.content)
+          if (content.toLowerCase().includes(lowerQuery)) {
+            results.set(storedNote.id, {
+              id: storedNote.id,
+              title: storedNote.title,
+              content,
+              category: storedNote.category,
+              embedding: storedNote.embedding,
+              createdAt: storedNote.createdAt,
+              updatedAt: storedNote.updatedAt,
+              sourceUrl: storedNote.sourceUrl
+            })
+          }
+        } catch (error) {
+          console.error(`Error decrypting note ${storedNote.id}:`, error)
+        }
+      }
+    }
+
+    return Array.from(results.values())
   } catch (error) {
     console.error("Error searching notes by title:", error)
     return []
@@ -455,20 +527,17 @@ export async function getNotesByCategory(category: string): Promise<Note[]> {
 }
 
 /**
- * Get all unique categories
+ * Get all unique categories (OPTIMIZED: uses index, no decryption needed)
+ * 
+ * This function is extremely fast because it reads ONLY from the category index
+ * without touching any note objects or decrypting any content.
  */
 export async function getAllCategories(): Promise<string[]> {
   try {
-    const allNotes = await getAllNotes()
-    const categories = new Set<string>()
-
-    allNotes.forEach((note) => {
-      if (note.category) {
-        categories.add(note.category)
-      }
-    })
-
-    return Array.from(categories).sort()
+    // Use Dexie's uniqueKeys() to get unique categories from the index
+    // This is orders of magnitude faster than loading all notes
+    const categories = await db.notes.orderBy("category").uniqueKeys()
+    return categories as string[]
   } catch (error) {
     console.error("Error getting categories:", error)
     return []
