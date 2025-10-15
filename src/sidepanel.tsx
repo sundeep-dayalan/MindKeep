@@ -120,6 +120,16 @@ function SidePanel() {
         return
       }
 
+      // Check for duplicate category when creating a new one
+      if (showNewCategory) {
+        const existingCategories = categories.map(cat => cat.toLowerCase())
+        if (existingCategories.includes(finalCategory)) {
+          alert(`Category "${finalCategory}" already exists. Please select it from the dropdown or choose a different name.`)
+          setLoading(false)
+          return
+        }
+      }
+
       if (editingNote) {
         // For updates, generate embedding here (in DOM context with full Web APIs)
         console.log("✏️ Updating existing note:", editingNote.id)
