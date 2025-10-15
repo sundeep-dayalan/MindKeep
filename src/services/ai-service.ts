@@ -418,7 +418,7 @@ export async function generateTitle(
   try {
     // If title is empty, generate from content; otherwise improve the existing title
     const textToProcess = titleContent.trim() || noteContent.trim()
-    
+
     if (!textToProcess) {
       throw new Error("No content available to generate title from")
     }
