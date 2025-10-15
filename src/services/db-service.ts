@@ -1,6 +1,6 @@
 /**
  * Database service for MindKeep
- * Manages all database interactions using IndexedDB for storage
+ * Manages all database interactions using Dexie.js (wrapper over IndexedDB)
  *
  * CRITICAL: This service stores and retrieves data AS-IS.
  * It does NOT generate embeddings - that is done by ai-service.ts in the background script
@@ -10,6 +10,8 @@
  * SAVE: Receive data → Generate embedding → Encrypt content → Store here
  * RETRIEVE: Fetch from here → Decrypt content → Return to UI
  */
+
+import Dexie, { type Table } from "dexie"
 
 import { decrypt } from "~util/crypto"
 
@@ -37,43 +39,27 @@ export interface StoredNote {
   sourceUrl?: string
 }
 
-// IndexedDB database name
-const DB_NAME = "mindkeep_db"
-const DB_VERSION = 1
-const STORE_NAME = "notes"
-
-let dbInstance: IDBDatabase | null = null
-let migrationRun = false
-
 /**
- * Initialize IndexedDB
+ * Dexie Database Class
+ * Defines the schema and provides typed access to tables
  */
-async function initializeDB(): Promise<IDBDatabase> {
-  if (dbInstance) {
-    return dbInstance
+class MindKeepDatabase extends Dexie {
+  notes!: Table<StoredNote, string> // StoredNote type, string key (id)
+
+  constructor() {
+    super("mindkeep_db")
+
+    // Define schema
+    // The string after the & symbol defines indexes
+    // Primary key (id) is automatically indexed
+    this.version(1).stores({
+      notes: "id, category, updatedAt, createdAt" // indexed fields
+    })
   }
-
-  return new Promise(async (resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION)
-
-    request.onerror = () => reject(request.error)
-    request.onsuccess = async () => {
-      dbInstance = request.result
-
-      resolve(dbInstance)
-    }
-
-    request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result
-
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const objectStore = db.createObjectStore(STORE_NAME, { keyPath: "id" })
-        objectStore.createIndex("category", "category", { unique: false })
-        objectStore.createIndex("updatedAt", "updatedAt", { unique: false })
-      }
-    }
-  })
 }
+
+// Create singleton database instance
+const db = new MindKeepDatabase()
 
 /**
  * Calculate cosine similarity between two vectors
@@ -126,7 +112,6 @@ export async function addNote(noteData: {
   embedding?: number[] // Pre-generated embedding vector
 }): Promise<StoredNote> {
   try {
-    const db = await initializeDB()
     const id = generateId()
     const now = Date.now()
 
@@ -141,17 +126,8 @@ export async function addNote(noteData: {
       sourceUrl: noteData.sourceUrl
     }
 
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], "readwrite")
-      const store = transaction.objectStore(STORE_NAME)
-      const request = store.add(storedNote)
-
-      request.onsuccess = () => {
-        resolve(storedNote)
-      }
-
-      request.onerror = () => reject(request.error)
-    })
+    await db.notes.add(storedNote)
+    return storedNote
   } catch (error) {
     console.error("Error adding note:", error)
     throw new Error("Failed to add note")
@@ -170,42 +146,24 @@ export async function addNote(noteData: {
  */
 export async function getNote(id: string): Promise<Note | null> {
   try {
-    const db = await initializeDB()
+    const storedNote = await db.notes.get(id)
 
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], "readonly")
-      const store = transaction.objectStore(STORE_NAME)
-      const request = store.get(id)
+    if (!storedNote) {
+      return null
+    }
 
-      request.onsuccess = async () => {
-        const storedNote = request.result as StoredNote | undefined
-
-        if (!storedNote) {
-          resolve(null)
-          return
-        }
-
-        try {
-          // Decrypt the content field
-          const content = await decrypt(storedNote.content)
-          resolve({
-            id: storedNote.id,
-            title: storedNote.title,
-            content, // Decrypted content
-            category: storedNote.category,
-            embedding: storedNote.embedding,
-            createdAt: storedNote.createdAt,
-            updatedAt: storedNote.updatedAt,
-            sourceUrl: storedNote.sourceUrl
-          })
-        } catch (error) {
-          console.error("Error decrypting note:", error)
-          resolve(null)
-        }
-      }
-
-      request.onerror = () => reject(request.error)
-    })
+    // Decrypt the content field
+    const content = await decrypt(storedNote.content)
+    return {
+      id: storedNote.id,
+      title: storedNote.title,
+      content, // Decrypted content
+      category: storedNote.category,
+      embedding: storedNote.embedding,
+      createdAt: storedNote.createdAt,
+      updatedAt: storedNote.updatedAt,
+      sourceUrl: storedNote.sourceUrl
+    }
   } catch (error) {
     console.error("Error getting note:", error)
     return null
@@ -233,21 +191,8 @@ export async function updateNote(
   }
 ): Promise<Note | null> {
   try {
-    const db = await initializeDB()
-
     // Get existing stored note (with encrypted content)
-    const existingStoredNote = await new Promise<StoredNote | null>(
-      (resolve, reject) => {
-        const transaction = db.transaction([STORE_NAME], "readonly")
-        const store = transaction.objectStore(STORE_NAME)
-        const request = store.get(id)
-
-        request.onsuccess = () => {
-          resolve(request.result || null)
-        }
-        request.onerror = () => reject(request.error)
-      }
-    )
+    const existingStoredNote = await db.notes.get(id)
 
     if (!existingStoredNote) {
       return null
@@ -264,29 +209,21 @@ export async function updateNote(
       sourceUrl: existingStoredNote.sourceUrl
     }
 
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], "readwrite")
-      const store = transaction.objectStore(STORE_NAME)
-      const request = store.put(updatedNote)
+    await db.notes.put(updatedNote)
 
-      request.onsuccess = async () => {
-        // Decrypt content for return value
-        const content = await decrypt(updatedNote.content)
+    // Decrypt content for return value
+    const content = await decrypt(updatedNote.content)
 
-        resolve({
-          id: updatedNote.id,
-          title: updatedNote.title,
-          content, // Decrypted content
-          category: updatedNote.category,
-          embedding: updatedNote.embedding,
-          createdAt: updatedNote.createdAt,
-          updatedAt: updatedNote.updatedAt,
-          sourceUrl: updatedNote.sourceUrl
-        })
-      }
-
-      request.onerror = () => reject(request.error)
-    })
+    return {
+      id: updatedNote.id,
+      title: updatedNote.title,
+      content, // Decrypted content
+      category: updatedNote.category,
+      embedding: updatedNote.embedding,
+      createdAt: updatedNote.createdAt,
+      updatedAt: updatedNote.updatedAt,
+      sourceUrl: updatedNote.sourceUrl
+    }
   } catch (error) {
     console.error("Error updating note:", error)
     return null
@@ -298,16 +235,8 @@ export async function updateNote(
  */
 export async function deleteNote(id: string): Promise<boolean> {
   try {
-    const db = await initializeDB()
-
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], "readwrite")
-      const store = transaction.objectStore(STORE_NAME)
-      const request = store.delete(id)
-
-      request.onsuccess = () => resolve(true)
-      request.onerror = () => reject(request.error)
-    })
+    await db.notes.delete(id)
+    return true
   } catch (error) {
     console.error("Error deleting note:", error)
     return false
@@ -324,19 +253,7 @@ export async function deleteNote(id: string): Promise<boolean> {
  */
 async function getAllStoredNotes(): Promise<StoredNote[]> {
   try {
-    const db = await initializeDB()
-
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], "readonly")
-      const store = transaction.objectStore(STORE_NAME)
-      const request = store.getAll()
-
-      request.onsuccess = () => {
-        resolve(request.result as StoredNote[])
-      }
-
-      request.onerror = () => reject(request.error)
-    })
+    return await db.notes.toArray()
   } catch (error) {
     console.error("Error getting stored notes:", error)
     return []
@@ -384,40 +301,44 @@ export async function getAllNotes(): Promise<Note[]> {
 }
 
 /**
- * Search notes by vector similarity
+ * Search notes by vector similarity (optimized with Dexie)
  *
  * IMPORTANT: This function performs semantic search using pre-generated embeddings.
  * The query embedding should be generated by the background script before calling this.
- * Only decrypts the content of matching notes (for efficiency).
+ *
+ * OPTIMIZATION: This function efficiently loads all notes at once (fast with Dexie),
+ * calculates similarity scores in memory, and only decrypts the top matching results.
+ * This is much faster than decrypting everything upfront.
  *
  * @param vector - The query embedding vector (from ai-service.generateEmbedding)
  * @param limit - Maximum number of results to return
- * @returns Array of notes with decrypted content, sorted by similarity score
+ * @returns Array of notes with decrypted content, sorted by similarity score (highest first)
  */
 export async function searchNotesByVector(
   vector: number[],
   limit: number = 5
 ): Promise<Note[]> {
   try {
-    // Get stored notes (with encrypted content)
-    const storedNotes = await getAllStoredNotes()
-    const notesWithEmbeddings = storedNotes.filter((note) => note.embedding)
+    // Efficiently get all stored notes with Dexie (returns encrypted content)
+    const storedNotes = await db.notes
+      .filter((note) => note.embedding && note.embedding.length > 0)
+      .toArray()
 
-    if (notesWithEmbeddings.length === 0) {
+    if (storedNotes.length === 0) {
       return []
     }
 
-    // Calculate similarity scores
-    const scored = notesWithEmbeddings.map((note) => ({
+    // Calculate similarity scores (fast, in-memory operation)
+    const scored = storedNotes.map((note) => ({
       note,
       score: cosineSimilarity(vector, note.embedding!)
     }))
 
-    // Sort by score and take top results
+    // Sort by score (descending) and take top results
     scored.sort((a, b) => b.score - a.score)
     const topResults = scored.slice(0, limit)
 
-    // Decrypt only the top matching notes
+    // Decrypt ONLY the top matching notes (critical optimization)
     const decryptedNotes: Note[] = []
     for (const { note } of topResults) {
       try {
@@ -496,12 +417,37 @@ export async function searchNotesByTitle(query: string): Promise<Note[]> {
 }
 
 /**
- * Get notes by category
+ * Get notes by category (optimized with Dexie's indexed query)
  */
 export async function getNotesByCategory(category: string): Promise<Note[]> {
   try {
-    const allNotes = await getAllNotes()
-    return allNotes.filter((note) => note.category === category)
+    // Use Dexie's indexed query for efficient filtering
+    const storedNotes = await db.notes
+      .where("category")
+      .equals(category)
+      .toArray()
+
+    // Decrypt only the filtered results
+    const notes: Note[] = []
+    for (const storedNote of storedNotes) {
+      try {
+        const content = await decrypt(storedNote.content)
+        notes.push({
+          id: storedNote.id,
+          title: storedNote.title,
+          content,
+          category: storedNote.category,
+          embedding: storedNote.embedding,
+          createdAt: storedNote.createdAt,
+          updatedAt: storedNote.updatedAt,
+          sourceUrl: storedNote.sourceUrl
+        })
+      } catch (error) {
+        console.error(`Error decrypting note ${storedNote.id}:`, error)
+      }
+    }
+
+    return notes
   } catch (error) {
     console.error("Error getting notes by category:", error)
     return []
@@ -601,20 +547,8 @@ export async function deleteCategory(
  */
 export async function clearAllNotes(): Promise<void> {
   try {
-    const db = await initializeDB()
-
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], "readwrite")
-      const store = transaction.objectStore(STORE_NAME)
-      const request = store.clear()
-
-      request.onsuccess = () => {
-        console.log("All notes cleared")
-        resolve()
-      }
-
-      request.onerror = () => reject(request.error)
-    })
+    await db.notes.clear()
+    console.log("All notes cleared")
   } catch (error) {
     console.error("Error clearing notes:", error)
     throw new Error("Failed to clear notes")
@@ -633,28 +567,19 @@ export async function debugIndexedDB(): Promise<void> {
     console.log("Available databases:", databases)
 
     // Check our database
-    const db = await initializeDB()
-    console.log("Connected to database:", DB_NAME)
-    console.log("Object stores:", Array.from(db.objectStoreNames))
+    console.log("Connected to database:", db.name)
+    console.log("Database version:", db.verno)
+    console.log(
+      "Tables:",
+      db.tables.map((t) => t.name)
+    )
 
     // Count notes
-    const count = await new Promise<number>((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], "readonly")
-      const store = transaction.objectStore(STORE_NAME)
-      const request = store.count()
-      request.onsuccess = () => resolve(request.result)
-      request.onerror = () => reject(request.error)
-    })
+    const count = await db.notes.count()
     console.log(`Total notes in database: ${count}`)
 
     // Get all raw stored notes (encrypted)
-    const rawNotes = await new Promise<StoredNote[]>((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], "readonly")
-      const store = transaction.objectStore(STORE_NAME)
-      const request = store.getAll()
-      request.onsuccess = () => resolve(request.result)
-      request.onerror = () => reject(request.error)
-    })
+    const rawNotes = await db.notes.toArray()
     console.log("Raw stored notes (encrypted):", rawNotes)
 
     console.log("=== End Debug Info ===")
