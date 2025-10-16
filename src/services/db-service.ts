@@ -19,7 +19,8 @@ import { decrypt } from "~util/crypto"
 export interface Note {
   id: string
   title: string
-  content: string // Plaintext content (for display)
+  content: string // Rich text JSON (decrypted, for display in TipTap)
+  contentPlaintext: string // Plain text extracted from rich text (decrypted, for search)
   category: string
   embedding?: number[]
   createdAt: number
@@ -31,7 +32,8 @@ export interface Note {
 export interface StoredNote {
   id: string
   title: string // Plaintext for searching/filtering
-  content: string // ENCRYPTED content (base64 string) - stored as "content" in DB
+  content: string // ENCRYPTED TipTap JSON (base64 string) - stored as "content" in DB
+  contentPlaintext: string // ENCRYPTED plain text for search (base64 string)
   category: string // Plaintext for filtering
   embedding?: number[] // Plaintext vector for semantic search
   createdAt: number
@@ -52,7 +54,8 @@ class MindKeepDatabase extends Dexie {
     // Define schema
     // The string after the & symbol defines indexes
     // Primary key (id) is automatically indexed
-    this.version(1).stores({
+    // Version 2: Added contentPlaintext field for rich text support
+    this.version(2).stores({
       notes: "id, category, updatedAt, createdAt, title" // indexed fields for fast queries
     })
   }
@@ -96,7 +99,8 @@ function generateId(): string {
  * Add a new note to the database
  *
  * IMPORTANT: This function expects the data to be PRE-PROCESSED by the background script:
- * - content should be ENCRYPTED (base64 string from crypto.encrypt())
+ * - content should be ENCRYPTED TipTap JSON (base64 string from crypto.encrypt())
+ * - contentPlaintext should be ENCRYPTED plain text (base64 string from crypto.encrypt())
  * - embedding should be GENERATED (number array from ai-service.generateEmbedding())
  *
  * This function ONLY stores the data as provided.
@@ -106,7 +110,8 @@ function generateId(): string {
  */
 export async function addNote(noteData: {
   title: string
-  content: string // ENCRYPTED content (base64 string)
+  content: string // ENCRYPTED TipTap JSON (base64 string)
+  contentPlaintext: string // ENCRYPTED plain text (base64 string)
   category?: string
   sourceUrl?: string
   embedding?: number[] // Pre-generated embedding vector
@@ -118,7 +123,8 @@ export async function addNote(noteData: {
     const storedNote: StoredNote = {
       id,
       title: noteData.title,
-      content: noteData.content, // Store encrypted content as-is
+      content: noteData.content, // Store encrypted TipTap JSON as-is
+      contentPlaintext: noteData.contentPlaintext, // Store encrypted plaintext as-is
       category: noteData.category || "general",
       embedding: noteData.embedding, // Store embedding as-is
       createdAt: now,
@@ -137,9 +143,8 @@ export async function addNote(noteData: {
 /**
  * Get a single note by ID and decrypt its content
  *
- * IMPORTANT: This function retrieves the stored note and decrypts the content
- * before returning it. The decryption happens here for convenience, but the
- * background script could also handle this if preferred.
+ * IMPORTANT: This function retrieves the stored note and decrypts both the
+ * TipTap JSON content and plaintext content before returning.
  *
  * @param id - The unique ID of the note
  * @returns The note with decrypted content, or null if not found
@@ -152,12 +157,15 @@ export async function getNote(id: string): Promise<Note | null> {
       return null
     }
 
-    // Decrypt the content field
+    // Decrypt both content fields
     const content = await decrypt(storedNote.content)
+    const contentPlaintext = await decrypt(storedNote.contentPlaintext)
+    
     return {
       id: storedNote.id,
       title: storedNote.title,
-      content, // Decrypted content
+      content, // Decrypted TipTap JSON
+      contentPlaintext, // Decrypted plain text
       category: storedNote.category,
       embedding: storedNote.embedding,
       createdAt: storedNote.createdAt,
@@ -174,6 +182,7 @@ export async function getNote(id: string): Promise<Note | null> {
  * Update an existing note
  *
  * IMPORTANT: If content is provided in updates, it should be PRE-ENCRYPTED.
+ * If contentPlaintext is provided, it should be PRE-ENCRYPTED.
  * If embedding is provided, it should be PRE-GENERATED.
  * The background script handles encryption/embedding before calling this.
  *
@@ -185,7 +194,8 @@ export async function updateNote(
   id: string,
   updates: {
     title?: string
-    content?: string // If provided, should be ENCRYPTED
+    content?: string // If provided, should be ENCRYPTED TipTap JSON
+    contentPlaintext?: string // If provided, should be ENCRYPTED plain text
     category?: string
     embedding?: number[] // If provided, should be pre-generated
   }
@@ -202,6 +212,7 @@ export async function updateNote(
       id,
       title: updates.title ?? existingStoredNote.title,
       content: updates.content ?? existingStoredNote.content, // Use encrypted content as-is
+      contentPlaintext: updates.contentPlaintext ?? existingStoredNote.contentPlaintext, // Use encrypted plaintext as-is
       category: updates.category ?? existingStoredNote.category,
       embedding: updates.embedding ?? existingStoredNote.embedding,
       createdAt: existingStoredNote.createdAt,
@@ -211,13 +222,15 @@ export async function updateNote(
 
     await db.notes.put(updatedNote)
 
-    // Decrypt content for return value
+    // Decrypt both content fields for return value
     const content = await decrypt(updatedNote.content)
+    const contentPlaintext = await decrypt(updatedNote.contentPlaintext)
 
     return {
       id: updatedNote.id,
       title: updatedNote.title,
-      content, // Decrypted content
+      content, // Decrypted TipTap JSON
+      contentPlaintext, // Decrypted plain text
       category: updatedNote.category,
       embedding: updatedNote.embedding,
       createdAt: updatedNote.createdAt,
@@ -263,8 +276,8 @@ async function getAllStoredNotes(): Promise<StoredNote[]> {
 /**
  * Get all notes and decrypt their content
  *
- * IMPORTANT: This function retrieves all stored notes and decrypts each
- * content field before returning. Used by the Side Panel to display notes.
+ * IMPORTANT: This function retrieves all stored notes and decrypts both
+ * content fields before returning. Used by the Side Panel to display notes.
  *
  * @returns Array of notes with decrypted content, sorted by updatedAt (newest first)
  */
@@ -275,12 +288,14 @@ export async function getAllNotes(): Promise<Note[]> {
 
     for (const storedNote of storedNotes) {
       try {
-        // Decrypt the content field
+        // Decrypt both content fields
         const content = await decrypt(storedNote.content)
+        const contentPlaintext = await decrypt(storedNote.contentPlaintext)
         notes.push({
           id: storedNote.id,
           title: storedNote.title,
-          content, // Decrypted content
+          content, // Decrypted TipTap JSON
+          contentPlaintext, // Decrypted plain text
           category: storedNote.category,
           embedding: storedNote.embedding,
           createdAt: storedNote.createdAt,
@@ -362,10 +377,12 @@ export async function searchNotesByVector(
     for (const { note, score } of topResults) {
       try {
         const content = await decrypt(note.content)
+        const contentPlaintext = await decrypt(note.contentPlaintext)
         decryptedNotes.push({
           id: note.id,
           title: note.title,
-          content, // Decrypted content
+          content, // Decrypted TipTap JSON
+          contentPlaintext, // Decrypted plain text
           category: note.category,
           embedding: note.embedding,
           createdAt: note.createdAt,
@@ -426,7 +443,8 @@ export async function searchNotesSemanticWithContent(
     const combineStartTime = performance.now()
     const combinedContent = matchingNotes
       .map((note, idx) => {
-        return `Note ${idx + 1}: ${note.title}\n${note.content}\n---`
+        // Use plain text content for AI summarization (not TipTap JSON)
+        return `Note ${idx + 1}: ${note.title}\n${note.contentPlaintext}\n---`
       })
       .join("\n\n")
     const combineTime = performance.now() - combineStartTime
@@ -490,10 +508,12 @@ export async function searchNotesByTitle(query: string): Promise<Note[]> {
     for (const storedNote of uniqueTitleMatches) {
       try {
         const content = await decrypt(storedNote.content)
+        const contentPlaintext = await decrypt(storedNote.contentPlaintext)
         results.set(storedNote.id, {
           id: storedNote.id,
           title: storedNote.title,
           content,
+          contentPlaintext,
           category: storedNote.category,
           embedding: storedNote.embedding,
           createdAt: storedNote.createdAt,
@@ -515,12 +535,15 @@ export async function searchNotesByTitle(query: string): Promise<Note[]> {
 
       for (const storedNote of remainingNotes) {
         try {
-          const content = await decrypt(storedNote.content)
-          if (content.toLowerCase().includes(lowerQuery)) {
+          // Search in plaintext content
+          const contentPlaintext = await decrypt(storedNote.contentPlaintext)
+          if (contentPlaintext.toLowerCase().includes(lowerQuery)) {
+            const content = await decrypt(storedNote.content)
             results.set(storedNote.id, {
               id: storedNote.id,
               title: storedNote.title,
               content,
+              contentPlaintext,
               category: storedNote.category,
               embedding: storedNote.embedding,
               createdAt: storedNote.createdAt,
@@ -557,10 +580,12 @@ export async function getNotesByCategory(category: string): Promise<Note[]> {
     for (const storedNote of storedNotes) {
       try {
         const content = await decrypt(storedNote.content)
+        const contentPlaintext = await decrypt(storedNote.contentPlaintext)
         notes.push({
           id: storedNote.id,
           title: storedNote.title,
           content,
+          contentPlaintext,
           category: storedNote.category,
           embedding: storedNote.embedding,
           createdAt: storedNote.createdAt,

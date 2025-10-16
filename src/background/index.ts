@@ -121,16 +121,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  * SAVE PIPELINE ORCHESTRATOR
  *
  * Steps:
- * 1. Receive raw note data (with optional pre-generated embedding)
+ * 1. Receive raw note data (TipTap JSON + plaintext, with optional pre-generated embedding)
  * 2. Generate embedding from PLAINTEXT content (if not provided)
- * 3. Encrypt the content
+ * 3. Encrypt BOTH the TipTap JSON content and plaintext content
  * 4. Assemble final object
  * 5. Save to database
  */
 async function handleSaveNote(data: {
   title: string
   category?: string
-  content: string
+  content: string // TipTap JSON as string
+  contentPlaintext: string // Plain text extracted from TipTap
   sourceUrl?: string
   embedding?: number[] // Optional pre-generated embedding from side panel
 }): Promise<{ success: boolean; note?: any; error?: string }> {
@@ -140,7 +141,7 @@ async function handleSaveNote(data: {
     console.log("📝 [BG Save] Starting save pipeline...")
 
     // Step 1: Data Reception (already done via message)
-    const { title, category, content, sourceUrl, embedding } = data
+    const { title, category, content, contentPlaintext, sourceUrl, embedding } = data
 
     // Step 2: Embedding Generation (from PLAINTEXT)
     // Use pre-generated embedding if provided, otherwise generate here
@@ -153,16 +154,17 @@ async function handleSaveNote(data: {
     } else {
       const embeddingStartTime = performance.now()
       console.log("🔢 [BG Save] Generating embedding from plaintext content...")
-      embeddingVector = await generateEmbedding(content)
+      embeddingVector = await generateEmbedding(contentPlaintext)
       const embeddingTime = performance.now() - embeddingStartTime
       console.log(
         `⏱️ [BG Save] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embeddingVector.length} dimensions)`
       )
     }
 
-    // Step 3: Content Encryption
+    // Step 3: Content Encryption (encrypt BOTH content fields)
     const encryptStartTime = performance.now()
-    const encryptedContent = await encrypt(content)
+    const encryptedContent = await encrypt(content) // TipTap JSON
+    const encryptedPlaintext = await encrypt(contentPlaintext) // Plain text
     const encryptTime = performance.now() - encryptStartTime
     console.log(`⏱️ [BG Save] Content encryption: ${encryptTime.toFixed(2)}ms`)
 
@@ -170,7 +172,8 @@ async function handleSaveNote(data: {
     const noteObject = {
       title,
       category: category || "general",
-      content: encryptedContent, // ENCRYPTED
+      content: encryptedContent, // ENCRYPTED TipTap JSON
+      contentPlaintext: encryptedPlaintext, // ENCRYPTED plain text
       embedding: embeddingVector, // PLAINTEXT vector
       sourceUrl
     }
@@ -210,16 +213,17 @@ async function handleSaveNote(data: {
  * UPDATE PIPELINE ORCHESTRATOR
  *
  * Steps:
- * 1. Receive note ID and update data (with optional pre-generated embedding)
+ * 1. Receive note ID and update data (TipTap JSON + plaintext, with optional pre-generated embedding)
  * 2. Generate new embedding if content changed (from PLAINTEXT, if not provided)
- * 3. Encrypt new content if changed
+ * 3. Encrypt new content if changed (BOTH JSON and plaintext)
  * 4. Update in database
  */
 async function handleUpdateNote(data: {
   id: string
   title?: string
   category?: string
-  content?: string
+  content?: string // TipTap JSON as string
+  contentPlaintext?: string // Plain text extracted from TipTap
   embedding?: number[] // Optional pre-generated embedding from side panel
 }): Promise<{ success: boolean; note?: any; error?: string }> {
   const startTime = performance.now()
@@ -227,7 +231,7 @@ async function handleUpdateNote(data: {
   try {
     console.log("✏️ [BG Update] Starting update pipeline for note:", data.id)
 
-    const { id, title, category, content, embedding } = data
+    const { id, title, category, content, contentPlaintext, embedding } = data
     const updates: any = {}
 
     // Update title/category if provided (no processing needed)
@@ -235,7 +239,7 @@ async function handleUpdateNote(data: {
     if (category !== undefined) updates.category = category
 
     // If content is being updated, process it through the pipeline
-    if (content !== undefined) {
+    if (content !== undefined && contentPlaintext !== undefined) {
       // Use pre-generated embedding if provided, otherwise generate here
       let embeddingVector: number[]
       if (embedding && embedding.length > 0) {
@@ -248,7 +252,7 @@ async function handleUpdateNote(data: {
         console.log(
           "🔢 [BG Update] Generating new embedding from plaintext content..."
         )
-        embeddingVector = await generateEmbedding(content)
+        embeddingVector = await generateEmbedding(contentPlaintext)
         const embeddingTime = performance.now() - embeddingStartTime
         console.log(
           `⏱️ [BG Update] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embeddingVector.length} dimensions)`
@@ -256,13 +260,15 @@ async function handleUpdateNote(data: {
       }
 
       const encryptStartTime = performance.now()
-      const encryptedContent = await encrypt(content)
+      const encryptedContent = await encrypt(content) // TipTap JSON
+      const encryptedPlaintext = await encrypt(contentPlaintext) // Plain text
       const encryptTime = performance.now() - encryptStartTime
       console.log(
         `⏱️ [BG Update] Content encryption: ${encryptTime.toFixed(2)}ms`
       )
 
       updates.content = encryptedContent
+      updates.contentPlaintext = encryptedPlaintext
       updates.embedding = embeddingVector
     }
 

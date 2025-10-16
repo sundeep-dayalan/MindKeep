@@ -1,9 +1,13 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 
 import "~style.css"
 
 import { AISearchBar } from "~components/AISearchBar"
 import { AIStatusBanner } from "~components/AIStatusBanner"
+import {
+  RichTextEditor,
+  type RichTextEditorRef
+} from "~components/RichTextEditor"
 import {
   generateEmbedding,
   generateTitle,
@@ -39,12 +43,16 @@ function SidePanel() {
   // Editor state
   const [editingNote, setEditingNote] = useState<Note | null>(null)
   const [noteTitle, setNoteTitle] = useState("")
-  const [noteContent, setNoteContent] = useState("")
+  const [noteContent, setNoteContent] = useState("") // TipTap JSON as string (for loading into editor)
+  const [hasEditorContent, setHasEditorContent] = useState(false) // Track if editor has content
   const [noteCategory, setNoteCategory] = useState("general")
   const [newCategoryName, setNewCategoryName] = useState("")
   const [showNewCategory, setShowNewCategory] = useState(false)
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false)
   const [isSummarizing, setIsSummarizing] = useState(false)
+
+  // Rich text editor ref
+  const editorRef = useRef<RichTextEditorRef>(null)
 
   // Load notes and categories
   useEffect(() => {
@@ -86,16 +94,22 @@ function SidePanel() {
     setEditingNote(null)
     setNoteTitle("")
     setNoteContent("")
+    setHasEditorContent(false)
     setNoteCategory("general")
     setShowNewCategory(false)
     clearSearchQuery() // Clear search when creating new note
     setView("editor")
+    // Clear editor content after a brief delay to ensure component is mounted
+    setTimeout(() => {
+      editorRef.current?.setContent("")
+    }, 50)
   }
 
   const handleEditNote = (note: Note) => {
     setEditingNote(note)
     setNoteTitle(note.title)
-    setNoteContent(note.content)
+    setNoteContent(note.content) // This will be passed to RichTextEditor
+    setHasEditorContent(note.contentPlaintext.trim().length > 0)
     setNoteCategory(note.category)
     setShowNewCategory(false)
     clearSearchQuery() // Clear search when editing a note
@@ -103,7 +117,11 @@ function SidePanel() {
   }
 
   const handleSaveNote = async () => {
-    if (!noteTitle.trim() || !noteContent?.trim()) {
+    // Get content from rich text editor
+    const contentPlaintext = editorRef.current?.getText() || ""
+    const contentJSON = editorRef.current?.getJSON()
+
+    if (!noteTitle.trim() || !contentPlaintext.trim()) {
       alert("Title and content are required")
       return
     }
@@ -132,14 +150,17 @@ function SidePanel() {
         }
       }
 
+      // Convert TipTap JSON to string for storage
+      const contentJSONString = JSON.stringify(contentJSON)
+
       if (editingNote) {
         // For updates, generate embedding here (in DOM context with full Web APIs)
         const updateStartTime = performance.now()
         console.log("✏️ [UI Update] Updating existing note:", editingNote.id)
 
-        // Generate new embedding for updated content
+        // Generate new embedding for updated content (from plaintext)
         const embeddingStartTime = performance.now()
-        const embedding = await generateEmbedding(noteContent)
+        const embedding = await generateEmbedding(contentPlaintext)
         const embeddingTime = performance.now() - embeddingStartTime
         console.log(
           `⏱️ [UI Update] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embedding.length} dimensions)`
@@ -152,7 +173,8 @@ function SidePanel() {
           data: {
             id: editingNote.id,
             title: noteTitle,
-            content: noteContent,
+            content: contentJSONString, // TipTap JSON as string
+            contentPlaintext, // Plain text
             category: finalCategory,
             embedding // Pass the pre-generated embedding
           }
@@ -180,7 +202,7 @@ function SidePanel() {
 
         // Step 1: Generate embedding from plaintext content (HERE in side panel)
         const embeddingStartTime = performance.now()
-        const embedding = await generateEmbedding(noteContent)
+        const embedding = await generateEmbedding(contentPlaintext)
         const embeddingTime = performance.now() - embeddingStartTime
         console.log(
           `⏱️ [UI Save] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embedding.length} dimensions)`
@@ -204,7 +226,8 @@ function SidePanel() {
           type: "SAVE_NOTE",
           data: {
             title: noteTitle,
-            content: noteContent, // Send PLAINTEXT - background will encrypt
+            content: contentJSONString, // TipTap JSON as string
+            contentPlaintext, // Plain text - background will encrypt both
             category: finalCategory,
             sourceUrl,
             embedding // Pass the pre-generated embedding
@@ -288,7 +311,8 @@ function SidePanel() {
   }
 
   const handleGenerateTitle = async () => {
-    if (!noteContent?.trim()) {
+    const contentPlaintext = editorRef.current?.getText() || ""
+    if (!contentPlaintext.trim()) {
       alert("Please enter some content first")
       return
     }
@@ -298,7 +322,7 @@ function SidePanel() {
 
     setIsGeneratingTitle(true)
     try {
-      const generatedTitle = await generateTitle(noteTitle, noteContent)
+      const generatedTitle = await generateTitle(noteTitle, contentPlaintext)
       setNoteTitle(generatedTitle)
 
       const totalTime = performance.now() - startTime
@@ -328,7 +352,8 @@ function SidePanel() {
   }
 
   const handleSummarizeContent = async () => {
-    if (!noteContent?.trim()) {
+    const contentPlaintext = editorRef.current?.getText() || ""
+    if (!contentPlaintext.trim()) {
       alert("Please enter some content first")
       return
     }
@@ -338,8 +363,9 @@ function SidePanel() {
 
     setIsSummarizing(true)
     try {
-      const summary = await summarizeText(noteContent)
-      setNoteContent(summary)
+      const summary = await summarizeText(contentPlaintext)
+      // Set the summarized content in the editor
+      editorRef.current?.setContent(summary)
 
       const totalTime = performance.now() - startTime
       console.log(
@@ -700,7 +726,7 @@ function SidePanel() {
                             {note.title}
                           </h3>
                           <p className="plasmo-text-sm plasmo-text-slate-600 plasmo-mt-1 plasmo-line-clamp-2">
-                            {note.content}
+                            {note.contentPlaintext}
                           </p>
                           <div className="plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-mt-2">
                             <span className="plasmo-text-xs plasmo-px-2 plasmo-py-1 plasmo-bg-blue-100 plasmo-text-blue-700 plasmo-rounded">
@@ -792,7 +818,7 @@ function SidePanel() {
                   />
                   <button
                     onClick={handleGenerateTitle}
-                    disabled={isGeneratingTitle || !noteContent?.trim()}
+                    disabled={isGeneratingTitle || !hasEditorContent}
                     className="plasmo-absolute plasmo-right-2 plasmo-top-1/2 plasmo--translate-y-1/2 plasmo-p-1.5 plasmo-text-purple-600 hover:plasmo-bg-purple-50 plasmo-rounded disabled:plasmo-opacity-40 disabled:plasmo-cursor-not-allowed plasmo-transition-colors"
                     title="Generate title from content using AI">
                     {isGeneratingTitle ? (
@@ -833,57 +859,64 @@ function SidePanel() {
               </div>
 
               <div className="plasmo-space-y-2">
-                <label className="plasmo-text-sm plasmo-font-medium plasmo-text-slate-700">
-                  Content
-                </label>
-                <div className="plasmo-relative">
-                  <textarea
-                    value={noteContent}
-                    onChange={(e) => setNoteContent(e.target.value)}
-                    placeholder="Note content"
-                    rows={10}
-                    className="plasmo-w-full plasmo-px-3 plasmo-py-2 plasmo-pr-10 plasmo-border plasmo-border-slate-300 plasmo-rounded-lg plasmo-resize-none focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-blue-500"
-                  />
+                <div className="plasmo-flex plasmo-items-center plasmo-justify-between">
+                  <label className="plasmo-text-sm plasmo-font-medium plasmo-text-slate-700">
+                    Content
+                  </label>
                   <button
                     onClick={handleSummarizeContent}
-                    disabled={isSummarizing || !noteContent?.trim()}
-                    className="plasmo-absolute plasmo-right-2 plasmo-top-2 plasmo-p-1.5 plasmo-text-purple-600 hover:plasmo-bg-purple-50 plasmo-rounded disabled:plasmo-opacity-40 disabled:plasmo-cursor-not-allowed plasmo-transition-colors"
+                    disabled={isSummarizing}
+                    className="plasmo-px-3 plasmo-py-1 plasmo-text-xs plasmo-text-purple-600 hover:plasmo-bg-purple-50 plasmo-rounded plasmo-font-medium disabled:plasmo-opacity-40 disabled:plasmo-cursor-not-allowed plasmo-transition-colors plasmo-flex plasmo-items-center plasmo-gap-1.5"
                     title="Summarize content using AI">
                     {isSummarizing ? (
-                      <svg
-                        className="plasmo-w-5 plasmo-h-5 plasmo-animate-spin"
-                        fill="none"
-                        viewBox="0 0 24 24">
-                        <circle
-                          className="plasmo-opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="plasmo-opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        />
-                      </svg>
+                      <>
+                        <svg
+                          className="plasmo-w-4 plasmo-h-4 plasmo-animate-spin"
+                          fill="none"
+                          viewBox="0 0 24 24">
+                          <circle
+                            className="plasmo-opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="plasmo-opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
+                        </svg>
+                        Summarizing...
+                      </>
                     ) : (
-                      <svg
-                        className="plasmo-w-5 plasmo-h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                        />
-                      </svg>
+                      <>
+                        <svg
+                          className="plasmo-w-4 plasmo-h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                          />
+                        </svg>
+                        Summarize
+                      </>
                     )}
                   </button>
                 </div>
+                <RichTextEditor
+                  ref={editorRef}
+                  initialContent={noteContent}
+                  placeholder="Start typing your note..."
+                  onUpdate={(plainText) => {
+                    setHasEditorContent(plainText.trim().length > 0)
+                  }}
+                />
               </div>
 
               {showNewCategory ? (
