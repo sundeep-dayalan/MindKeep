@@ -40,6 +40,8 @@ chrome.action.onClicked.addListener(async (tab) => {
   const isOpen = sidePanelState.get(tabId) || false
 
   if (isOpen) {
+    // Request side panel to close itself
+    chrome.runtime.sendMessage({ type: "CLOSE_SIDE_PANEL" })
     sidePanelState.set(tabId, false)
   } else {
     await chrome.sidePanel.open({ tabId: tabId })
@@ -52,6 +54,15 @@ chrome.action.onClicked.addListener(async (tab) => {
  */
 chrome.tabs.onRemoved.addListener((tabId) => {
   sidePanelState.delete(tabId)
+})
+
+/**
+ * Track when side panel is actually opened
+ */
+chrome.runtime.onMessage.addListener((message, sender) => {
+  if (message.type === "SIDE_PANEL_OPENED" && sender.tab?.id) {
+    sidePanelState.set(sender.tab.id, true)
+  }
 })
 
 // ==================== CONTEXT MENU ====================

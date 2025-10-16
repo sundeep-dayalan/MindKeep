@@ -57,6 +57,38 @@ function SidePanel() {
   // Load notes and categories
   useEffect(() => {
     loadData()
+
+    // Notify background that side panel is open
+    chrome.runtime.sendMessage({ type: "SIDE_PANEL_OPENED" })
+
+    // Listen for close message from background
+    const handleMessage = (
+      message: any,
+      sender: chrome.runtime.MessageSender
+    ) => {
+      if (message.type === "CLOSE_SIDE_PANEL") {
+        window.close()
+      } else if (message.type === "FILL_EDITOR") {
+        // Handle context menu "Save to MindKeep"
+        setNoteContent("")
+        setNoteTitle("")
+        setNoteCategory("general")
+        setShowNewCategory(false)
+        setEditingNote(null)
+        setView("editor")
+        setTimeout(() => {
+          if (message.data.content) {
+            editorRef.current?.setContent(message.data.content)
+          }
+        }, 100)
+      }
+    }
+
+    chrome.runtime.onMessage.addListener(handleMessage)
+
+    return () => {
+      chrome.runtime.onMessage.removeListener(handleMessage)
+    }
   }, [])
 
   const loadData = async () => {
