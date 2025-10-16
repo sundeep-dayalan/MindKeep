@@ -1,15 +1,18 @@
 /**
  * AI Service for MindKeep
- * Handles embeddings generation and intent classification
- * Uses @xenova/transformers for embeddings and chrome.ai for intent
+ * Handles embeddings generation
+ * Uses @xenova/transformers for embeddings
  *
- * CRITICAL: This service only generates embeddings and classifies intent.
+ * CRITICAL: This service only generates embeddings.
  * It does NOT handle encryption - that is done by crypto.ts
  * It does NOT handle storage - that is done by db-service.ts
+ * Google Nano AI operations (Summarizer, Rewriter) are handled by nano-service.ts
  */
 
 import type { FeatureExtractionPipeline } from "@xenova/transformers"
 import { env, pipeline } from "@xenova/transformers"
+
+import * as NanoService from "./gemini-nano-service"
 
 // Configure transformers.js for Chrome extension environment
 env.allowLocalModels = false
@@ -128,173 +131,24 @@ export async function generateBatchEmbeddings(
   }
 }
 
-// Define a shared type for the status object for consistency
-export type HealthCheckStatus = {
-  api: string
-  available: boolean
-  status: string
-  message: string
-}
+// Re-export types and functions from nano-service for convenience
+export {
+  checkAllNanoServices as checkAllAIServices,
+  checkRewriterAvailability,
+  checkSummarizerAvailability
+} from "./gemini-nano-service"
+export type { HealthCheckStatus } from "./gemini-nano-service"
 
 /**
- * Checks the availability of the experimental Summarizer API.
- */
-export async function checkSummarizerAvailability(): Promise<HealthCheckStatus> {
-  const apiName = "Summarizer"
-  try {
-    if (!("Summarizer" in self)) {
-      return {
-        api: apiName,
-        available: false,
-        status: "not-supported",
-        message: "Not supported. Enable #summarizer-api flag."
-      }
-    }
-
-    const availability = await Summarizer.availability()
-    if (availability === "unavailable") {
-      return {
-        api: apiName,
-        available: false,
-        status: "unavailable",
-        message: "Not available on this device."
-      }
-    } else if (availability === "available-after-download") {
-      return {
-        api: apiName,
-        available: true,
-        status: "downloading",
-        message: "Model is downloading."
-      }
-    } else {
-      return {
-        api: apiName,
-        available: true,
-        status: "ready",
-        message: "Ready to use."
-      }
-    }
-  } catch (error) {
-    return {
-      api: apiName,
-      available: false,
-      status: "error",
-      message: `Error: ${error}`
-    }
-  }
-}
-
-/**
- * Checks the availability of the experimental Rewriter API.
- */
-export async function checkRewriterAvailability(): Promise<HealthCheckStatus> {
-  const apiName = "Rewriter"
-  try {
-    if (!("Rewriter" in self)) {
-      return {
-        api: apiName,
-        available: false,
-        status: "not-supported",
-        message: "Not supported. Enable #rewriter-api flag."
-      }
-    }
-
-    const availability = await Rewriter.availability()
-    if (availability === "unavailable") {
-      return {
-        api: apiName,
-        available: false,
-        status: "unavailable",
-        message: "Not available on this device."
-      }
-    } else if (availability === "available-after-download") {
-      return {
-        api: apiName,
-        available: true,
-        status: "downloading",
-        message: "Model is downloading."
-      }
-    } else {
-      return {
-        api: apiName,
-        available: true,
-        status: "ready",
-        message: "Ready to use."
-      }
-    }
-  } catch (error) {
-    return {
-      api: apiName,
-      available: false,
-      status: "error",
-      message: `Error: ${error}`
-    }
-  }
-}
-
-/**
- * Runs a health check on all available on-device AI services.
- * @returns A promise that resolves to an array of status objects.
- */
-export async function checkAllAIServices(): Promise<HealthCheckStatus[]> {
-  try {
-    const statuses = await Promise.all([
-      checkSummarizerAvailability(),
-      checkRewriterAvailability()
-    ])
-    return statuses
-  } catch (error) {
-    console.error("A critical error occurred during AI health checks:", error)
-    // Return a single error object if the Promise.all itself fails
-    return [
-      {
-        api: "System",
-        available: false,
-        status: "error",
-        message: "Failed to check AI services."
-      }
-    ]
-  }
-}
-
-/**
- * Summarizes text using ONLY the experimental Summarizer API.
- *
- * NOTE: This function does not have a fallback. It will fail on any
- * browser that does not support the API or have it enabled via flags.
+ * Summarizes text using the experimental Summarizer API.
+ * This is a convenience wrapper around nano-service.summarizeText
+ * with default context for note summarization.
  *
  * @param textToSummarize The text content to summarize.
  * @returns A promise that resolves to the summary string.
- * @throws An error if the API is unavailable or the summarization fails.
  */
 export async function summarizeText(textToSummarize: string): Promise<string> {
-  const startTime = performance.now()
-
-  // 1. Check if the API exists in the browser at all
-  const checkStartTime = performance.now()
-  const status = await checkSummarizerAvailability()
-  const checkTime = performance.now() - checkStartTime
-  console.log(
-    `⏱️ [Summarizer] API availability check: ${checkTime.toFixed(2)}ms`
-  )
-
-  if (status.available === false) {
-    throw new Error(`Summarizer API is not available: ${status.message}`)
-  }
-
-  // If all checks pass, proceed with summarization.
-  // A try...finally block ensures we always clean up the summarizer instance.
-  let summarizer
-  try {
-    const createStartTime = performance.now()
-    summarizer = await Summarizer.create()
-    const createTime = performance.now() - createStartTime
-    console.log(`⏱️ [Summarizer] Model creation: ${createTime.toFixed(2)}ms`)
-
-    const summarizeStartTime = performance.now()
-    const summary = await summarizer.summarize(textToSummarize, {
-      // It's best to put all instructions here for clarity
-      context: `You are a summarizer for a notes app. Create concise, clear summaries. Fix spelling mistakes. Use bullet points for readability if needed.
+  const defaultContext = `You are a summarizer for a notes app. Create concise, clear summaries. Fix spelling mistakes. Use bullet points for readability if needed.
 Rules:
 - Keep summaries brief and to the point.
 - Capture the main idea or key points.
@@ -302,106 +156,37 @@ Rules:
 - Do not add information not present in the original text.
 - Do not use phrases like "This text is about" or "The summary is".
 - Provide only the summary directly.`
-    })
-    const summarizeTime = performance.now() - summarizeStartTime
-    console.log(
-      `⏱️ [Summarizer] Summarization time: ${summarizeTime.toFixed(2)}ms (input: ${textToSummarize.length} chars, output: ${summary.length} chars)`
-    )
 
-    if (summarizer) {
-      summarizer.destroy()
-    }
-
-    const totalTime = performance.now() - startTime
-    console.log(`⏱️ [Summarizer] TOTAL time: ${totalTime.toFixed(2)}ms`)
-
-    return summary
-  } catch (error) {
-    const totalTime = performance.now() - startTime
-    console.error(
-      `❌ [Summarizer] Failed after ${totalTime.toFixed(2)}ms:`,
-      error
-    )
-    return textToSummarize
-  }
+  return NanoService.summarizeText(textToSummarize, {
+    context: defaultContext
+  })
 }
 
 /**
- * Rewrites text using ONLY the experimental Rewriter API.
- *
- * NOTE: This function does not have a fallback. It will fail on any
- * browser that does not support the API or have it enabled via flags.
+ * Rewrites text using the experimental Rewriter API.
+ * This is a convenience wrapper around nano-service.rewriteText
+ * with default context for title rewriting.
  *
  * @param textToRewrite The text content to rewrite.
+ * @param sharedContext Additional context to help the rewriter.
  * @returns A promise that resolves to the rewritten string.
- * @throws An error if the API is unavailable or the rewrite fails.
  */
 export async function rewriteText(
   textToRewrite: string,
   sharedContext: string
 ): Promise<string> {
-  const startTime = performance.now()
-
-  // 1. Check if the API exists in the browser at all
-  const checkStartTime = performance.now()
-  const status = await checkRewriterAvailability()
-  const checkTime = performance.now() - checkStartTime
-  console.log(`⏱️ [Rewriter] API availability check: ${checkTime.toFixed(2)}ms`)
-
-  if (status.available === false) {
-    throw new Error(`Rewriter API is not available: ${status.message}`)
-  }
-
-  // If all checks pass, proceed with rewriting.
-  let rewriter
-  try {
-    // Define the core rewriting parameters
-    const options = {
-      length: "shorter", // 'shorter', 'longer', or 'as-is'
-      tone: "more-casual" // 'more-formal', 'more-casual', or 'as-is'
-    }
-
-    if (sharedContext && sharedContext.trim().length > 0) {
-      options.sharedContext = sharedContext
-    }
-
-    const createStartTime = performance.now()
-    rewriter = await Rewriter.create(options)
-    const createTime = performance.now() - createStartTime
-    console.log(`⏱️ [Rewriter] Model creation: ${createTime.toFixed(2)}ms`)
-
-    // Perform the actual rewrite operation with a specific prompt
-    const rewriteStartTime = performance.now()
-    const result = await rewriter.rewrite(textToRewrite, {
-      context: `You are a text rewriter. Your task is to improve the provided title for the notes. Fix spelling and grammar mistakes.
+  const defaultContext = `You are a text rewriter. Your task is to improve the provided title for the notes. Fix spelling and grammar mistakes.
 Rules:
 - Use clear, simple language. Give simple titles to notes.
 - Do not add new information.
 - Provide only the rewritten title directly.`
-    })
-    const rewriteTime = performance.now() - rewriteStartTime
-    console.log(
-      `⏱️ [Rewriter] Rewriting time: ${rewriteTime.toFixed(2)}ms (input: ${textToRewrite.length} chars, output: ${result.length} chars)`
-    )
 
-    const totalTime = performance.now() - startTime
-    console.log(`⏱️ [Rewriter] TOTAL time: ${totalTime.toFixed(2)}ms`)
-
-    return result
-  } catch (error) {
-    const totalTime = performance.now() - startTime
-    console.error(
-      `❌ [Rewriter] Failed after ${totalTime.toFixed(2)}ms:`,
-      error
-    )
-    // Re-throw the error to be handled by the calling function
-    throw new Error("Failed to rewrite text.")
-  } finally {
-    // 4. IMPORTANT: Always destroy the instance to free up memory
-    if (rewriter) {
-      rewriter.destroy()
-    }
-  }
+  return NanoService.rewriteText(textToRewrite, {
+    context: defaultContext,
+    sharedContext: sharedContext,
+    length: "shorter",
+    tone: "more-casual"
+  })
 }
 
 /**
