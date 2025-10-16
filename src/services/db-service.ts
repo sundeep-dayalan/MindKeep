@@ -160,7 +160,7 @@ export async function getNote(id: string): Promise<Note | null> {
     // Decrypt both content fields
     const content = await decrypt(storedNote.content)
     const contentPlaintext = await decrypt(storedNote.contentPlaintext)
-    
+
     return {
       id: storedNote.id,
       title: storedNote.title,
@@ -212,7 +212,8 @@ export async function updateNote(
       id,
       title: updates.title ?? existingStoredNote.title,
       content: updates.content ?? existingStoredNote.content, // Use encrypted content as-is
-      contentPlaintext: updates.contentPlaintext ?? existingStoredNote.contentPlaintext, // Use encrypted plaintext as-is
+      contentPlaintext:
+        updates.contentPlaintext ?? existingStoredNote.contentPlaintext, // Use encrypted plaintext as-is
       category: updates.category ?? existingStoredNote.category,
       embedding: updates.embedding ?? existingStoredNote.embedding,
       createdAt: existingStoredNote.createdAt,

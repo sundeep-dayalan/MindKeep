@@ -1,6 +1,6 @@
-import { useEditor, EditorContent } from "@tiptap/react"
+import { EditorContent, useEditor } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
-import { useEffect, forwardRef, useImperativeHandle } from "react"
+import { forwardRef, useEffect, useImperativeHandle } from "react"
 
 interface RichTextEditorProps {
   initialContent?: string // JSON string or plain text

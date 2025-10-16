@@ -141,7 +141,8 @@ async function handleSaveNote(data: {
     console.log("📝 [BG Save] Starting save pipeline...")
 
     // Step 1: Data Reception (already done via message)
-    const { title, category, content, contentPlaintext, sourceUrl, embedding } = data
+    const { title, category, content, contentPlaintext, sourceUrl, embedding } =
+      data
 
     // Step 2: Embedding Generation (from PLAINTEXT)
     // Use pre-generated embedding if provided, otherwise generate here
