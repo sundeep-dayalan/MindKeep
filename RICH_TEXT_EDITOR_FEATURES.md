@@ -5,6 +5,7 @@
 The RichTextEditor component now supports all advanced formatting features:
 
 ### 📝 Text Formatting
+
 - **Bold** (Ctrl+B) - Make text bold
 - **Italic** (Ctrl+I) - Italicize text
 - **Underline** (Ctrl+U) - Underline text
@@ -14,6 +15,7 @@ The RichTextEditor component now supports all advanced formatting features:
 - **Subscript** (X₂) - Lower text below baseline
 
 ### 📐 Text Styles
+
 - **Heading Dropdown** - Choose between:
   - Normal paragraph
   - Heading 1
@@ -21,6 +23,7 @@ The RichTextEditor component now supports all advanced formatting features:
   - Heading 3
 
 ### 🔗 Media & Links
+
 - **Insert Link** - Add hyperlinks with URL dialog
   - Click the link icon to add/edit links
   - Links are displayed in blue with underline
@@ -31,21 +34,25 @@ The RichTextEditor component now supports all advanced formatting features:
   - Images are responsive and rounded
 
 ### 📋 Lists
+
 - **Bullet List** - Create unordered lists
 - **Numbered List** - Create ordered lists
 
 ### ↔️ Text Alignment
+
 - **Align Left** - Left-align text
 - **Align Center** - Center text
 - **Align Right** - Right-align text
 - **Justify** - Justify text
 
 ### 🎨 Advanced Formatting
+
 - **Code Block** - Multi-line code with syntax highlighting
 - **Blockquote** - Format text as a quote
 - **Horizontal Rule** - Insert a horizontal divider line
 
 ### 📊 Tables
+
 - **Insert Table** - Create a 3x3 table with header row
 - **Add Column Before** - Insert a new column before current position
 - **Add Row Before** - Insert a new row before current position
@@ -57,12 +64,14 @@ The RichTextEditor component now supports all advanced formatting features:
 - **Resizable Columns** - Drag column borders to resize
 
 ### ↩️ History
+
 - **Undo** (Ctrl+Z) - Undo last action
 - **Redo** (Ctrl+Shift+Z) - Redo undone action
 
 ## 🎯 How to Use
 
 ### Adding Links
+
 1. Select text or place cursor where you want the link
 2. Click the link icon in the toolbar
 3. Enter the URL in the input dialog
@@ -70,6 +79,7 @@ The RichTextEditor component now supports all advanced formatting features:
 5. To remove a link, click on linked text and click the link icon again or use "Remove Link"
 
 ### Adding Images
+
 1. Place cursor where you want the image
 2. Click the image icon in the toolbar
 3. Enter the image URL
@@ -77,6 +87,7 @@ The RichTextEditor component now supports all advanced formatting features:
 5. Image will be inserted inline and is responsive
 
 ### Working with Tables
+
 1. **Create a Table**: Click the table icon to insert a 3x3 table with headers
 2. **Paste Tables**: Simply copy a table from Excel, Google Sheets, or any webpage and paste it directly into the editor
 3. **Edit Cells**: Click in any cell to edit content
@@ -87,6 +98,7 @@ The RichTextEditor component now supports all advanced formatting features:
 8. **Delete Table**: Use the trash icon when inside a table
 
 ### Keyboard Shortcuts
+
 - **Ctrl+B**: Bold
 - **Ctrl+I**: Italic
 - **Ctrl+U**: Underline
@@ -97,6 +109,7 @@ The RichTextEditor component now supports all advanced formatting features:
 ## 🎨 Styling
 
 All editor content is properly styled with:
+
 - Custom heading sizes and weights
 - Proper list indentation
 - Code blocks with dark theme
@@ -126,6 +139,7 @@ All editor content is properly styled with:
 ## 🔮 Future Enhancements
 
 The editor is now ready for:
+
 - Text color picker (Color extension already installed)
 - Text highlighting (Highlight extension already installed)
 - Font size controls
@@ -137,6 +151,7 @@ The editor is now ready for:
 ## 💾 Data Storage
 
 The editor stores content in two formats:
+
 - **Plain Text**: Via `getText()` - for search and display
 - **JSON**: Via `getJSON()` - preserves all formatting, links, images, and structure
 

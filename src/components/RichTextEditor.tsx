@@ -1,19 +1,25 @@
-import { EditorContent, useEditor } from "@tiptap/react"
-import StarterKit from "@tiptap/starter-kit"
-import { forwardRef, useEffect, useImperativeHandle, useCallback, useState } from "react"
-import Underline from "@tiptap/extension-underline"
-import Link from "@tiptap/extension-link"
-import Image from "@tiptap/extension-image"
-import TextAlign from "@tiptap/extension-text-align"
-import { TextStyle } from "@tiptap/extension-text-style"
 import { Color } from "@tiptap/extension-color"
 import Highlight from "@tiptap/extension-highlight"
-import Superscript from "@tiptap/extension-superscript"
+import Image from "@tiptap/extension-image"
+import Link from "@tiptap/extension-link"
 import Subscript from "@tiptap/extension-subscript"
+import Superscript from "@tiptap/extension-superscript"
 import { Table } from "@tiptap/extension-table"
-import { TableRow } from "@tiptap/extension-table-row"
 import { TableCell } from "@tiptap/extension-table-cell"
 import { TableHeader } from "@tiptap/extension-table-header"
+import { TableRow } from "@tiptap/extension-table-row"
+import TextAlign from "@tiptap/extension-text-align"
+import { TextStyle } from "@tiptap/extension-text-style"
+import Underline from "@tiptap/extension-underline"
+import { EditorContent, useEditor } from "@tiptap/react"
+import StarterKit from "@tiptap/starter-kit"
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useState
+} from "react"
 
 interface RichTextEditorProps {
   initialContent?: string // JSON string or plain text
@@ -704,7 +710,9 @@ export const RichTextEditor = forwardRef<
 
       {/* Character Count */}
       <div className="plasmo-px-3 plasmo-py-1.5 plasmo-bg-slate-50 plasmo-border-t plasmo-border-slate-200 plasmo-text-xs plasmo-text-slate-500 plasmo-flex plasmo-justify-between plasmo-items-center">
-        <span>{editor.storage.characterCount?.characters() || 0} characters</span>
+        <span>
+          {editor.storage.characterCount?.characters() || 0} characters
+        </span>
         {editor.isActive("link") && (
           <button
             onClick={() => editor.chain().focus().unsetLink().run()}
