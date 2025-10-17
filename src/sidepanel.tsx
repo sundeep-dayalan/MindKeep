@@ -9,7 +9,11 @@ import { Header } from "~components/Header"
 import { NoteEditor, type RichTextEditorRef } from "~components/NoteEditor"
 import { NotesList } from "~components/NotesList"
 import { SearchBar } from "~components/SearchBar"
-import { generateEmbedding, generateTitle, summarizeText } from "~services/ai-service"
+import {
+  generateEmbedding,
+  generateTitle,
+  summarizeText
+} from "~services/ai-service"
 import {
   deleteNote,
   getAllCategories,
@@ -126,13 +130,17 @@ function SidePanel() {
       // Auto-generate title if not provided
       let finalTitle = noteTitle.trim()
       if (!finalTitle) {
-        console.log("🎯 [Auto Title] No title provided, generating automatically...")
+        console.log(
+          "🎯 [Auto Title] No title provided, generating automatically..."
+        )
         const titleGenerationStart = performance.now()
-        
+
         try {
           finalTitle = await generateTitle("", contentPlaintext)
-          console.log(`✅ [Auto Title] Generated: "${finalTitle}" in ${(performance.now() - titleGenerationStart).toFixed(2)}ms`)
-          
+          console.log(
+            `✅ [Auto Title] Generated: "${finalTitle}" in ${(performance.now() - titleGenerationStart).toFixed(2)}ms`
+          )
+
           // Update the UI to show the generated title
           setNoteTitle(finalTitle)
         } catch (error) {
