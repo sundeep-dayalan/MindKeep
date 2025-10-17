@@ -1,18 +1,15 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 
 import "~style.css"
 
 import { AISearchBar } from "~components/AISearchBar"
 import { AIStatusBanner } from "~components/AIStatusBanner"
-import {
-  RichTextEditor,
-  type RichTextEditorRef
-} from "~components/RichTextEditor"
-import {
-  generateEmbedding,
-  generateTitle,
-  summarizeText
-} from "~services/ai-service"
+import { CategoryFilter } from "~components/CategoryFilter"
+import { Header } from "~components/Header"
+import { NoteEditor, type RichTextEditorRef } from "~components/NoteEditor"
+import { NotesList } from "~components/NotesList"
+import { SearchBar } from "~components/SearchBar"
+import { generateEmbedding, summarizeText } from "~services/ai-service"
 import {
   deleteNote,
   getAllCategories,
@@ -30,29 +27,13 @@ function SidePanel() {
   const [categories, setCategories] = useState<string[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
-  const [categorySearchQuery, setCategorySearchQuery] = useState("")
-  const [isCategoryExpanded, setIsCategoryExpanded] = useState(false)
   const [loading, setLoading] = useState(false)
-
-  // Generic clear search method
-  const clearSearchQuery = () => {
-    setSearchQuery("")
-    loadData() // Reload all notes
-  }
 
   // Editor state
   const [editingNote, setEditingNote] = useState<Note | null>(null)
   const [noteTitle, setNoteTitle] = useState("")
-  const [noteContent, setNoteContent] = useState("") // TipTap JSON as string (for loading into editor)
-  const [hasEditorContent, setHasEditorContent] = useState(false) // Track if editor has content
+  const [noteContent, setNoteContent] = useState("")
   const [noteCategory, setNoteCategory] = useState("general")
-  const [newCategoryName, setNewCategoryName] = useState("")
-  const [showNewCategory, setShowNewCategory] = useState(false)
-  const [isGeneratingTitle, setIsGeneratingTitle] = useState(false)
-  const [isSummarizing, setIsSummarizing] = useState(false)
-
-  // Rich text editor ref
-  const editorRef = useRef<RichTextEditorRef>(null)
 
   // Load notes and categories
   useEffect(() => {
@@ -70,17 +51,11 @@ function SidePanel() {
         window.close()
       } else if (message.type === "FILL_EDITOR") {
         // Handle context menu "Save to MindKeep"
-        setNoteContent("")
+        setNoteContent(message.data.content || "")
         setNoteTitle("")
         setNoteCategory("general")
-        setShowNewCategory(false)
         setEditingNote(null)
         setView("editor")
-        setTimeout(() => {
-          if (message.data.content) {
-            editorRef.current?.setContent(message.data.content)
-          }
-        }, 100)
       }
     }
 
@@ -106,82 +81,47 @@ function SidePanel() {
     setLoading(false)
   }
 
-  // Filter categories based on search
-  const filteredCategories = categories.filter((cat) =>
-    cat.toLowerCase().includes(categorySearchQuery.toLowerCase())
-  )
-
-  // Filter notes
-  const filteredNotes = notes.filter((note) => {
-    const matchesCategory =
-      selectedCategory === "all" || note.category === selectedCategory
-    const matchesSearch =
-      searchQuery === "" ||
-      note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      note.content.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesCategory && matchesSearch
-  })
+  // Clear search and reload
+  const clearSearchQuery = () => {
+    setSearchQuery("")
+    loadData()
+  }
 
   const handleCreateNew = () => {
     setEditingNote(null)
     setNoteTitle("")
     setNoteContent("")
-    setHasEditorContent(false)
     setNoteCategory("general")
-    setShowNewCategory(false)
-    clearSearchQuery() // Clear search when creating new note
+    clearSearchQuery()
     setView("editor")
-    // Clear editor content after a brief delay to ensure component is mounted
-    setTimeout(() => {
-      editorRef.current?.setContent("")
-    }, 50)
   }
 
   const handleEditNote = (note: Note) => {
     setEditingNote(note)
     setNoteTitle(note.title)
-    setNoteContent(note.content) // This will be passed to RichTextEditor
-    setHasEditorContent(note.contentPlaintext.trim().length > 0)
+    setNoteContent(note.content)
     setNoteCategory(note.category)
-    setShowNewCategory(false)
-    clearSearchQuery() // Clear search when editing a note
+    clearSearchQuery()
     setView("editor")
   }
 
-  const handleSaveNote = async () => {
-    // Get content from rich text editor
-    const contentPlaintext = editorRef.current?.getText() || ""
-    const contentJSON = editorRef.current?.getJSON()
+  const handleSaveNote = async (
+    editorRef: RichTextEditorRef | null,
+    finalCategory?: string
+  ) => {
+    const contentPlaintext = editorRef?.getText() || ""
+    const contentJSON = editorRef?.getJSON()
 
     if (!noteTitle.trim() || !contentPlaintext.trim()) {
       alert("Title and content are required")
       return
     }
 
+    // Use the passed category if provided, otherwise use the state category
+    const categoryToSave = finalCategory || noteCategory
+
     setLoading(true)
     try {
-      const finalCategory = showNewCategory
-        ? newCategoryName.trim().toLowerCase()
-        : noteCategory
-
-      if (!finalCategory) {
-        alert("Category is required")
-        setLoading(false)
-        return
-      }
-
-      // Check for duplicate category when creating a new one
-      if (showNewCategory) {
-        const existingCategories = categories.map((cat) => cat.toLowerCase())
-        if (existingCategories.includes(finalCategory)) {
-          alert(
-            `Category "${finalCategory}" already exists. Please select it from the dropdown or choose a different name.`
-          )
-          setLoading(false)
-          return
-        }
-      }
-
       // Convert TipTap JSON to string for storage
       const contentJSONString = JSON.stringify(contentJSON)
 
@@ -205,10 +145,10 @@ function SidePanel() {
           data: {
             id: editingNote.id,
             title: noteTitle,
-            content: contentJSONString, // TipTap JSON as string
-            contentPlaintext, // Plain text
-            category: finalCategory,
-            embedding // Pass the pre-generated embedding
+            content: contentJSONString,
+            contentPlaintext,
+            category: categoryToSave,
+            embedding
           }
         })
         const messageTime = performance.now() - messageStartTime
@@ -232,7 +172,7 @@ function SidePanel() {
         const saveStartTime = performance.now()
         console.log("📝 [UI Save] Creating new note...")
 
-        // Step 1: Generate embedding from plaintext content (HERE in side panel)
+        // Step 1: Generate embedding from plaintext content
         const embeddingStartTime = performance.now()
         const embedding = await generateEmbedding(contentPlaintext)
         const embeddingTime = performance.now() - embeddingStartTime
@@ -258,11 +198,11 @@ function SidePanel() {
           type: "SAVE_NOTE",
           data: {
             title: noteTitle,
-            content: contentJSONString, // TipTap JSON as string
-            contentPlaintext, // Plain text - background will encrypt both
-            category: finalCategory,
+            content: contentJSONString,
+            contentPlaintext,
+            category: categoryToSave,
             sourceUrl,
-            embedding // Pass the pre-generated embedding
+            embedding
           }
         })
         const messageTime = performance.now() - messageStartTime
@@ -283,7 +223,7 @@ function SidePanel() {
 
       console.log("Reloading data...")
       await loadData()
-      clearSearchQuery() // Clear search when returning to list view
+      clearSearchQuery()
       console.log("Switching to list view")
       setView("list")
     } catch (error) {
@@ -331,87 +271,14 @@ function SidePanel() {
   // Handle search input change with auto-search
   const handleSearchInput = (value: string) => {
     setSearchQuery(value)
-    // Auto-search as user types (debounced effect would be better in production)
+    // Auto-search as user types
     if (value.trim()) {
-      // Trigger search automatically
       setTimeout(() => {
         searchNotesByTitle(value).then(setNotes).catch(console.error)
       }, 300)
     } else {
       loadData()
     }
-  }
-
-  const handleGenerateTitle = async () => {
-    const contentPlaintext = editorRef.current?.getText() || ""
-    if (!contentPlaintext.trim()) {
-      alert("Please enter some content first")
-      return
-    }
-
-    const startTime = performance.now()
-    console.log("🎯 [UI] Starting title generation...")
-
-    setIsGeneratingTitle(true)
-    try {
-      const generatedTitle = await generateTitle(noteTitle, contentPlaintext)
-      setNoteTitle(generatedTitle)
-
-      const totalTime = performance.now() - startTime
-      console.log(
-        `⏱️ [UI] Title generation completed: ${totalTime.toFixed(2)}ms`
-      )
-    } catch (error) {
-      const totalTime = performance.now() - startTime
-      console.error(
-        `❌ [UI] Title generation failed after ${totalTime.toFixed(2)}ms:`,
-        error
-      )
-      // Show detailed error message
-      const errorMessage = error.message || "Failed to generate title"
-      if (
-        confirm(
-          errorMessage +
-            "\n\nWould you like to open Chrome flags to enable AI features?"
-        )
-      ) {
-        chrome.tabs.create({
-          url: "chrome://flags/#optimization-guide-on-device-model"
-        })
-      }
-    }
-    setIsGeneratingTitle(false)
-  }
-
-  const handleSummarizeContent = async () => {
-    const contentPlaintext = editorRef.current?.getText() || ""
-    if (!contentPlaintext.trim()) {
-      alert("Please enter some content first")
-      return
-    }
-
-    const startTime = performance.now()
-    console.log("📝 [UI] Starting content summarization...")
-
-    setIsSummarizing(true)
-    try {
-      const summary = await summarizeText(contentPlaintext)
-      // Set the summarized content in the editor
-      editorRef.current?.setContent(summary)
-
-      const totalTime = performance.now() - startTime
-      console.log(
-        `⏱️ [UI] Content summarization completed: ${totalTime.toFixed(2)}ms`
-      )
-    } catch (error) {
-      const totalTime = performance.now() - startTime
-      console.error(
-        `❌ [UI] Content summarization failed after ${totalTime.toFixed(2)}ms:`,
-        error
-      )
-      alert("Failed to summarize content")
-    }
-    setIsSummarizing(false)
   }
 
   const handleAISearch = async (query: string): Promise<string> => {
@@ -446,7 +313,7 @@ function SidePanel() {
       }
 
       console.log(
-        `� [UI AI Search] Combined content length: ${combinedContent.length} chars`
+        ` [UI AI Search] Combined content length: ${combinedContent.length} chars`
       )
 
       // Step 3: Summarize results using AI
@@ -475,34 +342,22 @@ function SidePanel() {
     }
   }
 
+  // Filter notes
+  const filteredNotes = notes.filter((note) => {
+    const matchesCategory =
+      selectedCategory === "all" || note.category === selectedCategory
+    const matchesSearch =
+      searchQuery === "" ||
+      note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      note.content.toLowerCase().includes(searchQuery.toLowerCase())
+    return matchesCategory && matchesSearch
+  })
+
   return (
     <div className="plasmo-w-full plasmo-h-screen plasmo-bg-slate-50 plasmo-overflow-hidden">
       <div className="plasmo-h-full plasmo-flex plasmo-flex-col">
         {/* Header */}
-        <div className="plasmo-bg-white plasmo-border-b plasmo-border-slate-200 plasmo-p-4">
-          <div className="plasmo-flex plasmo-items-center plasmo-justify-between">
-            <h1 className="plasmo-text-xl plasmo-font-bold plasmo-text-slate-900">
-              MindKeep 🧠
-            </h1>
-            <button
-              onClick={handleClose}
-              className="plasmo-p-2 plasmo-rounded-lg plasmo-text-slate-500 hover:plasmo-text-slate-900 hover:plasmo-bg-slate-100 plasmo-transition-colors"
-              title="Close">
-              <svg
-                className="plasmo-w-5 plasmo-h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </div>
-        </div>
+        <Header onClose={handleClose} />
 
         {/* Content */}
         <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-p-4 plasmo-pb-20">
@@ -513,221 +368,21 @@ function SidePanel() {
             <>
               {/* Search and Filters */}
               <div className="plasmo-mb-4 plasmo-space-y-3">
-                {/* Modern Search Input */}
-                <div className="plasmo-relative">
-                  <svg
-                    className="plasmo-w-4 plasmo-h-4 plasmo-absolute plasmo-left-3 plasmo-top-1/2 plasmo-transform -plasmo-translate-y-1/2 plasmo-text-slate-400 plasmo-pointer-events-none"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                  </svg>
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => handleSearchInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                    placeholder="Search notes..."
-                    className="plasmo-w-full plasmo-pl-10 plasmo-pr-10 plasmo-py-2.5 plasmo-border plasmo-border-slate-300 plasmo-rounded-lg plasmo-text-sm plasmo-bg-white focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-blue-500 focus:plasmo-border-blue-500 plasmo-transition-all"
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={clearSearchQuery}
-                      className="plasmo-absolute plasmo-right-3 plasmo-top-1/2 plasmo-transform -plasmo-translate-y-1/2 plasmo-text-slate-400 hover:plasmo-text-slate-600 plasmo-transition-colors plasmo-p-0.5"
-                      title="Clear search">
-                      <svg
-                        className="plasmo-w-4 plasmo-h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
-                  )}
-                </div>
+                <SearchBar
+                  value={searchQuery}
+                  onChange={handleSearchInput}
+                  onClear={clearSearchQuery}
+                  onSearch={handleSearch}
+                />
 
-                {/* Category Filter - Collapsible */}
-                <div className="plasmo-bg-white plasmo-border plasmo-border-slate-200 plasmo-rounded-lg plasmo-overflow-hidden">
-                  {/* Header - Always Visible */}
-                  <button
-                    onClick={() => setIsCategoryExpanded(!isCategoryExpanded)}
-                    className="plasmo-w-full plasmo-p-3 plasmo-flex plasmo-items-center plasmo-justify-between hover:plasmo-bg-slate-50 plasmo-transition-colors">
-                    <div className="plasmo-flex plasmo-items-center plasmo-gap-2">
-                      <h3 className="plasmo-text-xs plasmo-font-semibold plasmo-text-slate-500 plasmo-uppercase plasmo-tracking-wide">
-                        Categories
-                      </h3>
-                      <span className="plasmo-inline-flex plasmo-items-center plasmo-justify-center plasmo-min-w-[20px] plasmo-h-5 plasmo-px-1.5 plasmo-bg-slate-100 plasmo-text-slate-700 plasmo-text-xs plasmo-font-medium plasmo-rounded">
-                        {categories.length}
-                      </span>
-                    </div>
-                    <div className="plasmo-flex plasmo-items-center plasmo-gap-2">
-                      <span className="plasmo-inline-flex plasmo-items-center plasmo-gap-1.5 plasmo-px-3 plasmo-py-1.5 plasmo-bg-slate-900 plasmo-text-white plasmo-rounded-full plasmo-text-xs plasmo-font-medium plasmo-shadow-sm plasmo-capitalize plasmo-max-w-[140px] plasmo-truncate">
-                        <svg
-                          className="plasmo-w-3.5 plasmo-h-3.5 plasmo-flex-shrink-0"
-                          fill="currentColor"
-                          viewBox="0 0 20 20">
-                          <path
-                            fillRule="evenodd"
-                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                        <span className="plasmo-truncate">
-                          {selectedCategory === "all"
-                            ? "All"
-                            : selectedCategory}
-                        </span>
-                      </span>
-                      <svg
-                        className={`plasmo-w-4 plasmo-h-4 plasmo-text-slate-500 plasmo-transition-transform plasmo-duration-200 plasmo-flex-shrink-0 ${
-                          isCategoryExpanded ? "plasmo-rotate-180" : ""
-                        }`}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
-                    </div>
-                  </button>
-
-                  {/* Expandable Content */}
-                  {isCategoryExpanded && (
-                    <div className="plasmo-border-t plasmo-border-slate-200 plasmo-p-3 plasmo-pt-2">
-                      {/* Category Search (only show if more than 10 categories) */}
-                      {categories.length > 10 && (
-                        <div className="plasmo-mb-2">
-                          <div className="plasmo-relative">
-                            <input
-                              type="text"
-                              value={categorySearchQuery}
-                              onChange={(e) =>
-                                setCategorySearchQuery(e.target.value)
-                              }
-                              placeholder="Search categories..."
-                              className="plasmo-w-full plasmo-px-3 plasmo-py-1.5 plasmo-pl-8 plasmo-text-xs plasmo-border plasmo-border-slate-200 plasmo-rounded-md focus:plasmo-outline-none focus:plasmo-ring-1 focus:plasmo-ring-blue-500 focus:plasmo-border-blue-500"
-                            />
-                            <svg
-                              className="plasmo-w-3.5 plasmo-h-3.5 plasmo-absolute plasmo-left-2.5 plasmo-top-1/2 plasmo-transform -plasmo-translate-y-1/2 plasmo-text-slate-400"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24">
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                              />
-                            </svg>
-                            {categorySearchQuery && (
-                              <button
-                                onClick={() => setCategorySearchQuery("")}
-                                className="plasmo-absolute plasmo-right-2 plasmo-top-1/2 plasmo-transform -plasmo-translate-y-1/2 plasmo-text-slate-400 hover:plasmo-text-slate-600">
-                                <svg
-                                  className="plasmo-w-3.5 plasmo-h-3.5"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24">
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M6 18L18 6M6 6l12 12"
-                                  />
-                                </svg>
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Scrollable Category Pills Container */}
-                      <div
-                        className="plasmo-overflow-y-auto"
-                        style={{
-                          maxHeight: "150px"
-                        }}>
-                        <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-2">
-                          <button
-                            onClick={() => {
-                              setSelectedCategory("all")
-                              setCategorySearchQuery("")
-                              setIsCategoryExpanded(false)
-                              clearSearchQuery() // Clear main search when changing category
-                            }}
-                            className={`plasmo-inline-flex plasmo-items-center plasmo-gap-1.5 plasmo-px-3 plasmo-py-1.5 plasmo-rounded-full plasmo-text-xs plasmo-font-medium plasmo-transition-all plasmo-duration-200 plasmo-flex-shrink-0 ${
-                              selectedCategory === "all"
-                                ? "plasmo-bg-slate-900 plasmo-text-white plasmo-shadow-sm"
-                                : "plasmo-bg-slate-100 plasmo-text-slate-700 hover:plasmo-bg-slate-200"
-                            }`}>
-                            {selectedCategory === "all" && (
-                              <svg
-                                className="plasmo-w-3.5 plasmo-h-3.5"
-                                fill="currentColor"
-                                viewBox="0 0 20 20">
-                                <path
-                                  fillRule="evenodd"
-                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                  clipRule="evenodd"
-                                />
-                              </svg>
-                            )}
-                            <span>All</span>
-                          </button>
-                          {filteredCategories.length === 0 ? (
-                            <div className="plasmo-text-xs plasmo-text-slate-400 plasmo-py-1">
-                              No categories found
-                            </div>
-                          ) : (
-                            filteredCategories.map((cat) => (
-                              <button
-                                key={cat}
-                                onClick={() => {
-                                  setSelectedCategory(cat)
-                                  setCategorySearchQuery("")
-                                  setIsCategoryExpanded(false)
-                                  clearSearchQuery() // Clear main search when changing category
-                                }}
-                                className={`plasmo-inline-flex plasmo-items-center plasmo-gap-1.5 plasmo-px-3 plasmo-py-1.5 plasmo-rounded-full plasmo-text-xs plasmo-font-medium plasmo-transition-all plasmo-duration-200 plasmo-capitalize plasmo-flex-shrink-0 ${
-                                  selectedCategory === cat
-                                    ? "plasmo-bg-slate-900 plasmo-text-white plasmo-shadow-sm"
-                                    : "plasmo-bg-slate-100 plasmo-text-slate-700 hover:plasmo-bg-slate-200"
-                                }`}>
-                                {selectedCategory === cat && (
-                                  <svg
-                                    className="plasmo-w-3.5 plasmo-h-3.5"
-                                    fill="currentColor"
-                                    viewBox="0 0 20 20">
-                                    <path
-                                      fillRule="evenodd"
-                                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                      clipRule="evenodd"
-                                    />
-                                  </svg>
-                                )}
-                                <span>{cat}</span>
-                              </button>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <CategoryFilter
+                  categories={categories}
+                  selectedCategory={selectedCategory}
+                  onCategoryChange={(category) => {
+                    setSelectedCategory(category)
+                    clearSearchQuery()
+                  }}
+                />
 
                 <button
                   onClick={handleCreateNew}
@@ -738,230 +393,28 @@ function SidePanel() {
               </div>
 
               {/* Notes List */}
-              {loading ? (
-                <div className="plasmo-text-center plasmo-py-8 plasmo-text-slate-500">
-                  Loading...
-                </div>
-              ) : filteredNotes.length === 0 ? (
-                <div className="plasmo-text-center plasmo-py-8 plasmo-text-slate-500">
-                  No notes found. Create your first note!
-                </div>
-              ) : (
-                <div className="plasmo-space-y-2">
-                  {filteredNotes.map((note) => (
-                    <div
-                      key={note.id}
-                      className="plasmo-bg-white plasmo-p-3 plasmo-rounded-lg plasmo-border plasmo-border-slate-200 hover:plasmo-border-blue-300 plasmo-transition-colors">
-                      <div className="plasmo-flex plasmo-items-start plasmo-justify-between plasmo-gap-2">
-                        <div className="plasmo-flex-1 plasmo-min-w-0">
-                          <h3 className="plasmo-font-medium plasmo-text-slate-900 plasmo-truncate">
-                            {note.title}
-                          </h3>
-                          <p className="plasmo-text-sm plasmo-text-slate-600 plasmo-mt-1 plasmo-line-clamp-2">
-                            {note.contentPlaintext}
-                          </p>
-                          <div className="plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-mt-2">
-                            <span className="plasmo-text-xs plasmo-px-2 plasmo-py-1 plasmo-bg-blue-100 plasmo-text-blue-700 plasmo-rounded">
-                              {note.category}
-                            </span>
-                            <span className="plasmo-text-xs plasmo-text-slate-400">
-                              {new Date(note.updatedAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="plasmo-flex plasmo-gap-1">
-                          <button
-                            onClick={() => handleEditNote(note)}
-                            className="plasmo-p-1 plasmo-text-blue-600 hover:plasmo-bg-blue-50 plasmo-rounded"
-                            title="Edit">
-                            <svg
-                              className="plasmo-w-4 plasmo-h-4"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24">
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                              />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => handleDeleteNote(note.id)}
-                            className="plasmo-p-1 plasmo-text-red-600 hover:plasmo-bg-red-50 plasmo-rounded"
-                            title="Delete">
-                            <svg
-                              className="plasmo-w-4 plasmo-h-4"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24">
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                              />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <NotesList
+                notes={filteredNotes}
+                loading={loading}
+                onEdit={handleEditNote}
+                onDelete={handleDeleteNote}
+                onCreateNew={handleCreateNew}
+              />
             </>
           ) : (
             /* Editor View */
-            <div className="plasmo-space-y-4">
-              <div className="plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-mb-4">
-                <button
-                  onClick={() => setView("list")}
-                  className="plasmo-p-2 plasmo-text-slate-600 hover:plasmo-bg-slate-200 plasmo-rounded-lg">
-                  <svg
-                    className="plasmo-w-5 plasmo-h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                    />
-                  </svg>
-                </button>
-                <h2 className="plasmo-text-lg plasmo-font-semibold">
-                  {editingNote ? "Edit Note" : "New Note"}
-                </h2>
-              </div>
-
-              <div className="plasmo-space-y-2">
-                <label className="plasmo-text-sm plasmo-font-medium plasmo-text-slate-700">
-                  Title
-                </label>
-                <div className="plasmo-relative">
-                  <input
-                    type="text"
-                    value={noteTitle}
-                    onChange={(e) => setNoteTitle(e.target.value)}
-                    placeholder="Note title"
-                    className="plasmo-w-full plasmo-px-3 plasmo-py-2 plasmo-pr-10 plasmo-border plasmo-border-slate-300 plasmo-rounded-lg focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-blue-500"
-                  />
-                  <button
-                    onClick={handleGenerateTitle}
-                    disabled={isGeneratingTitle || !hasEditorContent}
-                    className="plasmo-absolute plasmo-right-2 plasmo-top-1/2 plasmo--translate-y-1/2 plasmo-p-1.5 plasmo-text-purple-600 hover:plasmo-bg-purple-50 plasmo-rounded disabled:plasmo-opacity-40 disabled:plasmo-cursor-not-allowed plasmo-transition-colors"
-                    title="Generate title from content using AI">
-                    {isGeneratingTitle ? (
-                      <svg
-                        className="plasmo-w-5 plasmo-h-5 plasmo-animate-spin"
-                        fill="none"
-                        viewBox="0 0 24 24">
-                        <circle
-                          className="plasmo-opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="plasmo-opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        />
-                      </svg>
-                    ) : (
-                      <svg
-                        className="plasmo-w-5 plasmo-h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                        />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <div className="plasmo-space-y-2">
-                <label className="plasmo-text-sm plasmo-font-medium plasmo-text-slate-700">
-                  Content
-                </label>
-                <RichTextEditor
-                  ref={editorRef}
-                  initialContent={noteContent}
-                  placeholder="Start typing your note..."
-                  onUpdate={(plainText) => {
-                    setHasEditorContent(plainText.trim().length > 0)
-                  }}
-                  onSummarize={handleSummarizeContent}
-                  isSummarizing={isSummarizing}
-                />
-              </div>
-
-              {showNewCategory ? (
-                <div className="plasmo-space-y-2">
-                  <input
-                    type="text"
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    placeholder="New category name"
-                    className="plasmo-w-full plasmo-px-3 plasmo-py-2 plasmo-border plasmo-border-slate-300 plasmo-rounded-lg focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-blue-500"
-                  />
-                  <button
-                    onClick={() => {
-                      setShowNewCategory(false)
-                      setNewCategoryName("")
-                    }}
-                    className="plasmo-text-sm plasmo-text-blue-600 hover:plasmo-underline">
-                    Use existing category
-                  </button>
-                </div>
-              ) : (
-                <div className="plasmo-space-y-2">
-                  <select
-                    value={noteCategory}
-                    onChange={(e) => setNoteCategory(e.target.value)}
-                    className="plasmo-w-full plasmo-px-3 plasmo-py-2 plasmo-border plasmo-border-slate-300 plasmo-rounded-lg focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-blue-500">
-                    {categories.length === 0 && (
-                      <option value="general">general</option>
-                    )}
-                    {categories.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => setShowNewCategory(true)}
-                    className="plasmo-text-sm plasmo-text-blue-600 hover:plasmo-underline">
-                    + Create new category
-                  </button>
-                </div>
-              )}
-
-              <div className="plasmo-flex plasmo-gap-2">
-                <button
-                  onClick={handleSaveNote}
-                  disabled={loading}
-                  className="plasmo-flex-1 plasmo-px-4 plasmo-py-2 plasmo-bg-blue-500 plasmo-text-white plasmo-rounded-lg plasmo-font-medium hover:plasmo-bg-blue-600 plasmo-transition-colors disabled:plasmo-opacity-50">
-                  {loading ? "Saving..." : "Save Note"}
-                </button>
-                <button
-                  onClick={() => setView("list")}
-                  disabled={loading}
-                  className="plasmo-px-4 plasmo-py-2 plasmo-border plasmo-border-slate-300 plasmo-text-slate-700 plasmo-rounded-lg plasmo-font-medium hover:plasmo-bg-slate-100 plasmo-transition-colors disabled:plasmo-opacity-50">
-                  Cancel
-                </button>
-              </div>
-            </div>
+            <NoteEditor
+              title={noteTitle}
+              content={noteContent}
+              category={noteCategory}
+              categories={categories}
+              isEditing={!!editingNote}
+              loading={loading}
+              onTitleChange={setNoteTitle}
+              onCategoryChange={setNoteCategory}
+              onSave={handleSaveNote}
+              onCancel={() => setView("list")}
+            />
           )}
         </div>
 
