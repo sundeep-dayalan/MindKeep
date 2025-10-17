@@ -1,4 +1,5 @@
 import type { Note } from "~services/db-service"
+
 import { NoteCard } from "./NoteCard"
 
 interface NotesListProps {

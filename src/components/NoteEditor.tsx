@@ -1,4 +1,5 @@
 import { useRef, useState } from "react"
+
 import {
   RichTextEditor,
   type RichTextEditorRef
@@ -261,7 +262,9 @@ export function NoteEditor({
             value={category}
             onChange={(e) => onCategoryChange(e.target.value)}
             className="plasmo-w-full plasmo-px-3 plasmo-py-2 plasmo-border plasmo-border-slate-300 plasmo-rounded-lg focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-blue-500">
-            {categories.length === 0 && <option value="general">general</option>}
+            {categories.length === 0 && (
+              <option value="general">general</option>
+            )}
             {categories.map((cat) => (
               <option key={cat} value={cat}>
                 {cat}
