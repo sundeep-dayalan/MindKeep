@@ -9,7 +9,7 @@ import { Header } from "~components/Header"
 import { NoteEditor, type RichTextEditorRef } from "~components/NoteEditor"
 import { NotesList } from "~components/NotesList"
 import { SearchBar } from "~components/SearchBar"
-import { generateEmbedding, summarizeText } from "~services/ai-service"
+import { generateEmbedding, generateTitle, summarizeText } from "~services/ai-service"
 import {
   deleteNote,
   getAllCategories,
@@ -112,8 +112,9 @@ function SidePanel() {
     const contentPlaintext = editorRef?.getText() || ""
     const contentJSON = editorRef?.getJSON()
 
-    if (!noteTitle.trim() || !contentPlaintext.trim()) {
-      alert("Title and content are required")
+    // Check if content exists
+    if (!contentPlaintext.trim()) {
+      alert("Content is required")
       return
     }
 
@@ -122,6 +123,26 @@ function SidePanel() {
 
     setLoading(true)
     try {
+      // Auto-generate title if not provided
+      let finalTitle = noteTitle.trim()
+      if (!finalTitle) {
+        console.log("🎯 [Auto Title] No title provided, generating automatically...")
+        const titleGenerationStart = performance.now()
+        
+        try {
+          finalTitle = await generateTitle("", contentPlaintext)
+          console.log(`✅ [Auto Title] Generated: "${finalTitle}" in ${(performance.now() - titleGenerationStart).toFixed(2)}ms`)
+          
+          // Update the UI to show the generated title
+          setNoteTitle(finalTitle)
+        } catch (error) {
+          console.error("❌ [Auto Title] Generation failed:", error)
+          // Fallback to a default title
+          finalTitle = "Untitled Note"
+          setNoteTitle(finalTitle)
+        }
+      }
+
       // Convert TipTap JSON to string for storage
       const contentJSONString = JSON.stringify(contentJSON)
 
@@ -144,7 +165,7 @@ function SidePanel() {
           type: "UPDATE_NOTE",
           data: {
             id: editingNote.id,
-            title: noteTitle,
+            title: finalTitle,
             content: contentJSONString,
             contentPlaintext,
             category: categoryToSave,
@@ -197,7 +218,7 @@ function SidePanel() {
         const response = await chrome.runtime.sendMessage({
           type: "SAVE_NOTE",
           data: {
-            title: noteTitle,
+            title: finalTitle,
             content: contentJSONString,
             contentPlaintext,
             category: categoryToSave,

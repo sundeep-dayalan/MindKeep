@@ -1,5 +1,6 @@
 import { useRef, useState } from "react"
 
+import CategorySuggestions from "~components/CategorySuggestions"
 import {
   RichTextEditor,
   type RichTextEditorRef
@@ -36,6 +37,7 @@ export function NoteEditor({
   const [hasEditorContent, setHasEditorContent] = useState(false)
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false)
   const [isSummarizing, setIsSummarizing] = useState(false)
+  const [currentContent, setCurrentContent] = useState(content) // Track content for suggestions
 
   const editorRef = useRef<RichTextEditorRef>(null)
 
@@ -232,6 +234,7 @@ export function NoteEditor({
           placeholder="Start typing your note..."
           onUpdate={(plainText) => {
             setHasEditorContent(plainText.trim().length > 0)
+            setCurrentContent(plainText) // Update content state for suggestions
           }}
           onSummarize={handleSummarizeContent}
           isSummarizing={isSummarizing}
@@ -257,25 +260,44 @@ export function NoteEditor({
           </button>
         </div>
       ) : (
-        <div className="plasmo-space-y-2">
-          <select
-            value={category}
-            onChange={(e) => onCategoryChange(e.target.value)}
-            className="plasmo-w-full plasmo-px-3 plasmo-py-2 plasmo-border plasmo-border-slate-300 plasmo-rounded-lg focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-blue-500">
-            {categories.length === 0 && (
-              <option value="general">general</option>
-            )}
-            {categories.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={() => setShowNewCategory(true)}
-            className="plasmo-text-sm plasmo-text-blue-600 hover:plasmo-underline">
-            + Create new category
-          </button>
+        <div className="plasmo-space-y-3">
+          <div className="plasmo-space-y-2">
+            <label className="plasmo-text-sm plasmo-font-medium plasmo-text-slate-700">
+              Category
+            </label>
+            <select
+              value={category}
+              onChange={(e) => onCategoryChange(e.target.value)}
+              className="plasmo-w-full plasmo-px-3 plasmo-py-2 plasmo-border plasmo-border-slate-300 plasmo-rounded-lg focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-blue-500">
+              {categories.length === 0 && (
+                <option value="general">general</option>
+              )}
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => setShowNewCategory(true)}
+              className="plasmo-text-sm plasmo-text-blue-600 hover:plasmo-underline">
+              + Create new category
+            </button>
+          </div>
+
+          {/* AI-Powered Category Suggestions */}
+          <CategorySuggestions
+            noteTitle={title}
+            noteContent={currentContent}
+            availableCategories={categories.filter((cat) => cat !== category)}
+            onCategorySelect={(selectedCategory) => {
+              onCategoryChange(selectedCategory)
+            }}
+            excludeCategories={[category]}
+            minRelevanceScore={0}
+            maxSuggestions={3}
+            className="plasmo-mt-3"
+          />
         </div>
       )}
 

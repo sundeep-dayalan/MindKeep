@@ -13,6 +13,7 @@ import type { FeatureExtractionPipeline } from "@xenova/transformers"
 import { env, pipeline } from "@xenova/transformers"
 
 import { NOTE_TITLE_GENERATION_SYSTEM_PROMPT } from "~lib/prompts"
+import type { ScoredCategory } from "~types/response"
 
 import * as NanoService from "./gemini-nano-service"
 import { executePrompt, type PromptOptions } from "./gemini-nano-service"
@@ -271,5 +272,119 @@ export async function generateTitle(
     )
     // Fallback: return the original title if it exists, otherwise return a truncated version of content
     return titleContent.trim() || "Untitled Note"
+  }
+}
+
+/**
+ * Calculate cosine similarity between two embedding vectors
+ * @param vecA First embedding vector
+ * @param vecB Second embedding vector
+ * @returns Similarity score between 0 and 1 (1 = identical, 0 = completely different)
+ */
+function cosineSimilarity(vecA: number[], vecB: number[]): number {
+  if (vecA.length !== vecB.length) {
+    throw new Error("Vectors must have the same length")
+  }
+
+  let dotProduct = 0
+  let normA = 0
+  let normB = 0
+
+  for (let i = 0; i < vecA.length; i++) {
+    dotProduct += vecA[i] * vecB[i]
+    normA += vecA[i] * vecA[i]
+    normB += vecB[i] * vecB[i]
+  }
+
+  const magnitude = Math.sqrt(normA) * Math.sqrt(normB)
+  if (magnitude === 0) return 0
+
+  return dotProduct / magnitude
+}
+
+/**
+ * Generates a list of relevant categories for a note using embeddings and cosine similarity.
+ * This is MUCH faster than using the Prompt API (~100-500ms vs 2-5 seconds).
+ *
+ * @param titleContent The title of the note.
+ * @param noteContent The body content of the note.
+ * @param availableCategories An array of existing categories to choose from.
+ * @returns A promise that resolves to an array of ScoredCategory objects.
+ */
+export async function getRelevantCategories(
+  titleContent: string,
+  noteContent: string,
+  availableCategories: string[]
+): Promise<ScoredCategory[]> {
+  const startTime = performance.now()
+  console.log(
+    `🎯 [Get Categories] Starting category suggestion (embeddings)...`
+  )
+
+  try {
+    const textToProcess = `${titleContent.trim()} ${noteContent.trim()}`
+
+    // Exit early if there is no content to analyze or no categories to match against
+    if (!textToProcess.trim() || availableCategories.length === 0) {
+      console.log("No content or categories available for analysis.")
+      return []
+    }
+
+    // Step 1: Generate embedding for the note content
+    const noteEmbeddingStart = performance.now()
+    const noteEmbedding = await generateEmbedding(textToProcess)
+    console.log(
+      `⏱️ [Get Categories] Note embedding: ${(performance.now() - noteEmbeddingStart).toFixed(2)}ms`
+    )
+
+    // Step 2: Generate embeddings for all categories in parallel
+    const categoryEmbeddingsStart = performance.now()
+    const categoryEmbeddings =
+      await generateBatchEmbeddings(availableCategories)
+    console.log(
+      `⏱️ [Get Categories] Category embeddings (${availableCategories.length}): ${(performance.now() - categoryEmbeddingsStart).toFixed(2)}ms`
+    )
+
+    // Step 3: Calculate cosine similarity between note and each category
+    const similarityStart = performance.now()
+    const scoredCategories: ScoredCategory[] = availableCategories.map(
+      (category, index) => {
+        const similarity = cosineSimilarity(
+          noteEmbedding,
+          categoryEmbeddings[index]
+        )
+        return {
+          category,
+          relevanceScore: similarity
+        }
+      }
+    )
+    console.log(
+      `⏱️ [Get Categories] Similarity calculation: ${(performance.now() - similarityStart).toFixed(2)}ms`
+    )
+
+    // Step 4: Sort by relevance score (highest first)
+    const sortedCategories = scoredCategories.sort(
+      (a, b) => b.relevanceScore - a.relevanceScore
+    )
+
+    const totalTime = performance.now() - startTime
+    console.log(`⏱️ [Get Categories] TOTAL time: ${totalTime.toFixed(2)}ms`)
+    console.log(
+      `✅ Top categories:`,
+      sortedCategories
+        .slice(0, 5)
+        .map((c) => `${c.category}: ${(c.relevanceScore * 100).toFixed(1)}%`)
+    )
+
+    return sortedCategories
+  } catch (error) {
+    const totalTime = performance.now() - startTime
+    console.warn(
+      `⚠️ [Get Categories] Could not generate categories after ${totalTime.toFixed(2)}ms.`,
+      error
+    )
+    // Fallback: return an empty array on error
+    return []
   }
 }
