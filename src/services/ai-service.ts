@@ -12,7 +12,10 @@
 import type { FeatureExtractionPipeline } from "@xenova/transformers"
 import { env, pipeline } from "@xenova/transformers"
 
+import { NOTE_TITLE_GENERATION_SYSTEM_PROMPT } from "~lib/prompts"
+
 import * as NanoService from "./gemini-nano-service"
+import { executePrompt, type PromptOptions } from "./gemini-nano-service"
 
 // Configure transformers.js for Chrome extension environment
 env.allowLocalModels = false
@@ -161,7 +164,6 @@ Rules:
     context: defaultContext
   })
 }
-
 /**
  * Rewrites text using the experimental Rewriter API.
  * This is a convenience wrapper around nano-service.rewriteText
@@ -208,12 +210,59 @@ export async function generateTitle(
       throw new Error("No content available to generate title from")
     }
 
-    const rewrittenContent = await rewriteText(textToProcess, noteContent)
+    const titleResponseSchema = {
+      type: "object",
+      properties: {
+        generatedTitle: { type: "string", description: "The generated title." }
+      },
+      required: ["generatedTitle"] // Only the generatedTitle is strictly required
+    }
+
+    const controller = new AbortController()
+    const signal = controller.signal
+
+    const initialPrompts: PromptMessage[] = [
+      {
+        role: "system",
+        content: NOTE_TITLE_GENERATION_SYSTEM_PROMPT
+      }
+    ]
+
+    const mainPrompt: string = `
+    Please generate a concise, descriptive title for the following note content.
+    ---
+    ${titleContent.trim() === "" ? "User has not provided any title for the note" : titleContent.trim()}
+    ${noteContent.trim() === "" ? "User has not provided any content for the note" : noteContent.trim()}
+    `
+
+    const options: PromptOptions = {
+      // Session creation options
+      initialPrompts: initialPrompts,
+      temperature: 0.5, // Lower temperature for more predictable, less creative output
+      topK: 1, // Constrain the model to the most likely token
+      onDownloadProgress: ({ loaded, total }) => {
+        console.log(`Model downloading: ${Math.round((loaded / total) * 100)}%`)
+      },
+
+      // Execution options
+      signal: signal, // Pass the AbortSignal
+      responseConstraint: titleResponseSchema, // Enforce the JSON schema
+      omitResponseConstraintInput: false // Tell the model it will be constrained
+    }
+
+    console.log("Executing prompt to extract title...")
+    const jsonResponse = await executePrompt(mainPrompt, options)
+
+    // The response will be a JSON string, so you need to parse it
+    const titleData = JSON.parse(jsonResponse)
+
+    console.log("✅ Successfully extracted title data:")
+    console.log(titleData)
 
     const totalTime = performance.now() - startTime
     console.log(`⏱️ [Generate Title] TOTAL time: ${totalTime.toFixed(2)}ms`)
 
-    return rewrittenContent
+    return titleData.generatedTitle.trim()
   } catch (error) {
     const totalTime = performance.now() - startTime
     console.warn(
@@ -221,6 +270,6 @@ export async function generateTitle(
       error
     )
     // Fallback: return the original title if it exists, otherwise return a truncated version of content
-    return titleContent.trim() || noteContent.trim().substring(0, 50)
+    return titleContent.trim() || "Untitled Note"
   }
 }
