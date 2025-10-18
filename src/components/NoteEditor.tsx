@@ -16,7 +16,11 @@ interface NoteEditorProps {
   loading: boolean
   onTitleChange: (title: string) => void
   onCategoryChange: (category: string) => void
-  onSave: (editorRef: RichTextEditorRef | null, finalCategory?: string, runAgents?: boolean) => void
+  onSave: (
+    editorRef: RichTextEditorRef | null,
+    finalCategory?: string,
+    runAgents?: boolean
+  ) => void
   onCancel: () => void
 }
 

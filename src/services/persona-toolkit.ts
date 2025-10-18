@@ -4,7 +4,9 @@
  * Each tool validates permissions before execution
  */
 
-import type { Note, StoredNote } from "./db-service"
+import { decrypt, encrypt } from "~util/crypto"
+
+import type { Note } from "./db-service"
 import {
   addNote,
   deleteNote,
@@ -12,7 +14,6 @@ import {
   getNote,
   updateNote
 } from "./db-service"
-import { decrypt, encrypt } from "~util/crypto"
 
 export interface ToolResult {
   success: boolean
@@ -80,20 +81,30 @@ export class PersonaToolkit {
   }): Promise<ToolResult> {
     // First check created notes from this pipeline (not yet in database)
     if (params.title) {
-      const createdMatch = this.createdNotes.find(n => n.title === params.title)
+      const createdMatch = this.createdNotes.find(
+        (n) => n.title === params.title
+      )
       if (createdMatch) {
-        console.log(`   ✅ Found "${params.title}" in pipeline-created notes (ID: ${createdMatch.id})`)
-        return { success: true, data: { note: createdMatch, id: createdMatch.id } }
+        console.log(
+          `   ✅ Found "${params.title}" in pipeline-created notes (ID: ${createdMatch.id})`
+        )
+        return {
+          success: true,
+          data: { note: createdMatch, id: createdMatch.id }
+        }
       }
     }
-    
+
     if (params.id) {
-      const createdMatch = this.createdNotes.find(n => n.id === params.id)
+      const createdMatch = this.createdNotes.find((n) => n.id === params.id)
       if (createdMatch) {
         console.log(`   ✅ Found note ${params.id} in pipeline-created notes`)
-        return { success: true, data: { note: createdMatch, id: createdMatch.id } }
+        return {
+          success: true,
+          data: { note: createdMatch, id: createdMatch.id }
+        }
       }
-      
+
       // Check database
       const storedNote = await getNote(params.id)
       if (!storedNote) {
@@ -124,7 +135,10 @@ export class PersonaToolkit {
             }
             return { success: true, data: { note, id: storedNote.id } }
           } catch (decryptError) {
-            console.error(`Decryption error for note ${storedNote.id}:`, decryptError)
+            console.error(
+              `Decryption error for note ${storedNote.id}:`,
+              decryptError
+            )
             // Skip corrupted notes
             continue
           }
@@ -216,13 +230,13 @@ export class PersonaToolkit {
     // Track this note as created during the pipeline
     this.createdNotes.push(note)
 
-    return { 
-      success: true, 
-      data: { 
+    return {
+      success: true,
+      data: {
         note,
         id: newNote.id, // Return ID prominently for use in subsequent actions
         message: `Created note "${params.title}" with ID: ${newNote.id}`
-      } 
+      }
     }
   }
 
@@ -299,16 +313,12 @@ export class PersonaToolkit {
   /**
    * Search notes by title substring
    */
-  private async searchNotes(params: {
-    query: string
-  }): Promise<ToolResult> {
+  private async searchNotes(params: { query: string }): Promise<ToolResult> {
     const allStoredNotes = await getAllNotes()
     const matches: Note[] = []
 
     for (const storedNote of allStoredNotes) {
-      if (
-        storedNote.title.toLowerCase().includes(params.query.toLowerCase())
-      ) {
+      if (storedNote.title.toLowerCase().includes(params.query.toLowerCase())) {
         const note: Note = {
           ...storedNote,
           content: await decrypt(storedNote.content),

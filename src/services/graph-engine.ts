@@ -152,8 +152,11 @@ export class GraphEngine {
 
     // Collect previous actions from this persona in current pipeline
     const previousActions: Action[] = state.executionHistory
-      .filter(step => step.nodeType === "persona" && step.personaName === personaName)
-      .flatMap(step => step.actionsPerformed || [])
+      .filter(
+        (step) =>
+          step.nodeType === "persona" && step.personaName === personaName
+      )
+      .flatMap((step) => step.actionsPerformed || [])
 
     // Create executor
     const executor = new PersonaExecutor(persona, toolkit)
@@ -227,14 +230,16 @@ export class GraphEngine {
    * Get personas available for execution
    * Filters by: enabled status, max iterations not exceeded
    */
-  private async getAvailablePersonas(
-    state: GraphState
-  ): Promise<Persona[]> {
+  private async getAvailablePersonas(state: GraphState): Promise<Persona[]> {
     const allPersonas = await getEnabledPersonas()
-    
-    console.log(`   🔍 Debug: getEnabledPersonas() returned ${allPersonas.length} personas`)
+
+    console.log(
+      `   🔍 Debug: getEnabledPersonas() returned ${allPersonas.length} personas`
+    )
     if (allPersonas.length > 0) {
-      console.log(`   📋 Personas: ${allPersonas.map(p => `${p.name} (enabled=${p.enabled})`).join(', ')}`)
+      console.log(
+        `   📋 Personas: ${allPersonas.map((p) => `${p.name} (enabled=${p.enabled})`).join(", ")}`
+      )
     }
 
     return allPersonas.filter((p) => {

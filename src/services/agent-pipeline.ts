@@ -4,10 +4,16 @@
  * Integrates with background script to run personas on note save
  */
 
-import type { Note } from "./db-service"
-import { GraphEngine, type GraphState } from "./graph-engine"
-import { getAllPersonas, addPersona, updatePersona, getPersonaByName } from "./db-service"
 import { DEFAULT_PERSONAS } from "~data/default-personas"
+
+import type { Note } from "./db-service"
+import {
+  addPersona,
+  getAllPersonas,
+  getPersonaByName,
+  updatePersona
+} from "./db-service"
+import { GraphEngine, type GraphState } from "./graph-engine"
 
 export interface AgentSettings {
   enabled: boolean
@@ -48,9 +54,7 @@ export async function getAgentSettings(): Promise<AgentSettings> {
 /**
  * Save agent settings to chrome.storage
  */
-export async function setAgentSettings(
-  settings: AgentSettings
-): Promise<void> {
+export async function setAgentSettings(settings: AgentSettings): Promise<void> {
   try {
     await chrome.storage.local.set({ agentSettings: settings })
   } catch (error) {
@@ -65,26 +69,28 @@ export async function setAgentSettings(
 async function ensurePersonasInstalled(): Promise<void> {
   try {
     const existingPersonas = await getAllPersonas()
-    
+
     if (existingPersonas.length === 0) {
       // Fresh install - add all default personas
       console.log("⚠️  No personas found - installing defaults...")
-      
+
       for (const personaData of DEFAULT_PERSONAS) {
         await addPersona(personaData)
         console.log(`✅ Installed persona: ${personaData.name}`)
       }
-      
+
       console.log("✅ Default personas installed successfully")
     } else {
       // Update existing personas with new settings (e.g., maxIterations)
       for (const defaultPersona of DEFAULT_PERSONAS) {
         const existing = await getPersonaByName(defaultPersona.name)
-        
+
         if (existing) {
           // Update only if maxIterations has changed
           if (existing.maxIterations !== defaultPersona.maxIterations) {
-            console.log(`🔄 Updating ${defaultPersona.name}: maxIterations ${existing.maxIterations} → ${defaultPersona.maxIterations}`)
+            console.log(
+              `🔄 Updating ${defaultPersona.name}: maxIterations ${existing.maxIterations} → ${defaultPersona.maxIterations}`
+            )
             await updatePersona(existing.id, {
               maxIterations: defaultPersona.maxIterations
             })
@@ -110,7 +116,7 @@ export async function runAgentPipeline(input: {
   try {
     // CRITICAL: Ensure personas are installed before running pipeline
     await ensurePersonasInstalled()
-    
+
     // Check global settings
     const settings = await getAgentSettings()
 

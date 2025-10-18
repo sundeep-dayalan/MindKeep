@@ -12,17 +12,20 @@ This is a custom LangGraph-inspired multi-pass agent system built specifically f
 ### Core Components:
 
 1. **graph-engine.ts** - The orchestration engine
+
    - Managed iterative supervisor → persona → supervisor loops
    - Handled state management with `GraphState` interface
    - Implemented infinite loop detection
    - Tracked created notes during pipeline execution
 
 2. **supervisor-service.ts** - AI-powered routing
+
    - Used Gemini Nano to classify notes
    - Matched notes to appropriate personas based on trigger prompts
    - Deterministic routing with temperature=0.3, topK=1
 
 3. **persona-executor.ts** - Action execution engine
+
    - Generated structured JSON actions using Gemini Nano
    - Built context from previous actions
    - Enforced single-action-per-iteration execution
@@ -42,7 +45,7 @@ This is a custom LangGraph-inspired multi-pass agent system built specifically f
 ✅ Infinite loop detection (same persona 3x in a row)  
 ✅ Rich context display with failure hints  
 ✅ Permission-based tool execution  
-✅ Comprehensive execution logging  
+✅ Comprehensive execution logging
 
 ## Why We Migrated to LangGraph
 
@@ -62,7 +65,7 @@ This is a custom LangGraph-inspired multi-pass agent system built specifically f
 ✅ **Professional maintenance**: Expert team handles edge cases  
 ✅ **Community support**: Thousands of developers using and testing  
 ✅ **Future-proof**: Automatic updates when APIs change  
-✅ **Better patterns**: Standard state management and routing  
+✅ **Better patterns**: Standard state management and routing
 
 ### Trade-offs:
 
@@ -80,7 +83,7 @@ This is a custom LangGraph-inspired multi-pass agent system built specifically f
 
 ✅ **persona-toolkit.ts** - Kept this! Sandboxed tools work perfectly  
 ✅ **default-personas.ts** - Kept this! Persona definitions are excellent  
-✅ **All UI components** - Kept everything! No changes needed  
+✅ **All UI components** - Kept everything! No changes needed
 
 ## Key Learnings:
 

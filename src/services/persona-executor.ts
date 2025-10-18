@@ -153,59 +153,69 @@ export class PersonaExecutor {
    */
   private buildExecutionPrompt(note: Note, previousActions?: Action[]): string {
     let contextSection = ""
-    
+
     // Add previous actions context if available
     if (previousActions && previousActions.length > 0) {
       const lastAction = previousActions[previousActions.length - 1]
-      const hasRepeatingFailure = previousActions.filter(a => 
-        a.tool === lastAction.tool && 
-        JSON.stringify(a.parameters) === JSON.stringify(lastAction.parameters) &&
-        !a.result?.success
-      ).length >= 2
-      
+      const hasRepeatingFailure =
+        previousActions.filter(
+          (a) =>
+            a.tool === lastAction.tool &&
+            JSON.stringify(a.parameters) ===
+              JSON.stringify(lastAction.parameters) &&
+            !a.result?.success
+        ).length >= 2
+
       contextSection = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PREVIOUS ACTIONS IN THIS PIPELINE (${previousActions.length} total):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${previousActions.map((action, idx) => {
-  let resultDetail = ''
-  if (action.result?.success) {
-    // Show detailed result data for successful actions
-    if (action.result.data) {
-      const data = action.result.data
-      if (data.id) {
-        resultDetail = `✅ SUCCESS - Created/Found note with ID: ${data.id}`
-      } else if (data.note?.id) {
-        resultDetail = `✅ SUCCESS - Note ID: ${data.note.id}`
-      } else if (data.message) {
-        resultDetail = `✅ SUCCESS - ${data.message}`
+${previousActions
+  .map((action, idx) => {
+    let resultDetail = ""
+    if (action.result?.success) {
+      // Show detailed result data for successful actions
+      if (action.result.data) {
+        const data = action.result.data
+        if (data.id) {
+          resultDetail = `✅ SUCCESS - Created/Found note with ID: ${data.id}`
+        } else if (data.note?.id) {
+          resultDetail = `✅ SUCCESS - Note ID: ${data.note.id}`
+        } else if (data.message) {
+          resultDetail = `✅ SUCCESS - ${data.message}`
+        } else {
+          resultDetail = `✅ SUCCESS`
+        }
       } else {
-        resultDetail = `✅ SUCCESS`
+        resultDetail = "✅ SUCCESS"
       }
     } else {
-      resultDetail = '✅ SUCCESS'
+      const error = action.result?.error || "unknown error"
+      resultDetail = `❌ FAILED - ${error}`
+
+      // Add helpful hint for common errors
+      if (error === "Note not found") {
+        resultDetail +=
+          "\n   💡 Hint: The note does not exist. You should CREATE it instead of searching again!"
+      }
     }
-  } else {
-    const error = action.result?.error || 'unknown error'
-    resultDetail = `❌ FAILED - ${error}`
-    
-    // Add helpful hint for common errors
-    if (error === 'Note not found') {
-      resultDetail += '\n   💡 Hint: The note does not exist. You should CREATE it instead of searching again!'
-    }
-  }
-  
-  return `Action #${idx + 1}: ${action.tool}
+
+    return `Action #${idx + 1}: ${action.tool}
    Parameters: ${JSON.stringify(action.parameters)}
    Result: ${resultDetail}
-   Your reasoning: "${action.reasoning || 'N/A'}"`
-}).join('\n\n')}
+   Your reasoning: "${action.reasoning || "N/A"}"`
+  })
+  .join("\n\n")}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-${hasRepeatingFailure ? `⚠️  WARNING: You've tried "${lastAction.tool}" multiple times and it keeps failing!
+${
+  hasRepeatingFailure
+    ? `⚠️  WARNING: You've tried "${lastAction.tool}" multiple times and it keeps failing!
 ⚠️  STOP repeating the same action. Try a DIFFERENT approach!
 ⚠️  If searching fails, CREATE the note instead!
 
-` : ''}CRITICAL RULES:
+`
+    : ""
+}CRITICAL RULES:
 1. You can ONLY plan ONE action at a time
 2. After each action, you will be re-invoked to plan the next step
 3. NEVER repeat a failed action - learn from failures and try something different!

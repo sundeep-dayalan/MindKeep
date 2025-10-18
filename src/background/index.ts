@@ -19,20 +19,14 @@
  * 5. Return complete, readable notes to UI
  */
 
-import { generateEmbedding } from "~services/ai-service"
-import { addNote, updateNote, addPersona, getAllPersonas } from "~services/db-service"
-import { runAgentPipeline } from "~services/agent-pipeline"
 import { DEFAULT_PERSONAS } from "~data/default-personas"
-import { encrypt, decrypt } from "~util/crypto"
+import { runAgentPipeline } from "~services/agent-pipeline"
+import { generateEmbedding } from "~services/ai-service"
 import type { Note } from "~services/db-service"
-
-// TEST: Import LangGraph to measure actual bundle impact
-import { testLangGraphBundle } from "~services/test-langgraph-bundle"
+import { addNote, addPersona, updateNote } from "~services/db-service"
+import { encrypt } from "~util/crypto"
 
 export {}
-
-// FORCE LangGraph into bundle by calling it
-testLangGraphBundle().catch(console.error);
 
 // Track side panel state per tab
 const sidePanelState = new Map<number, boolean>()
@@ -91,7 +85,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   // Install default personas on first install
   if (details.reason === "install") {
     console.log("🎉 First install detected - installing default personas...")
-    
+
     try {
       for (const personaData of DEFAULT_PERSONAS) {
         await addPersona(personaData)
@@ -179,8 +173,15 @@ async function handleSaveNote(data: {
     console.log("📝 [BG Save] Starting save pipeline...")
 
     // Step 1: Data Reception (already done via message)
-    const { title, category, content, contentPlaintext, sourceUrl, embedding, runAgents } =
-      data
+    const {
+      title,
+      category,
+      content,
+      contentPlaintext,
+      sourceUrl,
+      embedding,
+      runAgents
+    } = data
 
     // Step 2: Embedding Generation (from PLAINTEXT)
     // Use pre-generated embedding if provided, otherwise generate here
@@ -242,8 +243,12 @@ async function handleSaveNote(data: {
 
     if (pipelineResult.shouldSaveNote && pipelineResult.finalNote) {
       // Re-encrypt the final note (may have been modified by agents)
-      const finalEncryptedContent = await encrypt(pipelineResult.finalNote.content)
-      const finalEncryptedPlaintext = await encrypt(pipelineResult.finalNote.contentPlaintext)
+      const finalEncryptedContent = await encrypt(
+        pipelineResult.finalNote.content
+      )
+      const finalEncryptedPlaintext = await encrypt(
+        pipelineResult.finalNote.contentPlaintext
+      )
 
       // Prepare final note for database
       const noteObject = {

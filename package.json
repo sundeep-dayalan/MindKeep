@@ -10,8 +10,6 @@
     "package": "plasmo package && node fix-manifest.js"
   },
   "dependencies": {
-    "@langchain/core": "^1.0.1",
-    "@langchain/langgraph": "^1.0.0",
     "@tiptap/extension-color": "^3.7.1",
     "@tiptap/extension-highlight": "^3.7.1",
     "@tiptap/extension-image": "^3.7.1",

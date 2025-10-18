@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react"
-import { getAgentSettings, setAgentSettings, type AgentSettings } from "~services/agent-pipeline"
+import { useEffect, useState } from "react"
+
+import { getAgentSettings, setAgentSettings } from "~services/agent-pipeline"
 
 interface HeaderProps {
   onClose: () => void
@@ -19,7 +20,7 @@ export function Header({ onClose }: HeaderProps) {
   const toggleAgents = async () => {
     const newState = !agentsEnabled
     setAgentsEnabled(newState)
-    
+
     const settings = await getAgentSettings()
     await setAgentSettings({
       ...settings,
@@ -46,7 +47,7 @@ export function Header({ onClose }: HeaderProps) {
             <span>🤖</span>
             <span>{agentsEnabled ? "ON" : "OFF"}</span>
           </button>
-          
+
           {/* Close Button */}
           <button
             onClick={onClose}
