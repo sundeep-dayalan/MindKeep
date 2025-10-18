@@ -76,14 +76,12 @@ function generateIV(): Uint8Array {
  */
 async function getMasterKey(): Promise<CryptoKey> {
   try {
-    console.log("🔑 Getting master key...")
     // Try to get existing key from storage
     const stored = await new Promise<any>((resolve) => {
       chrome.storage.local.get(ENCRYPTION_KEY_STORAGE_KEY, resolve)
     })
 
     if (stored[ENCRYPTION_KEY_STORAGE_KEY]) {
-      console.log("🔑 Found existing key in storage, importing...")
       const keyData = stored[ENCRYPTION_KEY_STORAGE_KEY]
 
       // Import the stored key
@@ -94,7 +92,6 @@ async function getMasterKey(): Promise<CryptoKey> {
         true,
         ["encrypt", "decrypt"]
       )
-      console.log("🔑 Key imported successfully:", importedKey.type)
       return importedKey
     }
 

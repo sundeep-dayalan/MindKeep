@@ -111,7 +111,8 @@ function SidePanel() {
 
   const handleSaveNote = async (
     editorRef: RichTextEditorRef | null,
-    finalCategory?: string
+    finalCategory?: string,
+    runAgents?: boolean
   ) => {
     const contentPlaintext = editorRef?.getText() || ""
     const contentJSON = editorRef?.getJSON()
@@ -231,7 +232,8 @@ function SidePanel() {
             contentPlaintext,
             category: categoryToSave,
             sourceUrl,
-            embedding
+            embedding,
+            runAgents // Pass the agent pipeline flag
           }
         })
         const messageTime = performance.now() - messageStartTime

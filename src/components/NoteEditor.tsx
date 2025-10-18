@@ -16,7 +16,7 @@ interface NoteEditorProps {
   loading: boolean
   onTitleChange: (title: string) => void
   onCategoryChange: (category: string) => void
-  onSave: (editorRef: RichTextEditorRef | null, finalCategory?: string) => void
+  onSave: (editorRef: RichTextEditorRef | null, finalCategory?: string, runAgents?: boolean) => void
   onCancel: () => void
 }
 
@@ -38,6 +38,7 @@ export function NoteEditor({
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false)
   const [isSummarizing, setIsSummarizing] = useState(false)
   const [currentContent, setCurrentContent] = useState(content) // Track content for suggestions
+  const [runAgents, setRunAgents] = useState(true) // Agent pipeline toggle (default: enabled)
 
   const editorRef = useRef<RichTextEditorRef>(null)
 
@@ -142,8 +143,8 @@ export function NoteEditor({
       onCategoryChange(finalCategory)
     }
 
-    // Pass the final category to the save handler
-    onSave(editorRef.current, finalCategory)
+    // Pass the final category and runAgents flag to the save handler
+    onSave(editorRef.current, finalCategory, runAgents)
   }
 
   return (
@@ -300,6 +301,30 @@ export function NoteEditor({
           />
         </div>
       )}
+
+      {/* Agent Pipeline Toggle */}
+      <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-px-3 plasmo-py-2 plasmo-bg-purple-50 plasmo-border plasmo-border-purple-200 plasmo-rounded-lg">
+        <div className="plasmo-flex plasmo-items-center plasmo-gap-2">
+          <span className="plasmo-text-sm plasmo-font-medium plasmo-text-purple-900">
+            🤖 Run through agent pipeline
+          </span>
+          <span className="plasmo-text-xs plasmo-text-purple-600">
+            (Auto-organize & process)
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setRunAgents(!runAgents)}
+          className={`plasmo-relative plasmo-inline-flex plasmo-h-6 plasmo-w-11 plasmo-items-center plasmo-rounded-full plasmo-transition-colors ${
+            runAgents ? "plasmo-bg-purple-600" : "plasmo-bg-slate-300"
+          }`}>
+          <span
+            className={`plasmo-inline-block plasmo-h-4 plasmo-w-4 plasmo-transform plasmo-rounded-full plasmo-bg-white plasmo-transition-transform ${
+              runAgents ? "plasmo-translate-x-6" : "plasmo-translate-x-1"
+            }`}
+          />
+        </button>
+      </div>
 
       <div className="plasmo-flex plasmo-gap-2">
         <button

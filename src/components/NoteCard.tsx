@@ -21,6 +21,12 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
             <span className="plasmo-text-xs plasmo-px-2 plasmo-py-1 plasmo-bg-blue-100 plasmo-text-blue-700 plasmo-rounded">
               {note.category}
             </span>
+            {note.handledByPersona && (
+              <span className="plasmo-text-xs plasmo-px-2 plasmo-py-1 plasmo-bg-purple-100 plasmo-text-purple-700 plasmo-rounded plasmo-flex plasmo-items-center plasmo-gap-1">
+                <span>🤖</span>
+                <span>{note.handledByPersona}</span>
+              </span>
+            )}
             <span className="plasmo-text-xs plasmo-text-slate-400">
               {new Date(note.updatedAt).toLocaleDateString()}
             </span>

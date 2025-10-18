@@ -8,8 +8,8 @@
  * 1. Receive raw note data (title, category, plaintext content)
  * 2. Generate embedding from plaintext content (ai-service)
  * 3. Encrypt the plaintext content (crypto)
- * 4. Assemble final object with: title, category, encrypted content, embedding
- * 5. Store in database (db-service)
+ * 4. Run agent pipeline (multi-pass persona execution)
+ * 5. Store final result in database (db-service)
  *
  * RETRIEVE PIPELINE:
  * 1. Generate embedding from search query (ai-service)
@@ -20,10 +20,19 @@
  */
 
 import { generateEmbedding } from "~services/ai-service"
-import { addNote, updateNote } from "~services/db-service"
-import { encrypt } from "~util/crypto"
+import { addNote, updateNote, addPersona, getAllPersonas } from "~services/db-service"
+import { runAgentPipeline } from "~services/agent-pipeline"
+import { DEFAULT_PERSONAS } from "~data/default-personas"
+import { encrypt, decrypt } from "~util/crypto"
+import type { Note } from "~services/db-service"
+
+// TEST: Import LangGraph to measure actual bundle impact
+import { testLangGraphBundle } from "~services/test-langgraph-bundle"
 
 export {}
+
+// FORCE LangGraph into bundle by calling it
+testLangGraphBundle().catch(console.error);
 
 // Track side panel state per tab
 const sidePanelState = new Map<number, boolean>()
@@ -69,13 +78,30 @@ chrome.runtime.onMessage.addListener((message, sender) => {
 
 /**
  * Create context menu item for saving selected text
+ * Install default personas on first install
  */
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener(async (details) => {
+  // Create context menu
   chrome.contextMenus.create({
     id: "saveToMindKeep",
     title: "Save to MindKeep",
     contexts: ["selection"]
   })
+
+  // Install default personas on first install
+  if (details.reason === "install") {
+    console.log("🎉 First install detected - installing default personas...")
+    
+    try {
+      for (const personaData of DEFAULT_PERSONAS) {
+        await addPersona(personaData)
+        console.log(`✅ Installed persona: ${personaData.name}`)
+      }
+      console.log("✅ All default personas installed successfully")
+    } catch (error) {
+      console.error("❌ Error installing default personas:", error)
+    }
+  }
 })
 
 /**
@@ -135,8 +161,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  * 1. Receive raw note data (TipTap JSON + plaintext, with optional pre-generated embedding)
  * 2. Generate embedding from PLAINTEXT content (if not provided)
  * 3. Encrypt BOTH the TipTap JSON content and plaintext content
- * 4. Assemble final object
- * 5. Save to database
+ * 4. Run agent pipeline (multi-pass persona execution)
+ * 5. Save final result to database (or skip if agents deleted it)
  */
 async function handleSaveNote(data: {
   title: string
@@ -145,6 +171,7 @@ async function handleSaveNote(data: {
   contentPlaintext: string // Plain text extracted from TipTap
   sourceUrl?: string
   embedding?: number[] // Optional pre-generated embedding from side panel
+  runAgents?: boolean // Optional flag to enable/disable agents for this note (default: true)
 }): Promise<{ success: boolean; note?: any; error?: string }> {
   const startTime = performance.now()
 
@@ -152,7 +179,7 @@ async function handleSaveNote(data: {
     console.log("📝 [BG Save] Starting save pipeline...")
 
     // Step 1: Data Reception (already done via message)
-    const { title, category, content, contentPlaintext, sourceUrl, embedding } =
+    const { title, category, content, contentPlaintext, sourceUrl, embedding, runAgents } =
       data
 
     // Step 2: Embedding Generation (from PLAINTEXT)
@@ -180,33 +207,78 @@ async function handleSaveNote(data: {
     const encryptTime = performance.now() - encryptStartTime
     console.log(`⏱️ [BG Save] Content encryption: ${encryptTime.toFixed(2)}ms`)
 
-    // Step 4: Final Data Assembly
-    const noteObject = {
+    // Step 4: Create initial note object (decrypted for agent pipeline)
+    const initialNote: Note = {
+      id: `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       title,
+      content, // Unencrypted for agents
+      contentPlaintext, // Unencrypted for agents
       category: category || "general",
-      content: encryptedContent, // ENCRYPTED TipTap JSON
-      contentPlaintext: encryptedPlaintext, // ENCRYPTED plain text
-      embedding: embeddingVector, // PLAINTEXT vector
+      embedding: embeddingVector,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
       sourceUrl
     }
 
-    // Step 5: Database Storage
-    const dbStartTime = performance.now()
-    const savedNote = await addNote(noteObject)
-    const dbTime = performance.now() - dbStartTime
-    console.log(`⏱️ [BG Save] Database storage: ${dbTime.toFixed(2)}ms`)
+    // Step 5: Run agent pipeline
+    const pipelineStartTime = performance.now()
+    const pipelineResult = await runAgentPipeline({
+      note: initialNote,
+      embedding: embeddingVector,
+      encryptedContent,
+      runAgents // Pass through the flag
+    })
+    const pipelineTime = performance.now() - pipelineStartTime
+    console.log(`⏱️ [BG Save] Agent pipeline: ${pipelineTime.toFixed(2)}ms`)
 
-    const totalTime = performance.now() - startTime
-    console.log(
-      `⏱️ [BG Save] TOTAL background save time: ${totalTime.toFixed(2)}ms`
-    )
-    console.log(
-      `📊 [BG Save] Breakdown: Encrypt=${encryptTime.toFixed(2)}ms, DB=${dbTime.toFixed(2)}ms`
-    )
+    // Step 6: Handle pipeline result
+    if (pipelineResult.shouldDeleteNote) {
+      console.log("🗑️ [BG Save] Agent pipeline deleted the note - not saving")
+      return {
+        success: true,
+        note: null
+      }
+    }
+
+    if (pipelineResult.shouldSaveNote && pipelineResult.finalNote) {
+      // Re-encrypt the final note (may have been modified by agents)
+      const finalEncryptedContent = await encrypt(pipelineResult.finalNote.content)
+      const finalEncryptedPlaintext = await encrypt(pipelineResult.finalNote.contentPlaintext)
+
+      // Prepare final note for database
+      const noteObject = {
+        title: pipelineResult.finalNote.title,
+        category: pipelineResult.finalNote.category,
+        content: finalEncryptedContent,
+        contentPlaintext: finalEncryptedPlaintext,
+        embedding: pipelineResult.finalNote.embedding || embeddingVector,
+        sourceUrl: pipelineResult.finalNote.sourceUrl,
+        handledByPersona: pipelineResult.handledByPersona
+      }
+
+      // Save to database
+      const dbStartTime = performance.now()
+      const savedNote = await addNote(noteObject)
+      const dbTime = performance.now() - dbStartTime
+      console.log(`⏱️ [BG Save] Database storage: ${dbTime.toFixed(2)}ms`)
+
+      const totalTime = performance.now() - startTime
+      console.log(
+        `⏱️ [BG Save] TOTAL background save time: ${totalTime.toFixed(2)}ms`
+      )
+      console.log(
+        `📊 [BG Save] Breakdown: Encrypt=${encryptTime.toFixed(2)}ms, Pipeline=${pipelineTime.toFixed(2)}ms, DB=${dbTime.toFixed(2)}ms`
+      )
+
+      return {
+        success: true,
+        note: savedNote
+      }
+    }
 
     return {
-      success: true,
-      note: savedNote
+      success: false,
+      error: "Pipeline did not produce a valid result"
     }
   } catch (error) {
     const totalTime = performance.now() - startTime

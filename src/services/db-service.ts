@@ -26,6 +26,7 @@ export interface Note {
   createdAt: number
   updatedAt: number
   sourceUrl?: string
+  handledByPersona?: string // Name of persona that processed this note
 }
 
 // Internal storage format (content is encrypted at rest)
@@ -39,6 +40,36 @@ export interface StoredNote {
   createdAt: number
   updatedAt: number
   sourceUrl?: string
+  handledByPersona?: string // Name of persona that processed this note (if any)
+}
+
+// Persona interface (agent definition)
+export interface Persona {
+  id: string
+  name: string
+  description: string
+  triggerPrompt: string // Condition for supervisor to match
+  actionPrompt: string // Instructions for persona execution
+  enabled: boolean
+  priority: number // Lower = higher priority
+  maxIterations: number // Max times this persona can run in one pipeline
+  canModifyNote: boolean
+  canCreateNotes: boolean
+  toolsAllowed: string[] // Array of allowed tool names
+  createdAt: number
+  updatedAt: number
+}
+
+// Agent execution log interface
+export interface AgentExecutionLog {
+  id: string
+  noteId: string
+  personaId: string
+  personaName: string
+  executedAt: number
+  actionsPerformed: string // JSON string of actions array
+  success: boolean
+  error?: string
 }
 
 /**
@@ -47,16 +78,27 @@ export interface StoredNote {
  */
 class MindKeepDatabase extends Dexie {
   notes!: Table<StoredNote, string> // StoredNote type, string key (id)
+  personas!: Table<Persona, string> // Personas table
+  agentExecutionLogs!: Table<AgentExecutionLog, string> // Execution logs
 
   constructor() {
     super("mindkeep_db")
 
-    // Define schema
-    // The string after the & symbol defines indexes
-    // Primary key (id) is automatically indexed
-    // Version 2: Added contentPlaintext field for rich text support
-    this.version(2).stores({
-      notes: "id, category, updatedAt, createdAt, title" // indexed fields for fast queries
+    // IMPORTANT: Dexie requires ALL previous versions to be defined for proper migration
+
+    // Version 1: Initial schema with notes only
+    this.version(1).stores({
+      notes: "id, category, updatedAt, createdAt, title"
+    })
+
+    // Version 2: (If you had any changes in v2, define them here. If not, skip to v3)
+    // For now, assuming v2 was the same as v1
+
+    // Version 3: Added personas and agentExecutionLogs tables for agent system
+    this.version(3).stores({
+      notes: "id, category, updatedAt, createdAt, title",
+      personas: "id, name, priority, enabled, createdAt",
+      agentExecutionLogs: "id, noteId, personaId, executedAt"
     })
   }
 }
@@ -115,6 +157,7 @@ export async function addNote(noteData: {
   category?: string
   sourceUrl?: string
   embedding?: number[] // Pre-generated embedding vector
+  handledByPersona?: string // Name of persona that processed this note
 }): Promise<StoredNote> {
   try {
     const id = generateId()
@@ -129,7 +172,8 @@ export async function addNote(noteData: {
       embedding: noteData.embedding, // Store embedding as-is
       createdAt: now,
       updatedAt: now,
-      sourceUrl: noteData.sourceUrl
+      sourceUrl: noteData.sourceUrl,
+      handledByPersona: noteData.handledByPersona
     }
 
     await db.notes.add(storedNote)
@@ -733,5 +777,187 @@ export async function debugIndexedDB(): Promise<void> {
     console.log("=== End Debug Info ===")
   } catch (error) {
     console.error("Debug error:", error)
+  }
+}
+
+// ==================== PERSONA CRUD OPERATIONS ====================
+
+/**
+ * Generate a unique ID for a persona
+ */
+export function generatePersonaId(): string {
+  return `persona_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+}
+
+/**
+ * Add a new persona to the database
+ */
+export async function addPersona(
+  personaData: Omit<Persona, "id" | "createdAt" | "updatedAt">
+): Promise<Persona> {
+  try {
+    const persona: Persona = {
+      id: generatePersonaId(),
+      ...personaData,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    }
+
+    await db.personas.add(persona)
+    console.log("✅ Persona added:", persona.name)
+    return persona
+  } catch (error) {
+    console.error("Error adding persona:", error)
+    throw new Error("Failed to add persona")
+  }
+}
+
+/**
+ * Get a single persona by ID
+ */
+export async function getPersona(id: string): Promise<Persona | undefined> {
+  try {
+    return await db.personas.get(id)
+  } catch (error) {
+    console.error("Error getting persona:", error)
+    return undefined
+  }
+}
+
+/**
+ * Get a persona by name
+ */
+export async function getPersonaByName(
+  name: string
+): Promise<Persona | undefined> {
+  try {
+    return await db.personas.where("name").equals(name).first()
+  } catch (error) {
+    console.error("Error getting persona by name:", error)
+    return undefined
+  }
+}
+
+/**
+ * Get all personas
+ */
+export async function getAllPersonas(): Promise<Persona[]> {
+  try {
+    return await db.personas.toArray()
+  } catch (error) {
+    console.error("Error getting all personas:", error)
+    return []
+  }
+}
+
+/**
+ * Get all enabled personas sorted by priority
+ */
+export async function getEnabledPersonas(): Promise<Persona[]> {
+  try {
+    const allPersonas = await db.personas.toArray()
+    const enabledPersonas = allPersonas.filter((p) => p.enabled === true)
+    return enabledPersonas.sort((a, b) => a.priority - b.priority)
+  } catch (error) {
+    console.error("Error getting enabled personas:", error)
+    return []
+  }
+}
+
+/**
+ * Update an existing persona
+ */
+export async function updatePersona(
+  id: string,
+  updates: Partial<Omit<Persona, "id" | "createdAt">>
+): Promise<Persona | null> {
+  try {
+    const persona = await db.personas.get(id)
+    if (!persona) {
+      console.error("Persona not found:", id)
+      return null
+    }
+
+    const updated: Persona = {
+      ...persona,
+      ...updates,
+      updatedAt: Date.now()
+    }
+
+    await db.personas.put(updated)
+    console.log("✅ Persona updated:", updated.name)
+    return updated
+  } catch (error) {
+    console.error("Error updating persona:", error)
+    return null
+  }
+}
+
+/**
+ * Delete a persona
+ */
+export async function deletePersona(id: string): Promise<boolean> {
+  try {
+    await db.personas.delete(id)
+    console.log("✅ Persona deleted:", id)
+    return true
+  } catch (error) {
+    console.error("Error deleting persona:", error)
+    return false
+  }
+}
+
+// ==================== AGENT EXECUTION LOG OPERATIONS ====================
+
+/**
+ * Generate a unique ID for an execution log
+ */
+export function generateLogId(): string {
+  return `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+}
+
+/**
+ * Add an agent execution log
+ */
+export async function addAgentExecutionLog(
+  logData: Omit<AgentExecutionLog, "id">
+): Promise<AgentExecutionLog> {
+  try {
+    const log: AgentExecutionLog = {
+      id: generateLogId(),
+      ...logData
+    }
+
+    await db.agentExecutionLogs.add(log)
+    return log
+  } catch (error) {
+    console.error("Error adding execution log:", error)
+    throw new Error("Failed to add execution log")
+  }
+}
+
+/**
+ * Get execution logs for a specific note
+ */
+export async function getExecutionLogsForNote(
+  noteId: string
+): Promise<AgentExecutionLog[]> {
+  try {
+    return await db.agentExecutionLogs.where("noteId").equals(noteId).toArray()
+  } catch (error) {
+    console.error("Error getting execution logs:", error)
+    return []
+  }
+}
+
+/**
+ * Get all execution logs
+ */
+export async function getAllExecutionLogs(): Promise<AgentExecutionLog[]> {
+  try {
+    return await db.agentExecutionLogs.orderBy("executedAt").reverse().toArray()
+  } catch (error) {
+    console.error("Error getting all execution logs:", error)
+    return []
   }
 }
