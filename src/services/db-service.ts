@@ -680,17 +680,11 @@ export async function getDatabaseStatistics(): Promise<{
     const categoryStats = await getCategoryStatistics()
 
     const oldestNoteDate =
-      allNotes.length > 0
-        ? Math.min(...allNotes.map((n) => n.createdAt))
-        : null
+      allNotes.length > 0 ? Math.min(...allNotes.map((n) => n.createdAt)) : null
     const newestNoteDate =
-      allNotes.length > 0
-        ? Math.max(...allNotes.map((n) => n.createdAt))
-        : null
+      allNotes.length > 0 ? Math.max(...allNotes.map((n) => n.createdAt)) : null
     const lastModifiedDate =
-      allNotes.length > 0
-        ? Math.max(...allNotes.map((n) => n.updatedAt))
-        : null
+      allNotes.length > 0 ? Math.max(...allNotes.map((n) => n.updatedAt)) : null
 
     return {
       totalNotes,
