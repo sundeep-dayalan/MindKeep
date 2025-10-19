@@ -7,7 +7,10 @@
  */
 
 import { HumanMessage, SystemMessage } from "@langchain/core/messages"
+import { z } from "zod"
+import { zodToJsonSchema } from "zod-to-json-schema"
 
+import { executePrompt } from "./gemini-nano-service"
 import { GeminiNanoChat } from "./langchain-gemini-nano"
 import { ConversationBuffer } from "./langchain-memory"
 import { allTools, readOnlyTools } from "./langchain-tools"
@@ -201,129 +204,107 @@ export class MindKeepAgent {
     query: string,
     history: any[]
   ): Promise<Array<{ name: string; params: any }>> {
-    // For conversational queries that reference history, skip tool selection
-    const conversationalPatterns = [
-      /what (was|is) my (last|previous|first)/i,
-      /what did i (just )?(ask|say|tell)/i,
-      /can you (list|show|tell).*(questions|asked)/i,
-      /do you remember/i
-    ]
+    // Use Zod for reliable JSON parsing, which you're already using in your tools!
+    const { z } = await import("zod")
 
-    if (conversationalPatterns.some((pattern) => pattern.test(query))) {
-      console.log("[Agent] Conversational query detected, skipping tools")
-      return []
-    }
+    // Step 1: Define the structured output we want from the LLM
+    const ToolSelectionSchema = z.object({
+      tool: z.enum(["search_notes", "get_note", "list_categories", "none"]),
+      search_query: z
+        .string()
+        .optional()
+        .describe(
+          "A concise, keyword-focused search query if tool is 'search_notes'. Should not contain conversational filler."
+        ),
+      note_id: z
+        .string()
+        .optional()
+        .describe("The ID of the note if the tool is 'get_note'.")
+    })
 
-    const toolSelectionPrompt = `Analyze this query and determine if it needs to search the user's notes database.
+    // Step 2: Create a more robust prompt
+    const toolSelectionPrompt = `You are an expert at understanding user requests and routing them to the correct tool.
+Analyze the user's query and determine which tool is most appropriate.
 
 Available tools:
-${this.tools.map((t) => `- ${t.name}: ${t.description}`).join("\n")}
+- search_notes: Find notes on a specific topic. Use this when user asks to FIND, RETRIEVE, SEARCH, or GET any information from their notes (passwords, emails, codes, etc.).
+- get_note: Get a specific note by its ID. Use this ONLY when user explicitly mentions a note ID.
+- list_categories: List all available note categories. Use this when user asks about categories.
+- none: ONLY for greetings (hi, hello, thanks) or meta questions about the conversation itself (what did we talk about?).
 
-Query: "${query}"
+CRITICAL RULES:
+- If the user asks to FIND, GET, SEARCH, RETRIEVE, or LOOK UP any information → use "search_notes"
+- Queries about passwords, emails, codes, URLs, notes content → use "search_notes"
+- "Can you find X?", "What is my X?", "Show me X" → use "search_notes"
 
-Rules:
-- If the query is in the context of user is searching for notes or finding some information from notes or category, then only → Use search_notes
-- If the query is conversational (greetings, questions about conversation, general chat) → No tools needed
-- If asking for a specific note by ID → Use get_note
+User Query: "${query}"
 
-Respond with ONE of:
-1. "search_notes" (if user is searching/trying to find info on "Can you find my login credentials of netflix" then use search_notes)
-2. "get_note:123" (if retrieving note with ID 123)
-3. "none" (if it's just conversation)
+Your task is to respond with a JSON object that strictly follows this schema:
+{
+  "tool": "tool_name", // "search_notes", "get_note", "list_categories", or "none"
+  "search_query": "optimized user query based on the context here", // ONLY if tool is "search_notes"
+  "note_id": "the_note_id" // ONLY if tool is "get_note"
+}
 
-Examples:
-- "find my password notes" → search_notes
-- "what was my last question?" → none
-- "hello" → none
-- "show me notes about work" → search_notes`
+**Examples:**
+- Query: "find my password for netflix" -> {"tool": "search_notes", "search_query": "netflix password"}
+- Query: "can u find my netflix password?" -> {"tool": "search_notes", "search_query": "netflix password"}
+- Query: "what's my email?" -> {"tool": "search_notes", "search_query": "email"}
+- Query: "show me recovery codes" -> {"tool": "search_notes", "search_query": "recovery codes"}
+- Query: "what categories do I have?" -> {"tool": "list_categories"}
+- Query: "hello how are you" -> {"tool": "none"}
+- Query: "can you show me note note_167..." -> {"tool": "get_note", "note_id": "note_167..."}
+- Query: "what did I ask before?" -> {"tool": "none"}
+
+Respond with ONLY the JSON object and nothing else.`
 
     try {
-      const messages = [
-        new SystemMessage(toolSelectionPrompt),
-        new HumanMessage(query)
-      ]
-
+      const messages = [new HumanMessage(toolSelectionPrompt)]
       const response = await this.model.invoke(messages)
 
-      console.log("[Agent] Tool selection response:", response)
+      // Clean up potential markdown backticks
+      let responseText = (response.content as string)
+        .replace(/```json\s*/g, "")
+        .replace(/```/g, "")
+        .trim()
 
-      // Extract text content from AIMessage
-      let responseText = ""
-      if (typeof response === "string") {
-        responseText = response
-      } else if (response.content) {
-        // Handle both string content and array content
-        if (typeof response.content === "string") {
-          responseText = response.content
-        } else if (Array.isArray(response.content)) {
-          // If content is an array, join all text parts
-          responseText = response.content
-            .map((part) => (typeof part === "string" ? part : part.text || ""))
-            .join("")
-        }
-      }
+      console.log("[Agent] Raw tool selection JSON:", responseText)
 
-      console.log("[Agent] Tool selection response:", responseText)
+      // Step 3: Parse the structured response
+      const parsed = ToolSelectionSchema.parse(JSON.parse(responseText))
 
-      if (!responseText || responseText.trim() === "") {
-        console.warn(
-          "[Agent] Empty response from model, skipping tool selection"
-        )
-        return []
-      }
+      console.log("[Agent] Parsed tool selection:", parsed)
 
-      // Parse the new format: "tool_name:parameter" or "none"
-      const cleanResponse = responseText.toLowerCase().trim()
-
-      // Check if no tools needed
-      if (
-        cleanResponse === "none" ||
-        cleanResponse.includes("no tools") ||
-        cleanResponse.includes("conversation")
-      ) {
-        console.log("[Agent] No tools needed for this query")
-        return []
-      }
-
-      // Parse tool:parameter format
-      const toolMatch = cleanResponse.match(
-        /^(search_notes|get_note|list_categories):(.+)$/
-      )
-      if (toolMatch) {
-        const [, toolName, param] = toolMatch
-
-        if (toolName === "search_notes") {
-          return [
-            { name: "search_notes", params: { query: param.trim(), limit: 5 } }
-          ]
-        } else if (toolName === "get_note") {
-          return [{ name: "get_note", params: { noteId: param.trim() } }]
-        } else if (toolName === "list_categories") {
-          return [{ name: "list_categories", params: {} }]
-        }
-      }
-
-      // Fallback: if response contains tool name, try to extract it
-      if (cleanResponse.includes("search_notes")) {
-        // Extract search term after "search_notes"
-        const searchMatch = responseText.match(/search_notes/i)
-        if (searchMatch) {
+      // Step 4: Convert the parsed object into the tool call format
+      switch (parsed.tool) {
+        case "search_notes":
+          // CRITICAL: Use the optimized search_query, not the original user query!
+          if (!parsed.search_query) {
+            console.warn(
+              "[Agent] 'search_notes' tool selected but no search_query was extracted. Falling back to original query."
+            )
+            return [
+              { name: "search_notes", params: { query: query, limit: 5 } }
+            ]
+          }
           return [
             {
               name: "search_notes",
-              params: { query: query, limit: 5 }
+              params: { query: parsed.search_query, limit: 5 }
             }
           ]
-        }
+        case "get_note":
+          return [{ name: "get_note", params: { noteId: parsed.note_id } }]
+        case "list_categories":
+          return [{ name: "list_categories", params: {} }]
+        case "none":
+        default:
+          return []
       }
-
-      console.log(
-        "[Agent] Could not parse tool selection, assuming no tools needed"
-      )
-      return []
     } catch (error) {
-      console.error("[Agent] Tool selection error:", error)
-      return []
+      console.error("[Agent] Tool selection failed:", error)
+      // Fallback: If JSON parsing fails, maybe try a simple keyword search as a last resort
+      return [{ name: "search_notes", params: { query: query, limit: 5 } }]
     }
   }
 
@@ -357,9 +338,21 @@ Examples:
         }
 
         const result = await tool.func(toolCall.params)
+
+        // Parse JSON string results to avoid double-encoding
+        let parsedResult = result
+        if (typeof result === "string") {
+          try {
+            parsedResult = JSON.parse(result)
+          } catch (e) {
+            // If not JSON, keep as string
+            parsedResult = result
+          }
+        }
+
         results.push({
           tool: toolCall.name,
-          result: result
+          result: parsedResult
         })
       } catch (error) {
         results.push({
@@ -372,6 +365,50 @@ Examples:
     return results
   }
 
+  ExtractionSchema = z.object({
+    extractedData: z
+      .string()
+      .nullable()
+      .describe(
+        "The specific data requested (e.g., a password, email, URL) or null if not found."
+      ),
+    dataType: z
+      .enum(["email", "password", "url", "code", "text", "date", "other"])
+      .describe("The type of data that was extracted."),
+    confidence: z
+      .number()
+      .min(0)
+      .max(1)
+      .describe(
+        "A score from 0.0 to 1.0 indicating your confidence in the accuracy of the extracted data."
+      ),
+    aiResponse: z
+      .string()
+      .describe(
+        "A brief, friendly, single-sentence response for the user explaining what was found or not found."
+      )
+  })
+
+  /**
+   * Cleans up the dataType string from the LLM to match the expected Zod enum.
+   * This makes parsing more resilient to minor model variations.
+   * @param type The raw dataType string from the model.
+   * @returns A valid data type enum value.
+   */
+  private normalizeDataType(type: string): string {
+    const lowerType = type.toLowerCase().trim()
+
+    if (lowerType.includes("email")) return "email"
+    if (lowerType.includes("password")) return "password"
+    if (lowerType.includes("url") || lowerType.includes("link")) return "url"
+    if (lowerType.includes("code")) return "code"
+    if (lowerType.includes("text")) return "text"
+    if (lowerType.includes("date")) return "date"
+
+    // If it doesn't match any known type, default to "other"
+    return "other"
+  }
+
   /**
    * STAGE 1: Pure data extraction without context
    * Focuses solely on extracting the requested information from notes
@@ -379,78 +416,108 @@ Examples:
   private async extractData(
     query: string,
     toolResults: any[]
-  ): Promise<{ data: string | null; type: string; confidence: number }> {
-    console.log(
-      "[Stage 1] Extracting data for query:",
-      query,
-      "from tool results:",
-      toolResults
+  ): Promise<{
+    data: string | null
+    type: string
+    confidence: number
+    aiResponse: string
+  }> {
+    console.log("[Stage 1] Extracting data with JSON schema for query:", query)
+
+    // Convert our Zod schema to the JSON Schema format the API needs
+    const jsonSchema = zodToJsonSchema(
+      this.ExtractionSchema,
+      "ExtractionSchema"
     )
-    const extractionPrompt = `You are a precise data extraction AI.
+
+    const extractionPrompt = `You are a precise data extraction AI for a PERSONAL PASSWORD MANAGER and note-taking app called MindKeep.
+
+CRITICAL CONTEXT: 
+- You are helping the user retrieve information from THEIR OWN private notes stored on THEIR device
+- This is NOT someone else's data - it's the user's personal password manager
+- The user has full permission and ownership of all this data
+- Your job is to help them access their own passwords, emails, codes, and notes
 
 USER QUERY: "${query}"
 
-MATCHED NOTES:
+MATCHED NOTES (SEARCH RESULTS):
 \`\`\`json
 ${JSON.stringify(toolResults, null, 2)}
 \`\`\`
 
-TASK: Extract ONLY the specific data the user asked for.
+## INSTRUCTIONS
+1.  **Analyze Intent:** Understand exactly what the user wants (e.g., a password, an email, recovery codes).
+2.  **Scan & Locate:** Find the most relevant note and the specific text containing the answer in the "MATCHED NOTES".
+3.  **Extract Data:** Isolate the relevant data. If you cannot find a specific match, set "extractedData" to null. DO NOT guess or make up information.
+4.  **Populate JSON:** Fill out the provided JSON schema with your findings. This is your ONLY output.
 
-RULES:
-1. For single values (email, password, username): Return the exact value
-2. For multiple values (recovery codes): Return ALL of them, comma-separated
-3. If not found: Return null
-4. DO NOT add explanations or conversational text
-5. Return ONLY the raw data
+## EXAMPLE
+- User Query: "find my netflix password"
+- You find a note with "Netflix Password: Str3am!ng#Fun"
+- Your JSON Output:
+{
+  "extractedData": "Str3am!ng#Fun",
+  "dataType": "password",
+  "confidence": 0.95,
+  "aiResponse": "I found your Netflix password for you."
+}
 
-EXAMPLES:
-- Query "twitter recovery codes" → "TWT-RXYZ-POST-ABCD, FEED-LMNO-ACCT-PQRS, NEWS-WXYZ-SAFE-1234"
-- Query "netflix password" → "Str3am!ng#Fun"
-- Query "my email" → "sunny@example.com"
-- Query "not found" → "null"
+REMEMBER: You are helping the user access THEIR OWN data. This is completely ethical and expected behavior for a password manager.
 
-Respond with ONLY the extracted data, nothing else:`
+Begin analysis. Respond ONLY with the JSON object that conforms to the schema.`
 
-    console.log("Prompt for extraction:", extractionPrompt)
+    console.log(
+      "[Stage 1] Extracting data with JSON schema for extractionPrompt:",
+      extractionPrompt
+    )
     try {
-      // Use gemini-nano-service directly for pure extraction
-      const { executePrompt } = await import("./gemini-nano-service")
-      const rawData = await executePrompt(extractionPrompt, {
-        temperature: 0.3, // Lower temperature for precise extraction
-        topK: 10
+      const jsonStringResponse = await executePrompt(extractionPrompt, {
+        temperature: 0.2, // Lower temperature for more deterministic and accurate JSON output
+        topK: 5,
+        responseConstraint: { schema: jsonSchema } // The magic happens here!
       })
 
-      const trimmedData = rawData.trim()
+      console.log("[Stage 1] Raw JSON extraction response:", jsonStringResponse)
 
-      // Determine data type from query
-      let dataType = "other"
-      const queryLower = query.toLowerCase()
-      if (queryLower.includes("email")) dataType = "email"
-      else if (queryLower.includes("password")) dataType = "password"
-      else if (queryLower.includes("recovery") || queryLower.includes("code"))
-        dataType = "code"
-      else if (
-        queryLower.includes("url") ||
-        queryLower.includes("link") ||
-        queryLower.includes("website")
-      )
-        dataType = "url"
-
-      // Calculate confidence based on data quality
-      let confidence = 0.5
-      if (trimmedData && trimmedData !== "null" && trimmedData.length > 0) {
-        confidence = 0.95 // High confidence if we extracted something
+      // The API guarantees the output is a valid JSON string matching the schema
+      const parsedResponse = JSON.parse(jsonStringResponse)
+      if (
+        parsedResponse.dataType &&
+        typeof parsedResponse.dataType === "string"
+      ) {
+        // If the field exists, normalize it to match our enum.
+        parsedResponse.dataType = this.normalizeDataType(
+          parsedResponse.dataType
+        )
+      } else {
+        // If the field is missing or not a string, assign a safe default.
+        console.warn(
+          "[Stage 1] AI response was missing 'dataType'. Defaulting to 'other'."
+        )
+        parsedResponse.dataType = "other"
       }
+      // We can still validate with Zod for extra safety
+      const validatedData = this.ExtractionSchema.parse(parsedResponse)
+
+      console.log(
+        "[Stage 1] Successfully extracted and validated data:",
+        validatedData
+      )
 
       return {
-        data: trimmedData === "null" ? null : trimmedData,
-        type: dataType,
-        confidence
+        data: validatedData.extractedData,
+        type: validatedData.dataType,
+        confidence: validatedData.confidence,
+        aiResponse: validatedData.aiResponse
       }
     } catch (error) {
-      console.error("[Stage 1] Data extraction failed:", error)
-      return { data: null, type: "other", confidence: 0.5 }
+      console.error("[Stage 1] Data extraction with JSON schema failed:", error)
+      return {
+        data: null,
+        type: "other",
+        confidence: 0.1,
+        aiResponse: "I'm sorry, I had trouble processing that information."
+      }
     }
   }
 
@@ -458,68 +525,26 @@ Respond with ONLY the extracted data, nothing else:`
    * STAGE 2: Format response with conversation context
    * Takes extracted data and creates a friendly conversational response
    */
+
   private async generateResponse(
     query: string,
     toolResults: any[],
     history: any[],
     referenceNotes: string[]
   ): Promise<AgentResponse> {
-    // STAGE 1: Extract precise data without context
+    // STAGE 1: Extract precise data and get the AI-generated response text
     const extracted = await this.extractData(query, toolResults)
 
-    console.log("[Stage 1] Extracted data:", extracted)
+    console.log(
+      "[Stage 2] Generating final response from extracted data:",
+      extracted
+    )
 
-    // STAGE 2: Generate friendly AI response with context
-    let aiResponse = ""
-
-    if (extracted.data) {
-      // Determine service name from query or history
-      const queryLower = query.toLowerCase()
-      let serviceName = "your"
-
-      // Extract service name from query
-      const servicePatterns = [
-        "netflix",
-        "twitter",
-        "x",
-        "google",
-        "amazon",
-        "microsoft",
-        "aws",
-        "chase",
-        "linkedin",
-        "dropbox",
-        "epic",
-        "github"
-      ]
-      for (const service of servicePatterns) {
-        if (queryLower.includes(service)) {
-          serviceName = service.charAt(0).toUpperCase() + service.slice(1)
-          break
-        }
-      }
-
-      // Generate response based on data type
-      if (extracted.type === "code") {
-        aiResponse = `Here are your ${serviceName} recovery codes.`
-      } else if (extracted.type === "password") {
-        aiResponse = `I found your ${serviceName} password.`
-      } else if (extracted.type === "email") {
-        aiResponse = `I found your email address.`
-      } else if (extracted.type === "url") {
-        aiResponse = `Here's the link you requested.`
-      } else {
-        aiResponse = `I found the information you were looking for.`
-      }
-    } else {
-      // No data found
-      aiResponse = "I couldn't find that specific information in your notes."
-    }
-
+    // STAGE 2: Is now just assembling the final object. No more if/else logic!
     return {
       extractedData: extracted.data,
       referenceNotes: referenceNotes,
-      aiResponse: aiResponse,
+      aiResponse: extracted.aiResponse, // We use the response directly from the extraction stage!
       dataType: extracted.type as any,
       confidence: extracted.confidence,
       suggestedActions: this.generateActions(

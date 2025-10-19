@@ -59,71 +59,79 @@ const ListCategoriesSchema = z.object({})
  * Search Notes Tool
  * Performs semantic search through user's notes
  */
+
 export const searchNotesTool = new DynamicStructuredTool({
   name: "search_notes",
   description:
-    "Search through notes using semantic similarity. Use this when the user wants to find notes about a specific topic or asks questions about their notes.",
+    "Search through notes using semantic similarity and keywords. Use this when the user wants to find notes about a specific topic.",
   schema: SearchNotesSchema,
   func: async ({ query, limit = 5 }) => {
     try {
-      console.log(
-        `[Tool: search_notes] Searching for: "${query}" (limit: ${limit})`
-      )
+      console.log(`[Tool: search_notes] Hybrid search for: "${query}"`)
 
-      // Generate embedding for the query
+      // --- Step 1: Semantic Vector Search ---
       const embedding =
         await aiService.EmbeddingPipeline.generateEmbedding(query)
+      const vectorResults = await dbService.searchNotesByVector(
+        embedding,
+        limit
+      )
 
-      // Search using vector similarity
-      const results = await dbService.searchNotesByVector(embedding, limit)
+      // --- Step 2: Keyword Title Search ---
+      // You already built this function, let's use it!
+      const titleResults = await dbService.searchNotesByTitle(query)
+
+      // --- Step 3: Merge and De-duplicate Results ---
+      const allResults = new Map<string, any>()
 
       console.log(
-        `[Tool: search_notes] Retrieved ${results.length} results from vector search. Filtering...`
+        `[Tool: search_notes] Found ${vectorResults.length} vector results and ${titleResults.length} title results`
       )
 
-      // Filter out results with similarity score below 0.1 (minimum threshold)
-      const MIN_SIMILARITY_THRESHOLD = 0
-      const filteredResults = results.filter(
-        ({ score }) => score >= MIN_SIMILARITY_THRESHOLD
-      )
+      console.log("allResults before merging:", allResults)
+      console.log("vectorResults before merging:", vectorResults)
 
-      if (filteredResults.length === 0) {
-        return JSON.stringify({
-          success: true,
-          message: "No notes found matching your query.",
-          notes: []
-        })
+      // Add vector results first, respecting a proper threshold
+      const MIN_SIMILARITY_THRESHOLD = 0.1
+      vectorResults.forEach(({ note, score }) => {
+        if (score >= MIN_SIMILARITY_THRESHOLD) {
+          allResults.set(note.id, { ...note, similarity: score })
+        }
+      })
+
+      // Add title matches, which might not have been caught by vector search
+      titleResults.forEach((note) => {
+        if (!allResults.has(note.id)) {
+          allResults.set(note.id, { ...note, similarity: null }) // No similarity score for keyword match
+        }
+      })
+
+      // Convert map back to an array and format for the agent
+      const finalResults = Array.from(allResults.values()).map((note) => {
+        return {
+          id: note.id,
+          title: note.title,
+          content: note.contentPlaintext
+            .replace(/\\n/g, "\n") // Convert escaped newlines to actual newlines
+            .replace(/\n{3,}/g, "\n\n") // Replace 3+ consecutive newlines with just 2
+            .replace(/\n\s+\n/g, "\n\n") // Remove whitespace-only lines
+            .trim(),
+          category: note.category,
+          similarity: note.similarity
+            ? parseFloat(note.similarity.toFixed(4))
+            : "keyword_match",
+          updatedAt: new Date(note.updatedAt).toLocaleDateString()
+        }
+      })
+
+      if (finalResults.length === 0) {
+        return JSON.stringify({ success: true, message: "No notes found." })
       }
-
-      // Return simplified note info with similarity scores
-      // Clean up plain text: remove excessive newlines and whitespace
-      const formattedResults = filteredResults.map(({ note, score }) => ({
-        id: note.id,
-        title: note.title,
-        content: note.contentPlaintext
-          .replace(/\\n/g, "\n") // Convert escaped newlines to actual newlines
-          .replace(/\n{3,}/g, "\n\n") // Replace 3+ consecutive newlines with just 2
-          .replace(/\n\s+\n/g, "\n\n") // Remove whitespace-only lines
-          .trim(), // Remove leading/trailing whitespace
-        category: note.category,
-        similarity: parseFloat(score.toFixed(4)), // Similarity score (0-1, higher is better)
-        createdAt: new Date(note.createdAt).toLocaleDateString(),
-        updatedAt: new Date(note.updatedAt).toLocaleDateString()
-      }))
-
-      console.log(
-        "[Tool: search_notes] Search results:",
-        JSON.stringify(formattedResults, null, 200)
-      )
-
-      console.log(
-        `[Tool: search_notes] Filtered ${results.length - filteredResults.length} results below similarity threshold of ${MIN_SIMILARITY_THRESHOLD}`
-      )
 
       return JSON.stringify({
         success: true,
-        message: `Found ${filteredResults.length} relevant note(s).`,
-        notes: formattedResults
+        message: `Found ${finalResults.length} relevant note(s).`,
+        notes: finalResults.slice(0, limit) // Ensure we don't exceed the limit
       })
     } catch (error) {
       console.error("[Tool: search_notes] Error:", error)
