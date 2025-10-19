@@ -630,6 +630,88 @@ export async function getAllCategories(): Promise<string[]> {
 }
 
 /**
+ * Get statistics about notes by category
+ * Returns count of notes per category without decryption
+ */
+export async function getCategoryStatistics(): Promise<
+  Array<{ category: string; count: number; lastUpdated: number }>
+> {
+  try {
+    const categories = await getAllCategories()
+    const stats = []
+
+    for (const category of categories) {
+      const notesInCategory = await db.notes
+        .where("category")
+        .equals(category)
+        .toArray()
+
+      const count = notesInCategory.length
+      const lastUpdated =
+        notesInCategory.length > 0
+          ? Math.max(...notesInCategory.map((n) => n.updatedAt))
+          : 0
+
+      stats.push({ category, count, lastUpdated })
+    }
+
+    return stats
+  } catch (error) {
+    console.error("Error getting category statistics:", error)
+    return []
+  }
+}
+
+/**
+ * Get comprehensive database statistics
+ * Provides overview of all notes without decrypting content
+ */
+export async function getDatabaseStatistics(): Promise<{
+  totalNotes: number
+  categories: Array<{ category: string; count: number; lastUpdated: number }>
+  oldestNoteDate: number | null
+  newestNoteDate: number | null
+  lastModifiedDate: number | null
+}> {
+  try {
+    const allNotes = await db.notes.toArray()
+    const totalNotes = allNotes.length
+
+    const categoryStats = await getCategoryStatistics()
+
+    const oldestNoteDate =
+      allNotes.length > 0
+        ? Math.min(...allNotes.map((n) => n.createdAt))
+        : null
+    const newestNoteDate =
+      allNotes.length > 0
+        ? Math.max(...allNotes.map((n) => n.createdAt))
+        : null
+    const lastModifiedDate =
+      allNotes.length > 0
+        ? Math.max(...allNotes.map((n) => n.updatedAt))
+        : null
+
+    return {
+      totalNotes,
+      categories: categoryStats,
+      oldestNoteDate,
+      newestNoteDate,
+      lastModifiedDate
+    }
+  } catch (error) {
+    console.error("Error getting database statistics:", error)
+    return {
+      totalNotes: 0,
+      categories: [],
+      oldestNoteDate: null,
+      newestNoteDate: null,
+      lastModifiedDate: null
+    }
+  }
+}
+
+/**
  * Create a new category
  */
 export function createCategory(categoryName: string): string {

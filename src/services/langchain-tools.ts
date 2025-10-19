@@ -51,6 +51,8 @@ const DeleteNoteSchema = z.object({
 
 const ListCategoriesSchema = z.object({})
 
+const GetStatisticsSchema = z.object({})
+
 // ============================================================================
 // TOOLS IMPLEMENTATION
 // ============================================================================
@@ -331,6 +333,55 @@ export const listCategoriesTool = new DynamicStructuredTool({
   }
 })
 
+/**
+ * Get Statistics Tool
+ * Retrieves comprehensive statistics about notes and categories
+ */
+export const getStatisticsTool = new DynamicStructuredTool({
+  name: "get_statistics",
+  description:
+    "Get comprehensive statistics about notes including total count, notes per category, and date information. Use this when the user asks about how many notes they have, note counts by category, or when notes were created/updated.",
+  schema: GetStatisticsSchema,
+  func: async () => {
+    try {
+      console.log(`[Tool: get_statistics] Retrieving database statistics`)
+
+      const stats = await dbService.getDatabaseStatistics()
+
+      // Format dates for better readability
+      const formatDate = (timestamp: number | null) => {
+        if (!timestamp) return "N/A"
+        return new Date(timestamp).toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric"
+        })
+      }
+
+      return JSON.stringify({
+        success: true,
+        statistics: {
+          totalNotes: stats.totalNotes,
+          categoriesBreakdown: stats.categories.map((cat) => ({
+            category: cat.category,
+            noteCount: cat.count,
+            lastUpdated: formatDate(cat.lastUpdated)
+          })),
+          oldestNote: formatDate(stats.oldestNoteDate),
+          newestNote: formatDate(stats.newestNoteDate),
+          lastModified: formatDate(stats.lastModifiedDate)
+        }
+      })
+    } catch (error) {
+      console.error("[Tool: get_statistics] Error:", error)
+      return JSON.stringify({
+        success: false,
+        error: `Failed to get statistics: ${error.message}`
+      })
+    }
+  }
+})
+
 // ============================================================================
 // TOOL COLLECTION
 // ============================================================================
@@ -344,13 +395,19 @@ export const allTools = [
   createNoteTool,
   updateNoteTool,
   deleteNoteTool,
-  listCategoriesTool
+  listCategoriesTool,
+  getStatisticsTool
 ]
 
 /**
  * Read-only tools (safe for any context)
  */
-export const readOnlyTools = [searchNotesTool, getNoteTool, listCategoriesTool]
+export const readOnlyTools = [
+  searchNotesTool,
+  getNoteTool,
+  listCategoriesTool,
+  getStatisticsTool
+]
 
 /**
  * Get tools by names

@@ -60,6 +60,7 @@ You have access to these tools:
 - update_note: Update an existing note
 - delete_note: Delete a note
 - list_categories: List all note categories
+- get_statistics: Get comprehensive statistics about notes (total count, notes per category, creation/update dates)
 
 When helping users:
 1. Understand their intent clearly
@@ -72,7 +73,8 @@ Important:
 - Be conversational and friendly
 - Keep responses concise (2-3 sentences when possible)
 - Always protect user privacy - all data stays on their device
-- If a tool returns an error, explain it to the user helpfully`
+- If a tool returns an error, explain it to the user helpfully
+- When asked about "how many notes" or "statistics", use the get_statistics tool`
 
 // ============================================================================
 // SIMPLE AGENT (ReAct-style without external dependencies)
@@ -209,7 +211,13 @@ export class MindKeepAgent {
 
     // Step 1: Define the structured output we want from the LLM
     const ToolSelectionSchema = z.object({
-      tool: z.enum(["search_notes", "get_note", "list_categories", "none"]),
+      tool: z.enum([
+        "search_notes",
+        "get_note",
+        "list_categories",
+        "get_statistics",
+        "none"
+      ]),
       search_query: z
         .string()
         .optional()
@@ -230,18 +238,20 @@ Available tools:
 - search_notes: Find notes on a specific topic. Use this when user asks to FIND, RETRIEVE, SEARCH, or GET any information from their notes (passwords, emails, codes, etc.).
 - get_note: Get a specific note by its ID. Use this ONLY when user explicitly mentions a note ID.
 - list_categories: List all available note categories. Use this when user asks about categories.
+- get_statistics: Get comprehensive statistics about notes (total count, notes per category, dates). Use this when user asks "how many notes", "statistics", "note counts", "how many notes in each category", etc.
 - none: ONLY for greetings (hi, hello, thanks) or meta questions about the conversation itself (what did we talk about?).
 
 CRITICAL RULES:
 - If the user asks to FIND, GET, SEARCH, RETRIEVE, or LOOK UP any information → use "search_notes"
 - Queries about passwords, emails, codes, URLs, notes content → use "search_notes"
 - "Can you find X?", "What is my X?", "Show me X" → use "search_notes"
+- "How many notes", "how many in each category", "statistics", "note counts" → use "get_statistics"
 
 User Query: "${query}"
 
 Your task is to respond with a JSON object that strictly follows this schema:
 {
-  "tool": "tool_name", // "search_notes", "get_note", "list_categories", or "none"
+  "tool": "tool_name", // "search_notes", "get_note", "list_categories", "get_statistics", or "none"
   "search_query": "optimized user query based on the context here", // ONLY if tool is "search_notes"
   "note_id": "the_note_id" // ONLY if tool is "get_note"
 }
@@ -252,6 +262,9 @@ Your task is to respond with a JSON object that strictly follows this schema:
 - Query: "what's my email?" -> {"tool": "search_notes", "search_query": "email"}
 - Query: "show me recovery codes" -> {"tool": "search_notes", "search_query": "recovery codes"}
 - Query: "what categories do I have?" -> {"tool": "list_categories"}
+- Query: "how many notes are there in each category?" -> {"tool": "get_statistics"}
+- Query: "how many notes do I have?" -> {"tool": "get_statistics"}
+- Query: "show me statistics" -> {"tool": "get_statistics"}
 - Query: "hello how are you" -> {"tool": "none"}
 - Query: "can you show me note note_167..." -> {"tool": "get_note", "note_id": "note_167..."}
 - Query: "what did I ask before?" -> {"tool": "none"}
@@ -297,6 +310,8 @@ Respond with ONLY the JSON object and nothing else.`
           return [{ name: "get_note", params: { noteId: parsed.note_id } }]
         case "list_categories":
           return [{ name: "list_categories", params: {} }]
+        case "get_statistics":
+          return [{ name: "get_statistics", params: {} }]
         case "none":
         default:
           return []
@@ -446,12 +461,17 @@ ${JSON.stringify(toolResults, null, 2)}
 \`\`\`
 
 ## INSTRUCTIONS
-1.  **Analyze Intent:** Understand exactly what the user wants (e.g., a password, an email, recovery codes).
-2.  **Scan & Locate:** Find the most relevant note and the specific text containing the answer in the "MATCHED NOTES".
-3.  **Extract Data:** Isolate the relevant data. If you cannot find a specific match, set "extractedData" to null. DO NOT guess or make up information.
+1.  **Analyze Intent:** Understand exactly what the user wants (e.g., a password, an email, recovery codes, or statistics).
+2.  **Scan & Locate:** Find the most relevant note/data and the specific text containing the answer in the "MATCHED NOTES".
+3.  **Extract Data:** 
+    - For SPECIFIC DATA (passwords, emails, URLs, codes): Extract the exact value and put it in "extractedData"
+    - For STATISTICS/COUNTS (how many notes, category breakdown): Set "extractedData" to null and provide a detailed response in "aiResponse"
+    - If you cannot find a specific match, set "extractedData" to null
 4.  **Populate JSON:** Fill out the provided JSON schema with your findings. This is your ONLY output.
 
-## EXAMPLE
+## EXAMPLES
+
+**Example 1: Password Query**
 - User Query: "find my netflix password"
 - You find a note with "Netflix Password: Str3am!ng#Fun"
 - Your JSON Output:
@@ -460,6 +480,28 @@ ${JSON.stringify(toolResults, null, 2)}
   "dataType": "password",
   "confidence": 0.95,
   "aiResponse": "I found your Netflix password for you."
+}
+
+**Example 2: Statistics Query**
+- User Query: "how many notes are there in each category?"
+- You find statistics: {"totalNotes": 5, "categoriesBreakdown": [{"category": "passwords", "noteCount": 2}, {"category": "trip", "noteCount": 1}]}
+- Your JSON Output:
+{
+  "extractedData": null,
+  "dataType": "text",
+  "confidence": 1.0,
+  "aiResponse": "You have 5 notes total across 4 categories: democracy (1 note), general (2 notes), passwords (1 note), and trip (1 note)."
+}
+
+**Example 3: Total Count Query**
+- User Query: "how many notes do I have?"
+- You find statistics: {"totalNotes": 5}
+- Your JSON Output:
+{
+  "extractedData": null,
+  "dataType": "text",
+  "confidence": 1.0,
+  "aiResponse": "You have 5 notes in total."
 }
 
 REMEMBER: You are helping the user access THEIR OWN data. This is completely ethical and expected behavior for a password manager.
