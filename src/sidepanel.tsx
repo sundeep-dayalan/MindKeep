@@ -9,17 +9,12 @@ import { Header } from "~components/Header"
 import { NoteEditor, type RichTextEditorRef } from "~components/NoteEditor"
 import { NotesList } from "~components/NotesList"
 import { SearchBar } from "~components/SearchBar"
-import {
-  generateEmbedding,
-  generateTitle,
-  summarizeText
-} from "~services/ai-service"
+import { generateEmbedding, generateTitle } from "~services/ai-service"
 import {
   deleteNote,
   getAllCategories,
   getAllNotes,
   searchNotesByTitle,
-  searchNotesSemanticWithContent,
   type Note
 } from "~services/db-service"
 
@@ -314,57 +309,26 @@ function SidePanel() {
     const startTime = performance.now()
 
     try {
-      console.log("🔍 [UI AI Search] Started for query:", query)
+      console.log("🤖 [LangChain Agent] Processing query:", query)
 
-      // Step 1: Generate embedding for query
-      const embeddingStartTime = performance.now()
-      const queryEmbedding = await generateEmbedding(query)
-      const embeddingTime = performance.now() - embeddingStartTime
-      console.log(
-        `⏱️ [UI AI Search] Query embedding generation: ${embeddingTime.toFixed(2)}ms (${queryEmbedding.length} dimensions)`
-      )
+      // Use the LangChain agent for agentic search
+      const { getGlobalAgent } = await import("~services/langchain-agent")
+      const agent = await getGlobalAgent()
 
-      // Step 2: Search for similar notes
-      const searchStartTime = performance.now()
-      const { notes: matchingNotes, combinedContent } =
-        await searchNotesSemanticWithContent(queryEmbedding, 5)
-      const searchTime = performance.now() - searchStartTime
-      console.log(
-        `⏱️ [UI AI Search] Database search: ${searchTime.toFixed(2)}ms (found ${matchingNotes.length} notes)`
-      )
-
-      if (matchingNotes.length === 0) {
-        const totalTime = performance.now() - startTime
-        console.log(
-          `⏱️ [UI AI Search] No results found - TOTAL time: ${totalTime.toFixed(2)}ms`
-        )
-        return "I couldn't find any notes related to your query. Try adding more notes or rephrasing your question."
-      }
-
-      console.log(
-        ` [UI AI Search] Combined content length: ${combinedContent.length} chars`
-      )
-
-      // Step 3: Summarize results using AI
-      const summarizeStartTime = performance.now()
-      const prompt = `Based on the following notes, answer this question: "${query}"\n\n${combinedContent}\n\nProvide a clear, concise answer based only on the information in these notes.`
-      const summary = await summarizeText(prompt)
-      const summarizeTime = performance.now() - summarizeStartTime
-      console.log(
-        `⏱️ [UI AI Search] AI summarization: ${summarizeTime.toFixed(2)}ms`
-      )
+      const response = await agent.run(query)
 
       const totalTime = performance.now() - startTime
-      console.log(`⏱️ [UI AI Search] TOTAL time: ${totalTime.toFixed(2)}ms`)
-      console.log(
-        `📊 [UI AI Search] Breakdown: Embedding=${embeddingTime.toFixed(2)}ms, Search=${searchTime.toFixed(2)}ms, Summarize=${summarizeTime.toFixed(2)}ms`
-      )
+      console.log(`⏱️ [LangChain Agent] TOTAL time: ${totalTime.toFixed(2)}ms`)
+      console.log(`📊 [LangChain Agent] Structured response:`, response)
 
-      return summary
+      // Return formatted response for display
+      // For now, just return the AI` response text
+      // TODO: Update AISearchBar to handle structured responses with extractedData and actions
+      return response.extractedData || response.aiResponse
     } catch (error) {
       const totalTime = performance.now() - startTime
       console.error(
-        `❌ [UI AI Search] Failed after ${totalTime.toFixed(2)}ms:`,
+        `❌ [LangChain Agent] Failed after ${totalTime.toFixed(2)}ms:`,
         error
       )
       return "I encountered an error while searching. Please try again."

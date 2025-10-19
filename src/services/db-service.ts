@@ -333,7 +333,7 @@ export async function getAllNotes(): Promise<Note[]> {
 export async function searchNotesByVector(
   vector: number[],
   limit: number = 5
-): Promise<Note[]> {
+): Promise<Array<{ note: Note; score: number }>> {
   const startTime = performance.now()
 
   try {
@@ -374,21 +374,24 @@ export async function searchNotesByVector(
 
     // Decrypt ONLY the top matching notes (critical optimization)
     const decryptStartTime = performance.now()
-    const decryptedNotes: Note[] = []
+    const decryptedResults: Array<{ note: Note; score: number }> = []
     for (const { note, score } of topResults) {
       try {
         const content = await decrypt(note.content)
         const contentPlaintext = await decrypt(note.contentPlaintext)
-        decryptedNotes.push({
-          id: note.id,
-          title: note.title,
-          content, // Decrypted TipTap JSON
-          contentPlaintext, // Decrypted plain text
-          category: note.category,
-          embedding: note.embedding,
-          createdAt: note.createdAt,
-          updatedAt: note.updatedAt,
-          sourceUrl: note.sourceUrl
+        decryptedResults.push({
+          note: {
+            id: note.id,
+            title: note.title,
+            content, // Decrypted TipTap JSON
+            contentPlaintext, // Decrypted plain text
+            category: note.category,
+            embedding: note.embedding,
+            createdAt: note.createdAt,
+            updatedAt: note.updatedAt,
+            sourceUrl: note.sourceUrl
+          },
+          score
         })
         console.log(`  📄 Note "${note.title}" (score: ${score.toFixed(4)})`)
       } catch (error) {
@@ -403,7 +406,7 @@ export async function searchNotesByVector(
     const totalTime = performance.now() - startTime
     console.log(`⏱️ [DB Vector Search] TOTAL time: ${totalTime.toFixed(2)}ms`)
 
-    return decryptedNotes
+    return decryptedResults
   } catch (error) {
     const totalTime = performance.now() - startTime
     console.error(
@@ -443,9 +446,9 @@ export async function searchNotesSemanticWithContent(
 
     const combineStartTime = performance.now()
     const combinedContent = matchingNotes
-      .map((note, idx) => {
+      .map((result, idx) => {
         // Use plain text content for AI summarization (not TipTap JSON)
-        return `Note ${idx + 1}: ${note.title}\n${note.contentPlaintext}\n---`
+        return `Note ${idx + 1}: ${result.note.title}\n${result.note.contentPlaintext}\n---`
       })
       .join("\n\n")
     const combineTime = performance.now() - combineStartTime
@@ -458,7 +461,10 @@ export async function searchNotesSemanticWithContent(
       `⏱️ [Semantic Search With Content] TOTAL time: ${totalTime.toFixed(2)}ms`
     )
 
-    return { notes: matchingNotes, combinedContent }
+    return {
+      notes: matchingNotes.map((result) => result.note),
+      combinedContent
+    }
   } catch (error) {
     const totalTime = performance.now() - startTime
     console.error(
