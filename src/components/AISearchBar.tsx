@@ -244,6 +244,12 @@ export function AISearchBar({
           if (aiResponse.needsClarification) {
             setIsInputDisabled(true)
           }
+
+          // If a note was created, refresh the notes list
+          if (aiResponse.noteCreated && onNoteCreated) {
+            console.log("Note created, calling onNoteCreated callback")
+            onNoteCreated()
+          }
         } else {
           // String response (legacy support - should not happen with new agent)
           const aiMessage: Message = {
@@ -323,7 +329,7 @@ export function AISearchBar({
           // Generate both in parallel
           const [generatedTitle, generatedCategory] = await Promise.all([
             generateTitle("", noteContent),
-            generateCategory("", noteContent)
+            generateCategory(noteContent)
           ])
 
           finalTitle = generatedTitle

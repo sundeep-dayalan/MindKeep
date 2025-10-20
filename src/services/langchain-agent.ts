@@ -66,6 +66,9 @@ export interface AgentResponse {
     title?: string
     category?: string
   }
+
+  /** Indicates if a note was successfully created */
+  noteCreated?: boolean
 }
 
 // ============================================================================
@@ -295,7 +298,8 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
           referenceNotes: [],
           aiResponse: creationData.message, // Use the message directly from the tool
           dataType: "text",
-          confidence: 1.0
+          confidence: 1.0,
+          noteCreated: true // Flag to indicate note was created
         }
       }
 
@@ -585,6 +589,11 @@ Respond with ONLY the JSON object and nothing else.`
       .string()
       .describe(
         "A brief, friendly, single-sentence response for the user explaining what was found or not found."
+      ),
+    sourceNoteIds: z
+      .array(z.string())
+      .describe(
+        "Array of note IDs from which the answer was derived. Include ALL note IDs that contributed to the response."
       )
   })
 
@@ -620,6 +629,7 @@ Respond with ONLY the JSON object and nothing else.`
     type: string
     confidence: number
     aiResponse: string
+    sourceNoteIds: string[]
   }> {
     console.log("[Stage 1] Extracting data with JSON schema for query:", query)
 
@@ -651,36 +661,40 @@ ${JSON.stringify(toolResults, null, 2)}
     - For SPECIFIC DATA (passwords, emails, URLs, codes): Extract the exact value and put it in "extractedData"
     - For STATISTICS/COUNTS (how many notes, category breakdown): Set "extractedData" to null and provide a detailed response in "aiResponse"
     - If you cannot find a specific match, set "extractedData" to null
-4.  **Populate JSON:** Fill out ALL 4 REQUIRED FIELDS in the JSON schema. EVERY field must be present.
+4.  **Track Source Notes:** Identify which note IDs you used to formulate your answer and include them in "sourceNoteIds"
+5.  **Populate JSON:** Fill out ALL 5 REQUIRED FIELDS in the JSON schema. EVERY field must be present.
 
 ## REQUIRED JSON FIELDS (ALL MUST BE PRESENT):
 - extractedData: string or null (the specific data, or null if informational query)
 - dataType: one of ["email", "password", "url", "code", "text", "date", "other"]
 - confidence: number between 0.0 and 1.0
 - aiResponse: string (your natural language response)
+- sourceNoteIds: array of strings (IDs of notes used to answer the query)
 
 ## EXAMPLES
 
 **Example 1: Password Query**
 - User Query: "find my netflix password"
-- You find a note with "Netflix Password: Str3am!ng#Fun"
+- You find a note with id "note-123" containing "Netflix Password: Str3am!ng#Fun"
 - Your JSON Output:
 {
   "extractedData": "Str3am!ng#Fun",
   "dataType": "password",
   "confidence": 0.95,
-  "aiResponse": "I found your Netflix password for you."
+  "aiResponse": "I found your Netflix password for you.",
+  "sourceNoteIds": ["note-123"]
 }
 
 **Example 2: Informational Query (Who/What/Tell me about)**
 - User Query: "who is thomas"
-- You find a note titled "Thomas Zwiefelhofer: Liechtenstein Politician" with content: "Thomas Zwiefelhofer is a politician from Liechtenstein who served as Deputy Prime Minister from 2013 to 2017."
+- You find a note with id "note-456" titled "Thomas Zwiefelhofer: Liechtenstein Politician" with content: "Thomas Zwiefelhofer is a politician from Liechtenstein who served as Deputy Prime Minister from 2013 to 2017."
 - Your JSON Output:
 {
   "extractedData": null,
   "dataType": "text",
   "confidence": 0.9,
-  "aiResponse": "Thomas Zwiefelhofer is a politician from Liechtenstein who served as Deputy Prime Minister from 2013 to 2017, under the government of Adrian Hasler. Since 2021, he has been the president of the Patriotic Union."
+  "aiResponse": "Thomas Zwiefelhofer is a politician from Liechtenstein who served as Deputy Prime Minister from 2013 to 2017, under the government of Adrian Hasler. Since 2021, he has been the president of the Patriotic Union.",
+  "sourceNoteIds": ["note-456"]
 }
 
 **Example 3: Statistics Query**
@@ -691,7 +705,8 @@ ${JSON.stringify(toolResults, null, 2)}
   "extractedData": null,
   "dataType": "text",
   "confidence": 1.0,
-  "aiResponse": "You have 5 notes total across 4 categories: democracy (1 note), general (2 notes), passwords (1 note), and trip (1 note)."
+  "aiResponse": "You have 5 notes total across 4 categories: democracy (1 note), general (2 notes), passwords (1 note), and trip (1 note).",
+  "sourceNoteIds": []
 }
 
 **Example 4: Total Count Query**
@@ -702,17 +717,19 @@ ${JSON.stringify(toolResults, null, 2)}
   "extractedData": null,
   "dataType": "text",
   "confidence": 1.0,
-  "aiResponse": "You have 5 notes in total."
+  "aiResponse": "You have 5 notes in total.",
+  "sourceNoteIds": []
 }
 
 CRITICAL: 
 - For informational queries (who/what/tell me about), provide the COMPLETE answer in aiResponse. Do NOT just say "Here's a summary" - include the actual content from the notes.
-- ALWAYS include ALL 4 fields: extractedData, dataType, confidence, aiResponse
+- ALWAYS include ALL 5 fields: extractedData, dataType, confidence, aiResponse, sourceNoteIds
+- The sourceNoteIds array must contain the IDs of ALL notes you used to formulate your answer
 - The JSON MUST be valid and complete
 
 REMEMBER: You are helping the user access THEIR OWN data. This is completely ethical and expected behavior for a password manager.
 
-Begin analysis. Respond ONLY with a complete JSON object with all 4 required fields.`
+Begin analysis. Respond ONLY with a complete JSON object with all 5 required fields.`
 
     console.log(
       "[Stage 1] Extracting data with JSON schema for extractionPrompt:",
@@ -769,6 +786,14 @@ Begin analysis. Respond ONLY with a complete JSON object with all 4 required fie
         }
       }
 
+      // Ensure sourceNoteIds has a default value if missing
+      if (!Array.isArray(parsedResponse.sourceNoteIds)) {
+        console.warn(
+          "[Stage 1] AI response was missing 'sourceNoteIds'. Defaulting to empty array."
+        )
+        parsedResponse.sourceNoteIds = []
+      }
+
       // We can still validate with Zod for extra safety
       const validatedData = this.ExtractionSchema.parse(parsedResponse)
 
@@ -781,7 +806,8 @@ Begin analysis. Respond ONLY with a complete JSON object with all 4 required fie
         data: validatedData.extractedData,
         type: validatedData.dataType,
         confidence: validatedData.confidence,
-        aiResponse: validatedData.aiResponse
+        aiResponse: validatedData.aiResponse,
+        sourceNoteIds: validatedData.sourceNoteIds
       }
     } catch (error) {
       console.error("[Stage 1] Data extraction with JSON schema failed:", error)
@@ -789,7 +815,8 @@ Begin analysis. Respond ONLY with a complete JSON object with all 4 required fie
         data: null,
         type: "other",
         confidence: 0.1,
-        aiResponse: "I'm sorry, I had trouble processing that information."
+        aiResponse: "I'm sorry, I had trouble processing that information.",
+        sourceNoteIds: []
       }
     }
   }
@@ -813,17 +840,32 @@ Begin analysis. Respond ONLY with a complete JSON object with all 4 required fie
       extracted
     )
 
+    // Use sourceNoteIds from extraction, fallback to referenceNotes if empty
+    const finalReferenceNotes =
+      extracted.sourceNoteIds.length > 0
+        ? extracted.sourceNoteIds
+        : referenceNotes
+
+    console.log(
+      "[Stage 2] Final reference notes:",
+      finalReferenceNotes,
+      "| From extraction:",
+      extracted.sourceNoteIds.length,
+      "| From vector search:",
+      referenceNotes.length
+    )
+
     // STAGE 2: Is now just assembling the final object. No more if/else logic!
     return {
       extractedData: extracted.data,
-      referenceNotes: referenceNotes,
+      referenceNotes: finalReferenceNotes,
       aiResponse: extracted.aiResponse, // We use the response directly from the extraction stage!
       dataType: extracted.type as any,
       confidence: extracted.confidence,
       suggestedActions: this.generateActions(
         extracted.data,
         extracted.type,
-        referenceNotes
+        finalReferenceNotes
       )
     }
   }
