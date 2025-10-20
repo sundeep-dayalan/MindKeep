@@ -43,7 +43,7 @@ export function NoteEditor({
 
   const internalEditorRef = useRef<RichTextEditorRef>(null)
   const editorRef = externalEditorRef || internalEditorRef
-  
+
   // Update content when it changes from outside
   useEffect(() => {
     if (content && editorRef.current) {
