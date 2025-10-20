@@ -119,6 +119,145 @@ Important:
 - When asked about "how many notes" or "statistics", use the get_statistics tool`
 
 // ============================================================================
+// CONTENT OPTIMIZATION UTILITIES
+// ============================================================================
+
+/**
+ * Estimate token count for text (rough approximation)
+ * @param text The text to estimate tokens for
+ * @returns Estimated token count
+ */
+function estimateTokens(text: string): number {
+  // Rough estimation: 1 token ≈ 3.5 characters for English
+  // For JSON, account for formatting overhead
+  return Math.ceil(text.length / 3.5)
+}
+
+/**
+ * Extract structured data (passwords, emails, codes, URLs) from note content
+ * @param noteContent The content to extract from
+ * @returns Object containing extracted structured data and a summary
+ */
+function extractStructuredData(noteContent: string): {
+  passwords: string[]
+  emails: string[]
+  codes: string[]
+  urls: string[]
+  structuredSummary: string
+} {
+  // Regex patterns for common data types
+  const patterns = {
+    passwords: /(?:password|pass|pwd|pw)[\s:]*([^\s\n,;]+)/gi,
+    emails: /[\w\.-]+@[\w\.-]+\.\w+/gi,
+    codes: /[A-Z0-9]{4,}-[A-Z0-9]{4,}/gi,
+    urls: /https?:\/\/[^\s]+/gi
+  }
+
+  // Extract all structured data
+  const extracted = {
+    passwords: [...noteContent.matchAll(patterns.passwords)].map((m) => m[1]),
+    emails: [...noteContent.matchAll(patterns.emails)].map((m) => m[0]),
+    codes: [...noteContent.matchAll(patterns.codes)].map((m) => m[0]),
+    urls: [...noteContent.matchAll(patterns.urls)].map((m) => m[0])
+  }
+
+  // Create a compact summary of structured data
+  const parts: string[] = []
+  if (extracted.passwords.length > 0) {
+    parts.push(`Passwords: ${extracted.passwords.join(", ")}`)
+  }
+  if (extracted.emails.length > 0) {
+    parts.push(`Emails: ${extracted.emails.join(", ")}`)
+  }
+  if (extracted.codes.length > 0) {
+    parts.push(`Codes: ${extracted.codes.join(", ")}`)
+  }
+  if (extracted.urls.length > 0) {
+    parts.push(`URLs: ${extracted.urls.join(", ")}`)
+  }
+
+  const structuredSummary = parts.join("\n")
+
+  return { ...extracted, structuredSummary }
+}
+
+/**
+ * Extract relevant content based on query keywords (query-aware truncation)
+ * @param noteContent The full note content
+ * @param query The user's search query
+ * @param maxLength Maximum length of extracted content
+ * @returns Optimized content that prioritizes query-relevant sections
+ */
+function extractRelevantContent(
+  noteContent: string,
+  query: string,
+  maxLength: number = 500
+): string {
+  if (noteContent.length <= maxLength) {
+    return noteContent
+  }
+
+  // Strategy A: Keyword matching
+  const queryKeywords = query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((word) => word.length > 3) // "netflix", "password", etc.
+
+  if (queryKeywords.length > 0) {
+    // Split into sentences
+    const sentences = noteContent.split(/[.!?]+/).filter((s) => s.trim())
+
+    // Find sentences containing query keywords
+    const relevantSentences: Array<{ sentence: string; score: number }> = []
+
+    sentences.forEach((sentence) => {
+      const lowerSentence = sentence.toLowerCase()
+      let score = 0
+
+      // Calculate relevance score based on keyword matches
+      queryKeywords.forEach((keyword) => {
+        if (lowerSentence.includes(keyword)) {
+          score += 1
+        }
+      })
+
+      if (score > 0) {
+        relevantSentences.push({ sentence: sentence.trim(), score })
+      }
+    })
+
+    // Sort by relevance score (highest first)
+    relevantSentences.sort((a, b) => b.score - a.score)
+
+    // Build result from most relevant sentences until maxLength
+    if (relevantSentences.length > 0) {
+      let result = ""
+      for (const { sentence } of relevantSentences) {
+        if (result.length + sentence.length + 2 <= maxLength) {
+          result += sentence + ". "
+        } else {
+          break
+        }
+      }
+
+      if (result.length > 0) {
+        return result.trim()
+      }
+    }
+  }
+
+  // Strategy B: Fallback to sandwich approach (beginning + end)
+  // Keep first 40% and last 40%, skip middle 20%
+  const firstPartLength = Math.floor(maxLength * 0.4)
+  const lastPartLength = Math.floor(maxLength * 0.4)
+
+  const firstPart = noteContent.substring(0, firstPartLength)
+  const lastPart = noteContent.substring(noteContent.length - lastPartLength)
+
+  return `${firstPart} [...] ${lastPart}`
+}
+
+// ============================================================================
 // SIMPLE AGENT (ReAct-style without external dependencies)
 // ============================================================================
 
@@ -144,6 +283,118 @@ export class MindKeepAgent {
     this.memory = config.memory || new ConversationBuffer(10)
     this.maxIterations = config.maxIterations || 5
     this.verbose = config.verbose || false
+  }
+
+  /**
+   * Optimize tool results to fit within token budget for LLM
+   * Applies smart truncation and content extraction to prevent context overflow
+   * @param toolResults The raw tool results
+   * @param query The user's query for context-aware optimization
+   * @param maxTotalTokens Maximum total tokens allowed (default: 4000 for Gemini Nano)
+   * @returns Optimized tool results
+   */
+  private async optimizeToolResultsForLLM(
+    toolResults: any[],
+    query: string,
+    maxTotalTokens: number = 4000
+  ): Promise<any[]> {
+    const optimized = []
+    let currentTokenCount = 0
+
+    for (const result of toolResults) {
+      // Only optimize search_notes results (other tools return small data)
+      if (result.tool === "search_notes" && result.result?.notes) {
+        const notes = result.result.notes
+        const optimizedNotes = []
+
+        console.log(
+          `[Optimizer] Processing ${notes.length} notes from search results`
+        )
+
+        for (const note of notes) {
+          // Remove embedding arrays (they're huge and not needed for extraction)
+          if (note.embedding) {
+            delete note.embedding
+          }
+
+          // Preserve original content length for logging
+          const originalLength = note.content?.length || 0
+
+          // Step 1: Try structured data extraction first (for password/email queries)
+          const structured = extractStructuredData(note.content || "")
+          const hasStructuredData =
+            structured.passwords.length > 0 ||
+            structured.emails.length > 0 ||
+            structured.codes.length > 0 ||
+            structured.urls.length > 0
+
+          if (hasStructuredData) {
+            console.log(
+              `[Optimizer] Found structured data in note ${note.id}: ${structured.passwords.length} passwords, ${structured.emails.length} emails, ${structured.codes.length} codes`
+            )
+
+            // For queries about passwords/emails/codes, prioritize structured data
+            // Keep structured summary + some context from original content
+            const contextSnippet = extractRelevantContent(
+              note.content || "",
+              query,
+              200
+            )
+            note.content = `${structured.structuredSummary}\n\nContext: ${contextSnippet}`
+          } else {
+            // Step 2: Query-guided extraction for non-structured data
+            note.content = extractRelevantContent(
+              note.content || "",
+              query,
+              400
+            )
+          }
+
+          console.log(
+            `[Optimizer] Optimized note ${note.id}: ${originalLength} → ${note.content.length} chars`
+          )
+
+          // Step 3: Token budget check
+          const noteTokens = estimateTokens(JSON.stringify(note))
+
+          if (currentTokenCount + noteTokens > maxTotalTokens) {
+            console.warn(
+              `[Optimizer] Token budget exceeded (${currentTokenCount + noteTokens}/${maxTotalTokens}). Attempting harder truncation...`
+            )
+
+            // If we're at limit, try harder truncation
+            note.content = note.content.substring(0, 150)
+            const newTokens = estimateTokens(JSON.stringify(note))
+
+            if (currentTokenCount + newTokens > maxTotalTokens) {
+              console.warn(
+                `[Optimizer] Even with truncation, budget exceeded. Skipping note ${note.id}`
+              )
+              break // Skip this note entirely
+            }
+
+            console.log(
+              `[Optimizer] Hard truncation applied to note ${note.id}: ${noteTokens} → ${newTokens} tokens`
+            )
+            currentTokenCount += newTokens
+          } else {
+            currentTokenCount += noteTokens
+          }
+
+          optimizedNotes.push(note)
+        }
+
+        console.log(
+          `[Optimizer] Final result: ${optimizedNotes.length}/${notes.length} notes included, ~${currentTokenCount} tokens used`
+        )
+
+        result.result.notes = optimizedNotes
+      }
+
+      optimized.push(result)
+    }
+
+    return optimized
   }
 
   /**
@@ -659,7 +910,15 @@ Respond with ONLY the JSON object and nothing else.`
       }
     }
 
-    return results
+    // **NEW: Optimize results before returning to prevent token overflow**
+    // This applies smart content extraction and truncation to search results
+    const optimizedResults = await this.optimizeToolResultsForLLM(
+      results,
+      query,
+      4000 // Max tokens for Gemini Nano context
+    )
+
+    return optimizedResults
   }
 
   ExtractionSchema = z.object({

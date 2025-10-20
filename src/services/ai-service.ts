@@ -146,7 +146,7 @@ export type { HealthCheckStatus } from "./gemini-nano-service"
 /**
  * Summarizes text using the experimental Summarizer API.
  * This is a convenience wrapper around nano-service.summarizeText
- * with default context for note summarization.
+ * with default context and smart content optimization.
  *
  * @param textToSummarize The text content to summarize.
  * @returns A promise that resolves to the summary string.
@@ -161,7 +161,12 @@ Rules:
 - Do not use phrases like "This text is about" or "The summary is".
 - Provide only the summary directly.`
 
-  return NanoService.summarizeText(textToSummarize, {
+  // OPTIMIZATION: For large notes (200KB+), apply smart truncation to fit token budget
+  // Summarizer API has similar token limits. We allocate ~3428 tokens (12000 chars)
+  // This preserves enough context for meaningful summaries while staying under quota
+  const optimizedText = optimizeContentForAI(textToSummarize, 12000)
+
+  return NanoService.summarizeText(optimizedText, {
     context: defaultContext
   })
 }
@@ -193,6 +198,41 @@ Rules:
 }
 
 /**
+ * Optimizes large content for title/category generation by applying smart truncation.
+ * Uses a "sandwich" approach: keeps beginning and end of content, which usually contains
+ * the most relevant information for title/category generation.
+ *
+ * @param content The full content to optimize
+ * @param maxChars Maximum characters to keep (default: 1500 for ~428 tokens)
+ * @returns Optimized content string
+ */
+function optimizeContentForAI(
+  content: string,
+  maxChars: number = 1500
+): string {
+  if (content.length <= maxChars) {
+    return content
+  }
+
+  // For title/category generation, we use a "sandwich" approach:
+  // - First 60% of maxChars from beginning (usually contains main topic/intro)
+  // - Last 40% of maxChars from end (often contains summary or key points)
+  const beginningChars = Math.floor(maxChars * 0.6)
+  const endingChars = Math.floor(maxChars * 0.4)
+
+  const beginning = content.substring(0, beginningChars)
+  const ending = content.substring(content.length - endingChars)
+
+  const optimized = `${beginning}\n...[content truncated for AI processing]...\n${ending}`
+
+  console.log(
+    `[AI Optimizer] Reduced content: ${content.length} → ${optimized.length} chars (${((optimized.length / content.length) * 100).toFixed(1)}% of original)`
+  )
+
+  return optimized
+}
+
+/**
  * Generate a title from content using chrome.ai API (Gemini Nano)
  * Creates a short, descriptive title based on the content
  */
@@ -210,6 +250,11 @@ export async function generateTitle(
     if (!textToProcess) {
       throw new Error("No content available to generate title from")
     }
+
+    // OPTIMIZATION: For large notes (200KB+), truncate intelligently to fit token budget
+    // Gemini Nano has ~4000 token limit. We allocate ~428 tokens (1500 chars) for content
+    // to leave room for system prompts, response schema, and other overhead
+    const optimizedContent = optimizeContentForAI(textToProcess, 1500)
 
     const titleResponseSchema = {
       type: "object",
@@ -233,7 +278,7 @@ export async function generateTitle(
     Please generate a concise, descriptive title for the following note content.
     ---
     ${titleContent.trim() === "" ? "User has not provided any title for the note" : titleContent.trim()}
-    ${noteContent.trim() === "" ? "User has not provided any content for the note" : noteContent.trim()}
+    ${noteContent.trim() === "" ? "User has not provided any content for the note" : optimizedContent}
     `
 
     const options: PromptOptions = {
@@ -288,6 +333,10 @@ export async function generateCategory(noteContent: string): Promise<string> {
       throw new Error("No content available to generate category from")
     }
 
+    // OPTIMIZATION: For large notes, use smart truncation instead of simple substring
+    // Allocate ~857 tokens (3000 chars) for category generation
+    const optimizedContent = optimizeContentForAI(noteContent, 3000)
+
     const categoryResponseSchema = {
       type: "object",
       properties: {
@@ -319,7 +368,7 @@ Rules:
 
     const mainPrompt = `Generate a category name for this note content:
 ---
-${noteContent.trim().substring(0, 1000)}
+${optimizedContent}
 ---
 
 Return a JSON object with the category name.`
