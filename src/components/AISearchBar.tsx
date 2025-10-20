@@ -942,7 +942,9 @@ export function AISearchBar({
 
           try {
             // Import and call the organize note tool
-            const { organizeNoteTool } = await import("~services/langchain-tools")
+            const { organizeNoteTool } = await import(
+              "~services/langchain-tools"
+            )
 
             const organizeResult = await organizeNoteTool.func({
               noteId: noteId

@@ -8,8 +8,8 @@ import { DynamicStructuredTool } from "@langchain/core/tools"
 import { z } from "zod"
 
 import * as aiService from "./ai-service"
-import * as dbService from "./db-service"
 import type { Note } from "./db-service"
+import * as dbService from "./db-service"
 
 // ============================================================================
 // TOOL SCHEMAS (using Zod for validation)
