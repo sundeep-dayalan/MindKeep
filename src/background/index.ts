@@ -83,15 +83,44 @@ chrome.runtime.onInstalled.addListener(() => {
  */
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === "saveToMindKeep" && info.selectionText && tab?.id) {
-    // Open side panel
+    // IMPORTANT: Open side panel IMMEDIATELY in the user gesture context
+    // If we wait for async operations, Chrome will reject it as "not a user gesture"
     await chrome.sidePanel.open({ tabId: tab.id })
 
-    // Send selected text to side panel
+    // Now try to get the HTML content
+    let content = info.selectionText
+    let isHtml = false
+
+    try {
+      // First, try to ping the content script to see if it's injected
+      const response = await chrome.tabs.sendMessage(
+        tab.id,
+        { type: "GET_SELECTED_HTML" },
+        { frameId: 0 } // Send to main frame
+      )
+
+      if (response?.html) {
+        content = response.html
+        isHtml = true
+      }
+    } catch (error) {
+      console.warn(
+        "Could not get HTML from content script:",
+        error.message,
+        "- Using plain text fallback"
+      )
+      // Fallback to plain text - already set above
+      // Note: Content script may not be injected on some pages (chrome://, about:, etc.)
+      // or if the page was loaded before the extension was installed/reloaded
+    }
+
+    // Send content to side panel
     setTimeout(() => {
       chrome.runtime.sendMessage({
         type: "FILL_EDITOR",
         data: {
-          content: info.selectionText,
+          content: content,
+          isHtml: isHtml,
           sourceUrl: tab.url
         }
       })
@@ -105,6 +134,14 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
  * Message handler for processing note operations
  */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log(
+    `📨 [Background Listener] Received message type: ${message.type}`,
+    {
+      saveId: message.data?._debugSaveId || "N/A",
+      timestamp: Date.now()
+    }
+  )
+
   // Handle async operations properly
   ;(async () => {
     try {
@@ -147,9 +184,13 @@ async function handleSaveNote(data: {
   embedding?: number[] // Optional pre-generated embedding from side panel
 }): Promise<{ success: boolean; note?: any; error?: string }> {
   const startTime = performance.now()
+  const saveId = `save-${Date.now()}-${Math.random().toString(36).substring(7)}`
 
   try {
-    console.log("📝 [BG Save] Starting save pipeline...")
+    console.log(`[${saveId}] 📝 [BG Save] Starting save pipeline...`, {
+      title: data.title,
+      hasEmbedding: !!data.embedding
+    })
 
     // Step 1: Data Reception (already done via message)
     const { title, category, content, contentPlaintext, sourceUrl, embedding } =
@@ -160,7 +201,7 @@ async function handleSaveNote(data: {
     let embeddingVector: number[]
     if (embedding && embedding.length > 0) {
       console.log(
-        `✅ [BG Save] Using pre-generated embedding: ${embedding.length} dimensions`
+        `[${saveId}] ✅ [BG Save] Using pre-generated embedding: ${embedding.length} dimensions`
       )
       embeddingVector = embedding
     } else {
@@ -194,14 +235,16 @@ async function handleSaveNote(data: {
     const dbStartTime = performance.now()
     const savedNote = await addNote(noteObject)
     const dbTime = performance.now() - dbStartTime
-    console.log(`⏱️ [BG Save] Database storage: ${dbTime.toFixed(2)}ms`)
+    console.log(
+      `[${saveId}] ⏱️ [BG Save] Database storage: ${dbTime.toFixed(2)}ms`
+    )
 
     const totalTime = performance.now() - startTime
     console.log(
-      `⏱️ [BG Save] TOTAL background save time: ${totalTime.toFixed(2)}ms`
+      `[${saveId}] ⏱️ [BG Save] TOTAL background save time: ${totalTime.toFixed(2)}ms`
     )
     console.log(
-      `📊 [BG Save] Breakdown: Encrypt=${encryptTime.toFixed(2)}ms, DB=${dbTime.toFixed(2)}ms`
+      `[${saveId}] 📊 [BG Save] Breakdown: Encrypt=${encryptTime.toFixed(2)}ms, DB=${dbTime.toFixed(2)}ms`
     )
 
     return {

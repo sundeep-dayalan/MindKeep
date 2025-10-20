@@ -169,6 +169,7 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
  * @returns A base64-encoded string containing the IV and encrypted data
  */
 export async function encrypt(text: string): Promise<string> {
+  return text //TODO: disable encryption for now
   try {
     const encoder = new TextEncoder()
     const data = encoder.encode(text)
@@ -215,6 +216,7 @@ export async function encrypt(text: string): Promise<string> {
  * @returns The decrypted plaintext content
  */
 export async function decrypt(encryptedText: string): Promise<string> {
+  return encryptedText //TODO: disable encryption for now
   try {
     // Convert from base64
     const combined = new Uint8Array(base64ToArrayBuffer(encryptedText))

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import "~style.css"
 
@@ -8,22 +8,21 @@ import { CategoryFilter } from "~components/CategoryFilter"
 import { Header } from "~components/Header"
 import { NoteEditor, type RichTextEditorRef } from "~components/NoteEditor"
 import { NotesList } from "~components/NotesList"
+import { PersonaManager } from "~components/PersonaManager"
 import { SearchBar } from "~components/SearchBar"
-import {
-  generateEmbedding,
-  generateTitle,
-  summarizeText
-} from "~services/ai-service"
+import { generateEmbedding, generateTitle } from "~services/ai-service"
 import {
   deleteNote,
   getAllCategories,
   getAllNotes,
   searchNotesByTitle,
-  searchNotesSemanticWithContent,
   type Note
 } from "~services/db-service"
+import { getGlobalAgent } from "~services/langchain-agent"
+import { initializeDefaultPersonas } from "~services/persona-defaults"
+import type { Persona } from "~types/persona"
 
-type View = "list" | "editor"
+type View = "list" | "editor" | "personas"
 
 function SidePanel() {
   const [view, setView] = useState<View>("list")
@@ -39,9 +38,17 @@ function SidePanel() {
   const [noteContent, setNoteContent] = useState("")
   const [noteCategory, setNoteCategory] = useState("general")
 
+  // Add a ref to track the editor so we can update it when messages arrive
+  const editorRef = useRef<RichTextEditorRef | null>(null)
+
   // Load notes and categories
   useEffect(() => {
     loadData()
+
+    // Initialize default personas on first load
+    initializeDefaultPersonas().catch((error) => {
+      console.error("Failed to initialize default personas:", error)
+    })
 
     // Notify background that side panel is open
     chrome.runtime.sendMessage({ type: "SIDE_PANEL_OPENED" })
@@ -55,11 +62,29 @@ function SidePanel() {
         window.close()
       } else if (message.type === "FILL_EDITOR") {
         // Handle context menu "Save to MindKeep"
-        setNoteContent(message.data.content || "")
+        const content = message.data.content || ""
+        const isHtml = message.data.isHtml || false
+
+        // Reset editor state
         setNoteTitle("")
         setNoteCategory("general")
         setEditingNote(null)
         setView("editor")
+
+        // Set content appropriately based on type
+        if (isHtml) {
+          // For HTML content, set it and let the editor render
+          setNoteContent(content)
+          // If editor is already mounted, update it directly
+          setTimeout(() => {
+            if (editorRef.current) {
+              editorRef.current.setContent(content)
+            }
+          }, 100)
+        } else {
+          // For plain text, just set the state
+          setNoteContent(content)
+        }
       }
     }
 
@@ -223,6 +248,10 @@ function SidePanel() {
 
         // Step 2: Send to background script with pre-generated embedding
         const messageStartTime = performance.now()
+        const saveId = `save_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
+        console.log(
+          `🚀 [UI Save ${saveId}] Sending SAVE_NOTE message to background`
+        )
         const response = await chrome.runtime.sendMessage({
           type: "SAVE_NOTE",
           data: {
@@ -231,7 +260,8 @@ function SidePanel() {
             contentPlaintext,
             category: categoryToSave,
             sourceUrl,
-            embedding
+            embedding,
+            _debugSaveId: saveId
           }
         })
         const messageTime = performance.now() - messageStartTime
@@ -282,6 +312,30 @@ function SidePanel() {
     window.close()
   }
 
+  const handlePersonasClick = () => {
+    console.log("🎭 [SidePanel] Switching to personas view")
+    setView("personas")
+  }
+
+  const handlePersonaActivated = async (persona: Persona | null) => {
+    console.log("🎭 [SidePanel] Persona activated:", persona?.name || "None")
+
+    try {
+      // Update the global agent with the new persona
+      const agent = await getGlobalAgent()
+      agent.setPersona(persona)
+
+      console.log("🎭 [SidePanel] Global agent updated with persona")
+    } catch (error) {
+      console.error("🎭 [SidePanel] Error updating agent persona:", error)
+    }
+  }
+
+  const handleBackToList = () => {
+    console.log("📝 [SidePanel] Switching back to list view")
+    setView("list")
+  }
+
   const handleSearch = async () => {
     if (searchQuery.trim()) {
       setLoading(true)
@@ -310,61 +364,31 @@ function SidePanel() {
     }
   }
 
-  const handleAISearch = async (query: string): Promise<string> => {
+  const handleAISearch = async (
+    query: string
+  ): Promise<string | import("~services/langchain-agent").AgentResponse> => {
     const startTime = performance.now()
 
     try {
-      console.log("🔍 [UI AI Search] Started for query:", query)
+      console.log("🤖 [LangChain Agent] Processing query:", query)
 
-      // Step 1: Generate embedding for query
-      const embeddingStartTime = performance.now()
-      const queryEmbedding = await generateEmbedding(query)
-      const embeddingTime = performance.now() - embeddingStartTime
-      console.log(
-        `⏱️ [UI AI Search] Query embedding generation: ${embeddingTime.toFixed(2)}ms (${queryEmbedding.length} dimensions)`
-      )
+      // Use the LangChain agent for agentic search
+      const { getGlobalAgent } = await import("~services/langchain-agent")
+      const agent = await getGlobalAgent()
 
-      // Step 2: Search for similar notes
-      const searchStartTime = performance.now()
-      const { notes: matchingNotes, combinedContent } =
-        await searchNotesSemanticWithContent(queryEmbedding, 5)
-      const searchTime = performance.now() - searchStartTime
-      console.log(
-        `⏱️ [UI AI Search] Database search: ${searchTime.toFixed(2)}ms (found ${matchingNotes.length} notes)`
-      )
-
-      if (matchingNotes.length === 0) {
-        const totalTime = performance.now() - startTime
-        console.log(
-          `⏱️ [UI AI Search] No results found - TOTAL time: ${totalTime.toFixed(2)}ms`
-        )
-        return "I couldn't find any notes related to your query. Try adding more notes or rephrasing your question."
-      }
-
-      console.log(
-        ` [UI AI Search] Combined content length: ${combinedContent.length} chars`
-      )
-
-      // Step 3: Summarize results using AI
-      const summarizeStartTime = performance.now()
-      const prompt = `Based on the following notes, answer this question: "${query}"\n\n${combinedContent}\n\nProvide a clear, concise answer based only on the information in these notes.`
-      const summary = await summarizeText(prompt)
-      const summarizeTime = performance.now() - summarizeStartTime
-      console.log(
-        `⏱️ [UI AI Search] AI summarization: ${summarizeTime.toFixed(2)}ms`
-      )
+      const response = await agent.run(query)
 
       const totalTime = performance.now() - startTime
-      console.log(`⏱️ [UI AI Search] TOTAL time: ${totalTime.toFixed(2)}ms`)
-      console.log(
-        `📊 [UI AI Search] Breakdown: Embedding=${embeddingTime.toFixed(2)}ms, Search=${searchTime.toFixed(2)}ms, Summarize=${summarizeTime.toFixed(2)}ms`
-      )
+      console.log(`⏱️ [LangChain Agent] TOTAL time: ${totalTime.toFixed(2)}ms`)
+      console.log(`📊 [LangChain Agent] Structured response:`, response)
 
-      return summary
+      // Return the full response object for clarification support
+      // AISearchBar will handle it appropriately
+      return response
     } catch (error) {
       const totalTime = performance.now() - startTime
       console.error(
-        `❌ [UI AI Search] Failed after ${totalTime.toFixed(2)}ms:`,
+        `❌ [LangChain Agent] Failed after ${totalTime.toFixed(2)}ms:`,
         error
       )
       return "I encountered an error while searching. Please try again."
@@ -386,14 +410,42 @@ function SidePanel() {
     <div className="plasmo-w-full plasmo-h-screen plasmo-bg-slate-50 plasmo-overflow-hidden">
       <div className="plasmo-h-full plasmo-flex plasmo-flex-col">
         {/* Header */}
-        <Header onClose={handleClose} />
+        <Header
+          onClose={handleClose}
+          onPersonasClick={handlePersonasClick}
+          view={view}
+        />
 
         {/* Content */}
-        <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-p-4 plasmo-pb-20">
-          {/* AI Status Banner */}
-          <AIStatusBanner />
+        <div
+          className={`plasmo-flex-1 plasmo-overflow-y-auto plasmo-p-4 ${view === "personas" ? "plasmo-pb-4" : "plasmo-pb-20"}`}>
+          {/* AI Status Banner - only show in list view */}
+          {view === "list" && <AIStatusBanner />}
 
-          {view === "list" ? (
+          {view === "personas" ? (
+            <div className="plasmo-h-full">
+              <div className="plasmo-mb-4">
+                <button
+                  onClick={handleBackToList}
+                  className="plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-px-3 plasmo-py-2 plasmo-text-sm plasmo-text-slate-600 hover:plasmo-text-slate-900 plasmo-transition-colors">
+                  <svg
+                    className="plasmo-w-4 plasmo-h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                    />
+                  </svg>
+                  Back to Notes
+                </button>
+              </div>
+              <PersonaManager onPersonaActivated={handlePersonaActivated} />
+            </div>
+          ) : view === "list" ? (
             <>
               {/* Search and Filters */}
               <div className="plasmo-mb-4 plasmo-space-y-3">
@@ -443,17 +495,22 @@ function SidePanel() {
               onCategoryChange={setNoteCategory}
               onSave={handleSaveNote}
               onCancel={() => setView("list")}
+              externalEditorRef={editorRef}
             />
           )}
         </div>
 
-        {/* Fixed Bottom Search Bar */}
-        <div className="plasmo-fixed plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-bg-white plasmo-border-t plasmo-border-slate-200 plasmo-shadow-lg plasmo-p-4">
-          <AISearchBar
-            placeholder="Ask me anything..."
-            onSearch={handleAISearch}
-          />
-        </div>
+        {/* Fixed Bottom Search Bar - hide in personas view */}
+        {view !== "personas" && (
+          <div className="plasmo-fixed plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-bg-white plasmo-border-t plasmo-border-slate-200 plasmo-shadow-lg plasmo-p-4">
+            <AISearchBar
+              placeholder="Ask me anything..."
+              onSearch={handleAISearch}
+              onNoteCreated={loadData}
+              onNotesChange={loadData}
+            />
+          </div>
+        )}
       </div>
     </div>
   )

@@ -13,6 +13,7 @@
 
 import Dexie, { type Table } from "dexie"
 
+import type { Persona, PersonaInput } from "~types/persona"
 import { decrypt } from "~util/crypto"
 
 // Note interface (decrypted, user-facing format)
@@ -47,6 +48,7 @@ export interface StoredNote {
  */
 class MindKeepDatabase extends Dexie {
   notes!: Table<StoredNote, string> // StoredNote type, string key (id)
+  personas!: Table<Persona, string> // Persona type, string key (id)
 
   constructor() {
     super("mindkeep_db")
@@ -57,6 +59,12 @@ class MindKeepDatabase extends Dexie {
     // Version 2: Added contentPlaintext field for rich text support
     this.version(2).stores({
       notes: "id, category, updatedAt, createdAt, title" // indexed fields for fast queries
+    })
+
+    // Version 3: Added personas table
+    this.version(3).stores({
+      notes: "id, category, updatedAt, createdAt, title",
+      personas: "id, name, createdAt, updatedAt, isActive, isDefault" // indexed fields for personas
     })
   }
 }
@@ -119,6 +127,14 @@ export async function addNote(noteData: {
   try {
     const id = generateId()
     const now = Date.now()
+
+    console.log(
+      `💾 [DB Service] addNote() called for title: "${noteData.title}"`,
+      {
+        id,
+        timestamp: now
+      }
+    )
 
     const storedNote: StoredNote = {
       id,
@@ -333,7 +349,7 @@ export async function getAllNotes(): Promise<Note[]> {
 export async function searchNotesByVector(
   vector: number[],
   limit: number = 5
-): Promise<Note[]> {
+): Promise<Array<{ note: Note; score: number }>> {
   const startTime = performance.now()
 
   try {
@@ -374,21 +390,24 @@ export async function searchNotesByVector(
 
     // Decrypt ONLY the top matching notes (critical optimization)
     const decryptStartTime = performance.now()
-    const decryptedNotes: Note[] = []
+    const decryptedResults: Array<{ note: Note; score: number }> = []
     for (const { note, score } of topResults) {
       try {
         const content = await decrypt(note.content)
         const contentPlaintext = await decrypt(note.contentPlaintext)
-        decryptedNotes.push({
-          id: note.id,
-          title: note.title,
-          content, // Decrypted TipTap JSON
-          contentPlaintext, // Decrypted plain text
-          category: note.category,
-          embedding: note.embedding,
-          createdAt: note.createdAt,
-          updatedAt: note.updatedAt,
-          sourceUrl: note.sourceUrl
+        decryptedResults.push({
+          note: {
+            id: note.id,
+            title: note.title,
+            content, // Decrypted TipTap JSON
+            contentPlaintext, // Decrypted plain text
+            category: note.category,
+            embedding: note.embedding,
+            createdAt: note.createdAt,
+            updatedAt: note.updatedAt,
+            sourceUrl: note.sourceUrl
+          },
+          score
         })
         console.log(`  📄 Note "${note.title}" (score: ${score.toFixed(4)})`)
       } catch (error) {
@@ -403,7 +422,7 @@ export async function searchNotesByVector(
     const totalTime = performance.now() - startTime
     console.log(`⏱️ [DB Vector Search] TOTAL time: ${totalTime.toFixed(2)}ms`)
 
-    return decryptedNotes
+    return decryptedResults
   } catch (error) {
     const totalTime = performance.now() - startTime
     console.error(
@@ -443,9 +462,9 @@ export async function searchNotesSemanticWithContent(
 
     const combineStartTime = performance.now()
     const combinedContent = matchingNotes
-      .map((note, idx) => {
+      .map((result, idx) => {
         // Use plain text content for AI summarization (not TipTap JSON)
-        return `Note ${idx + 1}: ${note.title}\n${note.contentPlaintext}\n---`
+        return `Note ${idx + 1}: ${result.note.title}\n${result.note.contentPlaintext}\n---`
       })
       .join("\n\n")
     const combineTime = performance.now() - combineStartTime
@@ -458,7 +477,10 @@ export async function searchNotesSemanticWithContent(
       `⏱️ [Semantic Search With Content] TOTAL time: ${totalTime.toFixed(2)}ms`
     )
 
-    return { notes: matchingNotes, combinedContent }
+    return {
+      notes: matchingNotes.map((result) => result.note),
+      combinedContent
+    }
   } catch (error) {
     const totalTime = performance.now() - startTime
     console.error(
@@ -624,6 +646,82 @@ export async function getAllCategories(): Promise<string[]> {
 }
 
 /**
+ * Get statistics about notes by category
+ * Returns count of notes per category without decryption
+ */
+export async function getCategoryStatistics(): Promise<
+  Array<{ category: string; count: number; lastUpdated: number }>
+> {
+  try {
+    const categories = await getAllCategories()
+    const stats = []
+
+    for (const category of categories) {
+      const notesInCategory = await db.notes
+        .where("category")
+        .equals(category)
+        .toArray()
+
+      const count = notesInCategory.length
+      const lastUpdated =
+        notesInCategory.length > 0
+          ? Math.max(...notesInCategory.map((n) => n.updatedAt))
+          : 0
+
+      stats.push({ category, count, lastUpdated })
+    }
+
+    return stats
+  } catch (error) {
+    console.error("Error getting category statistics:", error)
+    return []
+  }
+}
+
+/**
+ * Get comprehensive database statistics
+ * Provides overview of all notes without decrypting content
+ */
+export async function getDatabaseStatistics(): Promise<{
+  totalNotes: number
+  categories: Array<{ category: string; count: number; lastUpdated: number }>
+  oldestNoteDate: number | null
+  newestNoteDate: number | null
+  lastModifiedDate: number | null
+}> {
+  try {
+    const allNotes = await db.notes.toArray()
+    const totalNotes = allNotes.length
+
+    const categoryStats = await getCategoryStatistics()
+
+    const oldestNoteDate =
+      allNotes.length > 0 ? Math.min(...allNotes.map((n) => n.createdAt)) : null
+    const newestNoteDate =
+      allNotes.length > 0 ? Math.max(...allNotes.map((n) => n.createdAt)) : null
+    const lastModifiedDate =
+      allNotes.length > 0 ? Math.max(...allNotes.map((n) => n.updatedAt)) : null
+
+    return {
+      totalNotes,
+      categories: categoryStats,
+      oldestNoteDate,
+      newestNoteDate,
+      lastModifiedDate
+    }
+  } catch (error) {
+    console.error("Error getting database statistics:", error)
+    return {
+      totalNotes: 0,
+      categories: [],
+      oldestNoteDate: null,
+      newestNoteDate: null,
+      lastModifiedDate: null
+    }
+  }
+}
+
+/**
  * Create a new category
  */
 export function createCategory(categoryName: string): string {
@@ -733,5 +831,295 @@ export async function debugIndexedDB(): Promise<void> {
     console.log("=== End Debug Info ===")
   } catch (error) {
     console.error("Debug error:", error)
+  }
+}
+
+// ============================================================================
+// PERSONA MANAGEMENT FUNCTIONS
+// ============================================================================
+
+/**
+ * Generate a unique ID for a persona
+ */
+function generatePersonaId(): string {
+  return `persona_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+}
+
+/**
+ * Add a new persona to the database
+ *
+ * @param personaData - The persona data to save
+ * @returns The created persona with generated ID and timestamps
+ */
+export async function addPersona(personaData: PersonaInput): Promise<Persona> {
+  console.log("🎭 [DB] addPersona called with:", personaData)
+
+  const now = Date.now()
+  const persona: Persona = {
+    id: generatePersonaId(),
+    name: personaData.name,
+    description: personaData.description,
+    context: personaData.context,
+    emoji: personaData.emoji,
+    outputTemplate: personaData.outputTemplate,
+    isDefault: personaData.isDefault || false,
+    isActive: false,
+    createdAt: now,
+    updatedAt: now
+  }
+
+  console.log("🎭 [DB] Generated persona object:", persona)
+
+  await db.personas.add(persona)
+  console.log("🎭 [DB] Persona added successfully with ID:", persona.id)
+
+  return persona
+}
+
+/**
+ * Get a persona by ID
+ *
+ * @param id - The persona ID
+ * @returns The persona or undefined if not found
+ */
+export async function getPersona(id: string): Promise<Persona | undefined> {
+  console.log("🎭 [DB] getPersona called with ID:", id)
+
+  const persona = await db.personas.get(id)
+
+  if (persona) {
+    console.log("🎭 [DB] Persona found:", persona.name)
+  } else {
+    console.log("🎭 [DB] Persona not found with ID:", id)
+  }
+
+  return persona
+}
+
+/**
+ * Get all personas from the database
+ *
+ * @returns Array of all personas, sorted by name (deduplicated by ID)
+ */
+export async function getAllPersonas(): Promise<Persona[]> {
+  console.log("🎭 [DB] getAllPersonas called")
+
+  const personas = await db.personas.orderBy("name").toArray()
+
+  console.log(
+    `🎭 [DB] Retrieved ${personas.length} personas (before deduplication):`,
+    personas.map((p) => ({ id: p.id, name: p.name }))
+  )
+
+  // Deduplicate by ID (in case there are duplicates in the database)
+  const uniquePersonas = Array.from(
+    new Map(personas.map((p) => [p.id, p])).values()
+  )
+
+  if (uniquePersonas.length < personas.length) {
+    console.warn(
+      `🎭 [DB] Found ${personas.length - uniquePersonas.length} duplicate personas, removed them from results`
+    )
+  }
+
+  console.log(`🎭 [DB] Returning ${uniquePersonas.length} unique personas`)
+
+  return uniquePersonas
+}
+
+/**
+ * Update an existing persona
+ *
+ * @param id - The persona ID to update
+ * @param updates - Partial persona data to update
+ * @returns The updated persona or undefined if not found
+ */
+export async function updatePersona(
+  id: string,
+  updates: Partial<PersonaInput>
+): Promise<Persona | undefined> {
+  console.log(
+    "🎭 [DB] updatePersona called for ID:",
+    id,
+    "with updates:",
+    updates
+  )
+
+  const existing = await db.personas.get(id)
+  if (!existing) {
+    console.log("🎭 [DB] Persona not found for update:", id)
+    return undefined
+  }
+
+  const updated: Persona = {
+    ...existing,
+    ...updates,
+    updatedAt: Date.now()
+  }
+
+  await db.personas.update(id, updated)
+  console.log("🎭 [DB] Persona updated successfully:", updated.name)
+
+  return updated
+}
+
+/**
+ * Delete a persona from the database
+ *
+ * @param id - The persona ID to delete
+ * @returns True if deleted, false if not found or is a default persona
+ */
+export async function deletePersona(id: string): Promise<boolean> {
+  console.log("🎭 [DB] deletePersona called for ID:", id)
+
+  const persona = await db.personas.get(id)
+
+  if (!persona) {
+    console.log("🎭 [DB] Persona not found for deletion:", id)
+    return false
+  }
+
+  if (persona.isDefault) {
+    console.log("🎭 [DB] Cannot delete default persona:", persona.name)
+    return false
+  }
+
+  await db.personas.delete(id)
+  console.log("🎭 [DB] Persona deleted successfully:", persona.name)
+
+  return true
+}
+
+/**
+ * Get all active personas
+ *
+ * @returns Array of active personas
+ */
+export async function getActivePersonas(): Promise<Persona[]> {
+  console.log("🎭 [DB] getActivePersonas called")
+
+  const personas = await db.personas.where("isActive").equals(1).toArray()
+
+  console.log(`🎭 [DB] Found ${personas.length} active personas`)
+
+  return personas
+}
+
+/**
+ * Set a persona as active (and deactivate all others)
+ *
+ * @param id - The persona ID to activate (null to deactivate all)
+ * @returns True if successful
+ */
+export async function setActivePersona(id: string | null): Promise<boolean> {
+  console.log("🎭 [DB] setActivePersona called with ID:", id)
+
+  try {
+    // Deactivate all personas first
+    const allPersonas = await db.personas.toArray()
+    console.log(`🎭 [DB] Deactivating ${allPersonas.length} personas`)
+
+    await Promise.all(
+      allPersonas.map((p) => db.personas.update(p.id, { isActive: false }))
+    )
+
+    // Activate the specified persona if ID provided
+    if (id) {
+      const persona = await db.personas.get(id)
+      if (!persona) {
+        console.log("🎭 [DB] Persona not found for activation:", id)
+        return false
+      }
+
+      await db.personas.update(id, { isActive: true })
+      console.log("🎭 [DB] Activated persona:", persona.name)
+    } else {
+      console.log("🎭 [DB] All personas deactivated (default mode)")
+    }
+
+    return true
+  } catch (error) {
+    console.error("🎭 [DB] Error setting active persona:", error)
+    return false
+  }
+}
+
+/**
+ * Get the currently active persona
+ *
+ * @returns The active persona or null if none active
+ */
+export async function getActivePersona(): Promise<Persona | null> {
+  console.log("🎭 [DB] getActivePersona called")
+
+  const personas = await db.personas.where("isActive").equals(1).toArray()
+
+  if (personas.length > 0) {
+    console.log("🎭 [DB] Active persona found:", personas[0].name)
+    return personas[0]
+  }
+
+  console.log("🎭 [DB] No active persona (default mode)")
+  return null
+}
+
+/**
+ * Clean up duplicate personas from the database
+ * Keeps only the most recent version of each persona (by name)
+ *
+ * @returns Number of duplicate personas removed
+ */
+export async function cleanupDuplicatePersonas(): Promise<number> {
+  console.log("🎭 [DB] cleanupDuplicatePersonas called")
+
+  try {
+    const allPersonas = await db.personas.toArray()
+    console.log(
+      `🎭 [DB] Found ${allPersonas.length} total personas in database`
+    )
+
+    // Group personas by name
+    const personasByName = new Map<string, Persona[]>()
+    for (const persona of allPersonas) {
+      const existing = personasByName.get(persona.name) || []
+      existing.push(persona)
+      personasByName.set(persona.name, existing)
+    }
+
+    let removedCount = 0
+
+    // For each group, keep only the most recent one
+    for (const [name, personas] of personasByName.entries()) {
+      if (personas.length > 1) {
+        console.log(`🎭 [DB] Found ${personas.length} duplicates of "${name}"`)
+
+        // Sort by updatedAt (newest first)
+        personas.sort((a, b) => b.updatedAt - a.updatedAt)
+
+        // Keep the first (newest), delete the rest
+        const toKeep = personas[0]
+        const toDelete = personas.slice(1)
+
+        console.log(
+          `🎭 [DB] Keeping persona "${name}" with ID: ${toKeep.id} (updated: ${new Date(toKeep.updatedAt).toISOString()})`
+        )
+
+        for (const duplicate of toDelete) {
+          await db.personas.delete(duplicate.id)
+          removedCount++
+          console.log(
+            `🎭 [DB] Deleted duplicate "${name}" with ID: ${duplicate.id}`
+          )
+        }
+      }
+    }
+
+    console.log(
+      `🎭 [DB] Cleanup complete. Removed ${removedCount} duplicate personas`
+    )
+    return removedCount
+  } catch (error) {
+    console.error("🎭 [DB] Error during cleanup:", error)
+    return 0
   }
 }
