@@ -53,6 +53,34 @@ const ListCategoriesSchema = z.object({})
 
 const GetStatisticsSchema = z.object({})
 
+const CreateNoteFromChatSchema = z.object({
+  content: z
+    .string()
+    .optional()
+    .describe(
+      "The content of the note to save. If not provided, use the last user message from conversation history."
+    ),
+  title: z
+    .string()
+    .optional()
+    .describe(
+      "The title for the note. If not provided, will request clarification from user or auto-generate."
+    ),
+  category: z
+    .string()
+    .optional()
+    .describe(
+      "The category for the note. If not provided, will suggest existing categories or auto-generate."
+    ),
+  skipClarification: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe(
+      "If true, auto-generate missing title/category without asking user. Use when user explicitly says 'auto-generate' or similar."
+    )
+})
+
 // ============================================================================
 // TOOLS IMPLEMENTATION
 // ============================================================================
@@ -94,7 +122,7 @@ export const searchNotesTool = new DynamicStructuredTool({
       console.log("vectorResults before merging:", vectorResults)
 
       // Add vector results first, respecting a proper threshold
-      const MIN_SIMILARITY_THRESHOLD = 0.1
+      const MIN_SIMILARITY_THRESHOLD = -0.2
       vectorResults.forEach(({ note, score }) => {
         if (score >= MIN_SIMILARITY_THRESHOLD) {
           allResults.set(note.id, { ...note, similarity: score })
@@ -382,6 +410,154 @@ export const getStatisticsTool = new DynamicStructuredTool({
   }
 })
 
+/**
+ * Create Note From Chat Tool
+ * Creates a note from conversation with smart parameter handling
+ * Handles missing title/category by requesting clarification or auto-generating
+ */
+export const createNoteFromChatTool = new DynamicStructuredTool({
+  name: "create_note_from_chat",
+  description: `Create a note from the current conversation. This is used when the user says things like:
+  - "can you add this as note?"
+  - "save that as a note"
+  - "add this as note under aws category"
+  - "add this as note with title Amazon"
+  
+  The tool intelligently handles missing parameters:
+  - If content is missing, uses the last user message
+  - If title is missing, either requests clarification or auto-generates
+  - If category is missing, suggests existing categories or auto-generates
+  
+  Use this tool when the user wants to save information from the chat as a note.`,
+  schema: CreateNoteFromChatSchema,
+  func: async ({ content, title, category, skipClarification = false }) => {
+    try {
+      console.log(
+        `[Tool: create_note_from_chat] Creating note from chat with params:`,
+        { content, title, category, skipClarification }
+      )
+
+      // Determine what's missing
+      const missingParams = {
+        content: !content,
+        title: !title,
+        category: !category
+      }
+
+      console.log(
+        `[Tool: create_note_from_chat] Missing params:`,
+        missingParams
+      )
+
+      // If content is missing, we need to signal that we should use conversation history
+      // This will be handled by the agent layer
+      if (missingParams.content) {
+        return JSON.stringify({
+          success: false,
+          needsClarification: true,
+          clarificationType: "content",
+          message:
+            "I need to know what content to save. Could you specify what you'd like to save as a note?"
+        })
+      }
+
+      // If title or category is missing and skipClarification is false, request clarification
+      if (
+        !skipClarification &&
+        (missingParams.title || missingParams.category)
+      ) {
+        // Get all existing categories for suggestions
+        const existingCategories = await dbService.getAllCategories()
+
+        return JSON.stringify({
+          success: false,
+          needsClarification: true,
+          clarificationType:
+            missingParams.title && missingParams.category
+              ? "both"
+              : missingParams.title
+                ? "title"
+                : "category",
+          missingParams: {
+            title: missingParams.title,
+            category: missingParams.category
+          },
+          existingCategories: existingCategories,
+          noteContent: content, // Pass content so it can be used for generation
+          message:
+            missingParams.title && missingParams.category
+              ? "I can create this note for you! Would you like me to auto-generate a title and category, or would you prefer to provide them?"
+              : missingParams.title
+                ? "Would you like me to auto-generate a title, or would you prefer to provide one?"
+                : "Which category would you like to use? I can suggest existing ones or create a new category."
+        })
+      }
+
+      // If we reach here, either all params are provided or skipClarification is true
+      // In case of skipClarification, the agent should have auto-generated missing values
+
+      // Actually create the note if we have all required params
+      if (title && category && content) {
+        try {
+          // Generate embedding for the content
+          const embedding = await aiService.generateEmbedding(content)
+
+          // Create the note via dbService
+          const createdNote = await dbService.addNote({
+            title: title,
+            content: content,
+            contentPlaintext: content, // For chat-created notes, content is already plaintext
+            category: category,
+            embedding: embedding
+          })
+
+          console.log(
+            `[Tool: create_note_from_chat] Note created successfully with ID: ${createdNote.id}`
+          )
+
+          return JSON.stringify({
+            success: true,
+            noteCreated: true,
+            message: `I have created a new note titled "${title}" under the category "${category}" containing the following information:\n\n${content}`,
+            noteData: {
+              id: createdNote.id, // Only return the ID, not the full note object with embedding
+              title: title,
+              content: content,
+              category: category
+            }
+          })
+        } catch (error) {
+          console.error(
+            "[Tool: create_note_from_chat] Failed to create note:",
+            error
+          )
+          return JSON.stringify({
+            success: false,
+            message: `Failed to create note: ${error.message}`
+          })
+        }
+      }
+
+      // Fallback: return metadata without creating
+      return JSON.stringify({
+        success: true,
+        message: `Note will be created with title "${title || "Auto-generated"}" under category "${category || "general"}".`,
+        noteData: {
+          title: title || "Untitled Note",
+          content: content,
+          category: category || "general"
+        }
+      })
+    } catch (error) {
+      console.error("[Tool: create_note_from_chat] Error:", error)
+      return JSON.stringify({
+        success: false,
+        error: `Failed to create note from chat: ${error.message}`
+      })
+    }
+  }
+})
+
 // ============================================================================
 // TOOL COLLECTION
 // ============================================================================
@@ -396,7 +572,8 @@ export const allTools = [
   updateNoteTool,
   deleteNoteTool,
   listCategoriesTool,
-  getStatisticsTool
+  getStatisticsTool,
+  createNoteFromChatTool
 ]
 
 /**

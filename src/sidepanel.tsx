@@ -305,7 +305,9 @@ function SidePanel() {
     }
   }
 
-  const handleAISearch = async (query: string): Promise<string> => {
+  const handleAISearch = async (
+    query: string
+  ): Promise<string | import("~services/langchain-agent").AgentResponse> => {
     const startTime = performance.now()
 
     try {
@@ -321,10 +323,9 @@ function SidePanel() {
       console.log(`⏱️ [LangChain Agent] TOTAL time: ${totalTime.toFixed(2)}ms`)
       console.log(`📊 [LangChain Agent] Structured response:`, response)
 
-      // Return formatted response for display
-      // For now, just return the AI` response text
-      // TODO: Update AISearchBar to handle structured responses with extractedData and actions
-      return response.extractedData || response.aiResponse
+      // Return the full response object for clarification support
+      // AISearchBar will handle it appropriately
+      return response
     } catch (error) {
       const totalTime = performance.now() - startTime
       console.error(
@@ -416,6 +417,7 @@ function SidePanel() {
           <AISearchBar
             placeholder="Ask me anything..."
             onSearch={handleAISearch}
+            onNoteCreated={loadData}
           />
         </div>
       </div>

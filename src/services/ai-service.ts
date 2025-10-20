@@ -276,6 +276,86 @@ export async function generateTitle(
 }
 
 /**
+ * Generate a category from content using chrome.ai API (Gemini Nano)
+ * Creates a short, descriptive category based on the content
+ */
+export async function generateCategory(noteContent: string): Promise<string> {
+  const startTime = performance.now()
+  console.log(`🎯 [Generate Category] Starting category generation...`)
+
+  try {
+    if (!noteContent.trim()) {
+      throw new Error("No content available to generate category from")
+    }
+
+    const categoryResponseSchema = {
+      type: "object",
+      properties: {
+        generatedCategory: {
+          type: "string",
+          description: "The generated category name."
+        }
+      },
+      required: ["generatedCategory"]
+    }
+
+    const controller = new AbortController()
+    const signal = controller.signal
+
+    const initialPrompts: PromptMessage[] = [
+      {
+        role: "system",
+        content: `You are a category generation assistant. Generate a concise, single-word or two-word category name that best describes the content.
+
+Rules:
+- Category must be 1-2 words maximum (e.g., "Work", "Personal", "Tech", "AWS", "Finance")
+- Use title case (e.g., "Machine Learning" not "machine learning")
+- Be specific but broad enough to group similar content
+- Avoid generic categories like "Notes" or "Miscellaneous"
+- For technical content, use the main technology/platform name
+- Return ONLY the category name in JSON format`
+      }
+    ]
+
+    const mainPrompt = `Generate a category name for this note content:
+---
+${noteContent.trim().substring(0, 1000)}
+---
+
+Return a JSON object with the category name.`
+
+    const options: PromptOptions = {
+      initialPrompts: initialPrompts,
+      temperature: 0.3, // Low temperature for consistent categorization
+      topK: 1,
+      signal: signal,
+      responseConstraint: categoryResponseSchema,
+      omitResponseConstraintInput: false
+    }
+
+    console.log("Executing prompt to generate category...")
+    const jsonResponse = await executePrompt(mainPrompt, options)
+
+    const categoryData = JSON.parse(jsonResponse)
+
+    console.log("✅ Successfully generated category:")
+    console.log(categoryData)
+
+    const totalTime = performance.now() - startTime
+    console.log(`⏱️ [Generate Category] TOTAL time: ${totalTime.toFixed(2)}ms`)
+
+    return categoryData.generatedCategory.trim()
+  } catch (error) {
+    const totalTime = performance.now() - startTime
+    console.warn(
+      `⚠️ [Generate Category] Could not generate category after ${totalTime.toFixed(2)}ms, falling back to default.`,
+      error
+    )
+    return "General"
+  }
+}
+
+/**
  * Calculate cosine similarity between two embedding vectors
  * @param vecA First embedding vector
  * @param vecB Second embedding vector

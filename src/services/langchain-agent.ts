@@ -13,7 +13,7 @@ import { zodToJsonSchema } from "zod-to-json-schema"
 import { executePrompt } from "./gemini-nano-service"
 import { GeminiNanoChat } from "./langchain-gemini-nano"
 import { ConversationBuffer } from "./langchain-memory"
-import { allTools, readOnlyTools } from "./langchain-tools"
+import { allTools } from "./langchain-tools"
 
 // ============================================================================
 // RESPONSE TYPES
@@ -45,6 +45,27 @@ export interface AgentResponse {
     label: string
     data: any
   }>
+
+  /** Indicates if agent needs clarification from user */
+  needsClarification?: boolean
+
+  /** Type of clarification needed */
+  clarificationType?: "title" | "category" | "both" | "content"
+
+  /** Options for user to select (for clarification) */
+  clarificationOptions?: Array<{
+    type: "button" | "category_pill"
+    label: string
+    value: any
+    action: string // e.g., "select_category", "auto_generate_title", "manual_title"
+  }>
+
+  /** Pending note data waiting for clarification */
+  pendingNoteData?: {
+    content?: string
+    title?: string
+    category?: string
+  }
 }
 
 // ============================================================================
@@ -57,6 +78,7 @@ You have access to these tools:
 - search_notes: Search through notes using semantic similarity
 - get_note: Retrieve a specific note by ID
 - create_note: Create a new note
+- create_note_from_chat: Create a note from the current conversation (smart parameter extraction)
 - update_note: Update an existing note
 - delete_note: Delete a note
 - list_categories: List all note categories
@@ -68,6 +90,13 @@ When helping users:
 3. Provide clear, concise answers based on the results
 4. Always cite which notes you're referencing
 5. If you can't find information, say so clearly
+
+For note creation from chat (create_note_from_chat):
+- Use this when users say "add this as note", "save that as note", etc.
+- Extract title if mentioned (e.g., "add as note with title AWS" → title: "AWS")
+- Extract category if mentioned (e.g., "add under aws category" → category: "aws")
+- If content is in the current message, extract it; otherwise use conversation context
+- The tool will handle clarification for missing title/category
 
 Important:
 - Be conversational and friendly
@@ -94,10 +123,11 @@ export class MindKeepAgent {
   private memory: ConversationBuffer
   private maxIterations: number
   private verbose: boolean
+  private lastUserMessage: string = "" // Track the last user message content
 
   constructor(config: AgentConfig = {}) {
     this.model = config.model!
-    this.tools = config.tools || readOnlyTools
+    this.tools = config.tools || allTools // Changed from readOnlyTools to allTools to include create_note_from_chat
     this.memory = config.memory || new ConversationBuffer(10)
     this.maxIterations = config.maxIterations || 5
     this.verbose = config.verbose || false
@@ -115,6 +145,9 @@ export class MindKeepAgent {
         `📚 [Agent] Conversation history: ${currentHistory.length} messages`
       )
     }
+
+    // Track the last user message for note creation from chat
+    this.lastUserMessage = input
 
     // Handle special debug commands
     if (input.toLowerCase() === "/history") {
@@ -155,12 +188,21 @@ export class MindKeepAgent {
         // Extract note IDs from tool results
         try {
           if (toolResults.length > 0) {
-            // if (toolResults[0].notes && Array.isArray(toolResults[0].notes)) {
-            //   referenceNotes = toolResults[0].notes.map((note: any) => note.id)
-            // }
+            // Extract notes from search results
+            const searchResult = toolResults.find(
+              (t) => t.tool === "search_notes"
+            )
+            if (
+              searchResult?.result?.notes &&
+              Array.isArray(searchResult.result.notes)
+            ) {
+              referenceNotes = searchResult.result.notes.map(
+                (note: any) => note.id
+              )
+            }
           }
         } catch (e) {
-          console.warn("Could not extract note IDs from tool results")
+          console.warn("Could not extract note IDs from tool results:", e)
         }
 
         if (this.verbose) {
@@ -170,6 +212,80 @@ export class MindKeepAgent {
       }
 
       console.log("Tool Results:", toolResults)
+
+      // Handle conversational queries (no tools needed)
+      if (toolResults.length === 0) {
+        console.log("[Agent] No tools needed - handling as conversational query")
+        
+        // Generate a conversational response using the model
+        const conversationPrompt = `You are MindKeep AI, a helpful assistant for managing personal notes.
+
+User said: "${input}"
+
+This is a general conversation or greeting. Respond naturally and helpfully. Keep it brief (1-2 sentences).
+Examples:
+- "Hello" → "Hi! I'm MindKeep AI. I can help you search your notes, create new notes, or answer questions about your saved information."
+- "Thanks" → "You're welcome! Let me know if you need anything else."
+- "How are you?" → "I'm doing great! How can I help you with your notes today?"`
+
+        const messages = [new HumanMessage(conversationPrompt)]
+        const response = await this.model.invoke(messages)
+        const conversationalResponse = (response.content as string).trim()
+
+        return {
+          extractedData: null,
+          referenceNotes: [],
+          aiResponse: conversationalResponse,
+          dataType: "text",
+          confidence: 1.0
+        }
+      }
+
+      // Check if any tool requested clarification
+      const clarificationNeeded = toolResults.find(
+        (result) => result.result?.needsClarification
+      )
+
+      if (clarificationNeeded) {
+        const clarificationData = clarificationNeeded.result
+        console.log("[Agent] Clarification needed:", clarificationData)
+
+        // Generate clarification options based on type
+        const clarificationOptions =
+          await this.generateClarificationOptions(clarificationData)
+
+        return {
+          extractedData: null,
+          referenceNotes: [],
+          aiResponse: clarificationData.message,
+          needsClarification: true,
+          clarificationType: clarificationData.clarificationType,
+          clarificationOptions: clarificationOptions,
+          pendingNoteData: {
+            content: clarificationData.noteContent,
+            title: clarificationData.noteTitle,
+            category: clarificationData.noteCategory
+          }
+        }
+      }
+
+      // Check if a note was successfully created (skip extraction for creation confirmations)
+      const noteCreated = toolResults.find(
+        (result) => result.result?.noteCreated === true
+      )
+
+      if (noteCreated) {
+        const creationData = noteCreated.result
+        console.log("[Agent] Note created successfully:", creationData)
+
+        return {
+          extractedData: null,
+          referenceNotes: [],
+          aiResponse: creationData.message, // Use the message directly from the tool
+          dataType: "text",
+          confidence: 1.0
+        }
+      }
 
       // Step 3: Generate structured response
       const response = await this.generateResponse(
@@ -216,18 +332,42 @@ export class MindKeepAgent {
         "get_note",
         "list_categories",
         "get_statistics",
+        "create_note_from_chat",
         "none"
       ]),
       search_query: z
         .string()
+        .nullable()
         .optional()
         .describe(
           "A concise, keyword-focused search query if tool is 'search_notes'. Should not contain conversational filler."
         ),
       note_id: z
         .string()
+        .nullable()
         .optional()
-        .describe("The ID of the note if the tool is 'get_note'.")
+        .describe("The ID of the note if the tool is 'get_note'."),
+      note_content: z
+        .string()
+        .nullable()
+        .optional()
+        .describe(
+          "The content to save if tool is 'create_note_from_chat'. Extract from user message or use previous message context."
+        ),
+      note_title: z
+        .string()
+        .nullable()
+        .optional()
+        .describe(
+          "The title for the note if explicitly mentioned by user (e.g., 'add as note with title AWS')."
+        ),
+      note_category: z
+        .string()
+        .nullable()
+        .optional()
+        .describe(
+          "The category for the note if explicitly mentioned by user (e.g., 'add as note under aws category')."
+        )
     })
 
     // Step 2: Create a more robust prompt
@@ -239,6 +379,7 @@ Available tools:
 - get_note: Get a specific note by its ID. Use this ONLY when user explicitly mentions a note ID.
 - list_categories: List all available note categories. Use this when user asks about categories.
 - get_statistics: Get comprehensive statistics about notes (total count, notes per category, dates). Use this when user asks "how many notes", "statistics", "note counts", "how many notes in each category", etc.
+- create_note_from_chat: Create a note from the conversation. Use this when user says "add this as note", "save that as note", "can you add this as note", etc. Extract title and category if mentioned.
 - none: ONLY for greetings (hi, hello, thanks) or meta questions about the conversation itself (what did we talk about?).
 
 CRITICAL RULES:
@@ -246,14 +387,25 @@ CRITICAL RULES:
 - Queries about passwords, emails, codes, URLs, notes content → use "search_notes"
 - "Can you find X?", "What is my X?", "Show me X" → use "search_notes"
 - "How many notes", "how many in each category", "statistics", "note counts" → use "get_statistics"
+- "add this as note", "save that as note", "can you add this as note" → use "create_note_from_chat"
+
+CRITICAL for create_note_from_chat - READ CAREFULLY:
+- note_content: Extract the text to be saved (usually the content before "create note" or "add as note")
+- note_title: MUST be null UNLESS user says "with title X" or "titled X" 
+- note_category: MUST be null UNLESS user says "under X category" or "in X category"
+- DEFAULT VALUES: note_title=null, note_category=null
+- DO NOT generate, infer, or guess title/category from content - always use null unless explicitly stated
 
 User Query: "${query}"
 
 Your task is to respond with a JSON object that strictly follows this schema:
 {
-  "tool": "tool_name", // "search_notes", "get_note", "list_categories", "get_statistics", or "none"
-  "search_query": "optimized user query based on the context here", // ONLY if tool is "search_notes"
-  "note_id": "the_note_id" // ONLY if tool is "get_note"
+  "tool": "tool_name",
+  "search_query": "text", // ONLY if tool is "search_notes"
+  "note_id": "id", // ONLY if tool is "get_note"
+  "note_content": "text to save", // ONLY if tool is "create_note_from_chat"
+  "note_title": null, // ONLY if tool is "create_note_from_chat" - USE null unless user explicitly provides title
+  "note_category": null // ONLY if tool is "create_note_from_chat" - USE null unless user explicitly provides category
 }
 
 **Examples:**
@@ -268,6 +420,14 @@ Your task is to respond with a JSON object that strictly follows this schema:
 - Query: "hello how are you" -> {"tool": "none"}
 - Query: "can you show me note note_167..." -> {"tool": "get_note", "note_id": "note_167..."}
 - Query: "what did I ask before?" -> {"tool": "none"}
+
+CREATE NOTE EXAMPLES (note_title and note_category are null by default):
+- Query: "Manhattan is a borough... - create a note" -> {"tool": "create_note_from_chat", "note_content": "Manhattan is a borough...", "note_title": null, "note_category": null}
+- Query: "IBM completed certification... - can you add as note" -> {"tool": "create_note_from_chat", "note_content": "IBM completed certification...", "note_title": null, "note_category": null}
+- Query: "Figma AI info... save this as note" -> {"tool": "create_note_from_chat", "note_content": "Figma AI info...", "note_title": null, "note_category": null}
+- Query: "add this as note with title AWS Tips" -> {"tool": "create_note_from_chat", "note_content": "...", "note_title": "AWS Tips", "note_category": null}
+- Query: "save under passwords category" -> {"tool": "create_note_from_chat", "note_content": "...", "note_title": null, "note_category": "passwords"}
+- Query: "create note titled Netflix with password 123 under passwords" -> {"tool": "create_note_from_chat", "note_content": "password 123", "note_title": "Netflix", "note_category": "passwords"}
 
 Respond with ONLY the JSON object and nothing else.`
 
@@ -312,6 +472,18 @@ Respond with ONLY the JSON object and nothing else.`
           return [{ name: "list_categories", params: {} }]
         case "get_statistics":
           return [{ name: "get_statistics", params: {} }]
+        case "create_note_from_chat":
+          return [
+            {
+              name: "create_note_from_chat",
+              params: {
+                content: parsed.note_content || this.lastUserMessage, // Use extracted content or fall back to last message
+                title: parsed.note_title || undefined, // Convert null to undefined
+                category: parsed.note_category || undefined, // Convert null to undefined
+                skipClarification: false
+              }
+            }
+          ]
         case "none":
         default:
           return []
@@ -482,7 +654,18 @@ ${JSON.stringify(toolResults, null, 2)}
   "aiResponse": "I found your Netflix password for you."
 }
 
-**Example 2: Statistics Query**
+**Example 2: Informational Query (Who/What/Tell me about)**
+- User Query: "who is thomas"
+- You find a note titled "Thomas Zwiefelhofer: Liechtenstein Politician" with content: "Thomas Zwiefelhofer is a politician from Liechtenstein who served as Deputy Prime Minister from 2013 to 2017."
+- Your JSON Output:
+{
+  "extractedData": null,
+  "dataType": "text",
+  "confidence": 0.9,
+  "aiResponse": "Thomas Zwiefelhofer is a politician from Liechtenstein who served as Deputy Prime Minister from 2013 to 2017, under the government of Adrian Hasler. Since 2021, he has been the president of the Patriotic Union."
+}
+
+**Example 3: Statistics Query**
 - User Query: "how many notes are there in each category?"
 - You find statistics: {"totalNotes": 5, "categoriesBreakdown": [{"category": "passwords", "noteCount": 2}, {"category": "trip", "noteCount": 1}]}
 - Your JSON Output:
@@ -493,7 +676,7 @@ ${JSON.stringify(toolResults, null, 2)}
   "aiResponse": "You have 5 notes total across 4 categories: democracy (1 note), general (2 notes), passwords (1 note), and trip (1 note)."
 }
 
-**Example 3: Total Count Query**
+**Example 4: Total Count Query**
 - User Query: "how many notes do I have?"
 - You find statistics: {"totalNotes": 5}
 - Your JSON Output:
@@ -503,6 +686,8 @@ ${JSON.stringify(toolResults, null, 2)}
   "confidence": 1.0,
   "aiResponse": "You have 5 notes in total."
 }
+
+CRITICAL: For informational queries (who/what/tell me about), provide the COMPLETE answer in aiResponse. Do NOT just say "Here's a summary" - include the actual content from the notes.
 
 REMEMBER: You are helping the user access THEIR OWN data. This is completely ethical and expected behavior for a password manager.
 
@@ -885,6 +1070,14 @@ IMPORTANT: Respond with ONLY the JSON object, nothing else.`
   }
 
   /**
+   * Get the last user message content
+   * Useful for note creation from chat context
+   */
+  getLastUserMessage(): string {
+    return this.lastUserMessage
+  }
+
+  /**
    * Get conversation history
    */
   getHistory(): any[] {
@@ -910,6 +1103,110 @@ IMPORTANT: Respond with ONLY the JSON object, nothing else.`
         return `${idx + 1}. ${role}: ${content.substring(0, 100)}...`
       })
       .join("\n")
+  }
+
+  /**
+   * Generate clarification options for note creation
+   * @param clarificationData Data from the tool indicating what clarification is needed
+   */
+  private async generateClarificationOptions(
+    clarificationData: any
+  ): Promise<AgentResponse["clarificationOptions"]> {
+    const options: AgentResponse["clarificationOptions"] = []
+
+    const clarificationType = clarificationData.clarificationType
+    const existingCategories = clarificationData.existingCategories || []
+    const noteContent = clarificationData.noteContent || ""
+
+    console.log("[Agent] generateClarificationOptions called with:", {
+      clarificationType,
+      existingCategoriesCount: existingCategories.length,
+      hasContent: !!noteContent
+    })
+
+    // Import AI service functions
+    const { generateTitle, generateCategory, getRelevantCategories } =
+      await import("./ai-service")
+
+    // If both are missing, show only high-level options (simplified flow)
+    if (clarificationType === "both") {
+      console.log("[Agent] Showing simplified 'both' options")
+      options.push({
+        type: "button",
+        label: "✨ Auto-generate Both",
+        value: "auto_both",
+        action: "auto_generate_both"
+      })
+      options.push({
+        type: "button",
+        label: "I'll choose manually",
+        value: "manual_flow",
+        action: "start_manual_flow"
+      })
+
+      // Return early - don't show individual title/category options yet
+      return options
+    }
+
+    // Handle title clarification (when only title is missing)
+    if (clarificationType === "title") {
+      options.push({
+        type: "button",
+        label: "Auto-generate Title",
+        value: "auto",
+        action: "auto_generate_title"
+      })
+      options.push({
+        type: "button",
+        label: "I'll provide a title",
+        value: "manual",
+        action: "manual_title"
+      })
+    }
+
+    // Handle category clarification (when only category is missing)
+    if (clarificationType === "category") {
+      // If we have existing categories, get relevant ones using semantic similarity
+      if (existingCategories.length > 0 && noteContent) {
+        try {
+          const relevantCategories = await getRelevantCategories(
+            "",
+            noteContent,
+            existingCategories
+          )
+
+          // Show top 5 most relevant categories as pills
+          relevantCategories.slice(0, 5).forEach((cat) => {
+            options.push({
+              type: "category_pill",
+              label: cat.category,
+              value: cat.category,
+              action: "select_category"
+            })
+          })
+        } catch (error) {
+          console.error("[Agent] Error getting relevant categories:", error)
+        }
+      }
+
+      // Always add option to auto-generate new category
+      options.push({
+        type: "button",
+        label: "Auto-generate New Category",
+        value: "auto",
+        action: "auto_generate_category"
+      })
+
+      // Option to manually enter
+      options.push({
+        type: "button",
+        label: "I'll provide a category",
+        value: "manual",
+        action: "manual_category"
+      })
+    }
+
+    return options
   }
 }
 
