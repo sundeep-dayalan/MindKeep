@@ -27,6 +27,8 @@ interface RichTextEditorProps {
   onUpdate?: (plainText: string, json: any) => void
   onSummarize?: () => void
   isSummarizing?: boolean
+  showToolbar?: boolean // New prop to control toolbar visibility
+  compact?: boolean // New prop for compact mode (smaller padding, simpler styling)
 }
 
 export interface RichTextEditorRef {
@@ -46,7 +48,9 @@ export const RichTextEditor = forwardRef<
       placeholder = "Start typing...",
       onUpdate,
       onSummarize,
-      isSummarizing
+      isSummarizing,
+      showToolbar = true,
+      compact = false
     },
     ref
   ) => {
@@ -178,9 +182,15 @@ export const RichTextEditor = forwardRef<
     }
 
     return (
-      <div className="plasmo-border plasmo-border-slate-300 plasmo-rounded-lg plasmo-bg-white plasmo-overflow-hidden focus-within:plasmo-ring-2 focus-within:plasmo-ring-blue-500 focus-within:plasmo-border-blue-500 plasmo-transition-all">
-        {/* Toolbar */}
-        <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-1 plasmo-p-2 plasmo-bg-slate-50 plasmo-border-b plasmo-border-slate-200">
+      <div
+        className={`plasmo-bg-white plasmo-overflow-hidden plasmo-transition-all ${
+          compact
+            ? "plasmo-border-none"
+            : "plasmo-border plasmo-border-slate-300 plasmo-rounded-lg focus-within:plasmo-ring-2 focus-within:plasmo-ring-blue-500 focus-within:plasmo-border-blue-500"
+        }`}>
+        {/* Toolbar - only show if showToolbar is true */}
+        {showToolbar && (
+          <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-1 plasmo-p-2 plasmo-bg-slate-50 plasmo-border-b plasmo-border-slate-200">
           {/* Undo */}
           <button
             onClick={() => editor.chain().focus().undo().run()}
@@ -650,9 +660,10 @@ export const RichTextEditor = forwardRef<
             </>
           )}
         </div>
+        )}
 
         {/* Link Input Dialog */}
-        {showLinkInput && (
+        {showToolbar && showLinkInput && (
           <div className="plasmo-p-3 plasmo-bg-blue-50 plasmo-border-b plasmo-border-slate-200 plasmo-flex plasmo-gap-2 plasmo-items-center">
             <input
               type="url"
@@ -688,7 +699,7 @@ export const RichTextEditor = forwardRef<
         )}
 
         {/* Image Input Dialog */}
-        {showImageInput && (
+        {showToolbar && showImageInput && (
           <div className="plasmo-p-3 plasmo-bg-green-50 plasmo-border-b plasmo-border-slate-200 plasmo-flex plasmo-gap-2 plasmo-items-center">
             <input
               type="url"
@@ -724,12 +735,17 @@ export const RichTextEditor = forwardRef<
         )}
 
         {/* Editor Content */}
-        <div className="plasmo-min-h-[240px] plasmo-max-h-[400px] plasmo-overflow-y-auto">
+        <div
+          className={
+            compact
+              ? "plasmo-min-h-[40px] plasmo-max-h-[200px] plasmo-overflow-y-auto compact-editor"
+              : "plasmo-min-h-[240px] plasmo-max-h-[400px] plasmo-overflow-y-auto"
+          }>
           <EditorContent editor={editor} />
         </div>
 
         {/* Summarize Button */}
-        {onSummarize && (
+        {onSummarize && showToolbar && (
           <div className="plasmo-px-3 plasmo-py-1.5 plasmo-bg-slate-50 plasmo-border-t plasmo-border-slate-200 plasmo-flex plasmo-justify-end plasmo-items-center">
             <button
               onClick={onSummarize}

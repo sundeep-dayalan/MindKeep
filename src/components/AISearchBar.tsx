@@ -2,6 +2,10 @@ import React from "react"
 
 import type { Note } from "~services/db-service"
 import type { AgentResponse } from "~services/langchain-agent"
+import {
+  RichTextEditor,
+  type RichTextEditorRef
+} from "~components/RichTextEditor"
 
 interface Message {
   id: string
@@ -134,7 +138,6 @@ export function AISearchBar({
   onNoteCreated,
   className = ""
 }: AISearchBarProps) {
-  const [query, setQuery] = React.useState("")
   const [messages, setMessages] = React.useState<Message[]>([])
   const [isSearching, setIsSearching] = React.useState(false)
   const [isChatExpanded, setIsChatExpanded] = React.useState(true)
@@ -146,8 +149,12 @@ export function AISearchBar({
     pendingNoteData?: AgentResponse["pendingNoteData"]
   }>({ type: null })
 
+  // Store the rich content JSON when user submits (to preserve formatting)
+  const [lastSubmittedContentJSON, setLastSubmittedContentJSON] =
+    React.useState<any>(null)
+
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
-  const textareaRef = React.useRef<HTMLTextAreaElement>(null)
+  const editorRef = React.useRef<RichTextEditorRef>(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -157,46 +164,44 @@ export function AISearchBar({
     scrollToBottom()
   }, [messages])
 
-  // Auto-resize textarea as user types
-  React.useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto"
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
-    }
-  }, [query])
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (query.trim() && onSearch && !isSearching) {
-      const userQuery = query.trim()
-
+    
+    // Get both text and JSON from TipTap editor
+    const query = editorRef.current?.getText()?.trim() || ""
+    const contentJSON = editorRef.current?.getJSON() // Capture rich formatting
+    
+    if (query && onSearch && !isSearching) {
+      // Store the rich content JSON for later use when saving
+      setLastSubmittedContentJSON(contentJSON)
+      
       // Check if we're waiting for manual input (title or category)
       if (pendingManualInput.type && pendingManualInput.pendingNoteData) {
         console.log(
           "Processing manual input:",
           pendingManualInput.type,
-          userQuery
+          query
         )
 
         if (pendingManualInput.type === "category") {
           // User provided manual category
           await handleClarificationOption(
             "select_category",
-            userQuery,
+            query,
             pendingManualInput.pendingNoteData
           )
         } else if (pendingManualInput.type === "title") {
           // User provided manual title
           await handleClarificationOption(
             "use_manual_title",
-            userQuery,
+            query,
             pendingManualInput.pendingNoteData
           )
         }
 
-        // Clear pending state
+        // Clear pending state and editor
         setPendingManualInput({ type: null })
-        setQuery("")
+        editorRef.current?.setContent("")
         return
       }
 
@@ -204,16 +209,16 @@ export function AISearchBar({
       const userMessage: Message = {
         id: `user-${Date.now()}`,
         type: "user",
-        content: userQuery,
+        content: query,
         timestamp: Date.now()
       }
 
       setMessages((prev) => [...prev, userMessage])
-      setQuery("")
+      editorRef.current?.setContent("") // Clear editor
       setIsSearching(true)
 
       try {
-        const aiResponse = await onSearch(userQuery)
+        const aiResponse = await onSearch(query)
 
         // Check if response is an AgentResponse object (has aiResponse field or referenceNotes)
         if (
@@ -741,14 +746,107 @@ export function AISearchBar({
           console.warn("Could not get tab URL:", e)
         }
 
-        // Step 2: Send to background script with pre-generated embedding
+        // Step 2: Use the stored TipTap JSON (with rich formatting) or convert plain text
+        let contentJSONString: string
+        if (lastSubmittedContentJSON && noteContent) {
+          // Extract only the portion of TipTap JSON that matches the agent's extracted content
+          console.log(
+            "✨ Extracting relevant portion from rich content JSON..."
+          )
+
+          // Get the full plaintext from the stored JSON to compare
+          const extractPlainTextFromJSON = (json: any): string => {
+            if (!json || !json.content) return ""
+            return json.content
+              .map((node: any) => {
+                if (node.type === "paragraph" || node.type === "heading") {
+                  return node.content
+                    ?.map((child: any) => child.text || "")
+                    .join("")
+                }
+                return ""
+              })
+              .join("\n")
+              .trim()
+          }
+
+          const fullText = extractPlainTextFromJSON(lastSubmittedContentJSON)
+
+          // Check if noteContent is a subset of fullText (agent extracted only part)
+          if (
+            fullText.includes(noteContent) &&
+            fullText.length > noteContent.length
+          ) {
+            console.log(
+              "⚠️ Agent extracted partial content, filtering TipTap nodes..."
+            )
+
+            // Filter TipTap nodes to only include those that are part of noteContent
+            const filteredNodes: any[] = []
+            let accumulatedText = ""
+
+            for (const node of lastSubmittedContentJSON.content || []) {
+              const nodeText = extractPlainTextFromJSON({ content: [node] })
+
+              // Check if this node is part of the extracted content
+              if (noteContent.includes(nodeText.trim())) {
+                filteredNodes.push(node)
+                accumulatedText += nodeText + "\n"
+
+                // Stop if we've accumulated enough content
+                if (accumulatedText.trim().length >= noteContent.length) {
+                  break
+                }
+              }
+            }
+
+            if (filteredNodes.length > 0) {
+              contentJSONString = JSON.stringify({
+                type: "doc",
+                content: filteredNodes
+              })
+              console.log(
+                `✅ Filtered to ${filteredNodes.length} nodes (removed prompt)`
+              )
+            } else {
+              // Fallback: use the full content if filtering failed
+              contentJSONString = JSON.stringify(lastSubmittedContentJSON)
+              console.log("⚠️ Filtering failed, using full content")
+            }
+          } else {
+            // Content matches exactly, use full JSON
+            console.log("✅ Content matches exactly, using full rich JSON")
+            contentJSONString = JSON.stringify(lastSubmittedContentJSON)
+          }
+        } else {
+          // Fallback: Convert plain text to TipTap JSON format (for backward compatibility)
+          console.log("⚠️ No rich content found, converting plain text to JSON")
+          const contentJSON = {
+            type: "doc",
+            content: noteContent
+              .split("\n")
+              .filter((line) => line.trim() !== "")
+              .map((line) => ({
+                type: "paragraph",
+                content: [
+                  {
+                    type: "text",
+                    text: line
+                  }
+                ]
+              }))
+          }
+          contentJSONString = JSON.stringify(contentJSON)
+        }
+
+        // Step 3: Send to background script with pre-generated embedding
         // (Same pattern as sidepanel.tsx)
         const messageStartTime = performance.now()
         const response = await chrome.runtime.sendMessage({
           type: "SAVE_NOTE",
           data: {
             title: finalTitle,
-            content: noteContent, // For chat notes, content is plaintext
+            content: contentJSONString, // Now properly formatted as TipTap JSON
             contentPlaintext: noteContent,
             category: finalCategory,
             sourceUrl,
@@ -777,6 +875,9 @@ export function AISearchBar({
           timestamp: Date.now()
         }
         setMessages((prev) => [...prev, successMessage])
+
+        // Clear the stored content JSON after successful save
+        setLastSubmittedContentJSON(null)
 
         // Notify parent component to refresh notes list
         if (onNoteCreated) {
@@ -948,36 +1049,29 @@ export function AISearchBar({
       {/* Search Input */}
       <form onSubmit={handleSubmit}>
         <div className="plasmo-flex plasmo-items-end plasmo-gap-2 plasmo-bg-slate-50 plasmo-rounded-2xl plasmo-px-4 plasmo-py-3 plasmo-border plasmo-border-slate-200 hover:plasmo-border-slate-300 plasmo-transition-all focus-within:plasmo-border-blue-400 focus-within:plasmo-ring-2 focus-within:plasmo-ring-blue-100">
-          <svg
-            className="plasmo-w-5 plasmo-h-5 plasmo-text-slate-400 plasmo-flex-shrink-0 plasmo-mb-1"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+          {/* Rich Text Editor - takes full width */}
+          <div className="plasmo-flex-1 plasmo-min-h-[40px] plasmo-max-h-[200px] plasmo-overflow-y-auto">
+            <RichTextEditor
+              ref={editorRef}
+              placeholder={
+                isInputDisabled
+                  ? "Please select an option above..."
+                  : placeholder
+              }
+              showToolbar={false}
+              compact={true}
+              onUpdate={() => {
+                // Optional: could track changes if needed
+              }}
             />
-          </svg>
-          <textarea
-            ref={textareaRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              isInputDisabled ? "Please select an option above..." : placeholder
-            }
-            disabled={isSearching || isInputDisabled}
-            rows={1}
-            className="plasmo-flex-1 plasmo-bg-transparent plasmo-border-none plasmo-outline-none plasmo-text-slate-700 placeholder:plasmo-text-slate-400 plasmo-text-sm disabled:plasmo-opacity-50 plasmo-resize-none plasmo-max-h-32 plasmo-overflow-y-auto plasmo-leading-relaxed"
-            style={{ minHeight: "24px" }}
-          />
+          </div>
+          
+          {/* Submit Button - aligned to bottom right */}
           <button
             type="submit"
             className="plasmo-flex-shrink-0 plasmo-w-8 plasmo-h-8 plasmo-bg-slate-900 plasmo-text-white plasmo-rounded-full plasmo-flex plasmo-items-center plasmo-justify-center hover:plasmo-bg-slate-800 plasmo-transition-colors disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed plasmo-mb-0.5"
-            title="Send (Enter) • New line (Shift+Enter)"
-            disabled={!query.trim() || isSearching || isInputDisabled}>
+            title="Send (Ctrl+Enter)"
+            disabled={isSearching || isInputDisabled}>
             <svg
               className="plasmo-w-4 plasmo-h-4"
               fill="none"
@@ -992,16 +1086,15 @@ export function AISearchBar({
             </svg>
           </button>
         </div>
+        
         {/* Hint text for keyboard shortcuts */}
-        {query.trim() && (
-          <div className="plasmo-text-xs plasmo-text-slate-400 plasmo-mt-1 plasmo-px-2 plasmo-text-right">
-            Press{" "}
-            <kbd className="plasmo-px-1 plasmo-py-0.5 plasmo-bg-slate-100 plasmo-rounded plasmo-text-slate-600 plasmo-font-mono plasmo-text-xs">
-              Enter
-            </kbd>{" "}
-            to send
-          </div>
-        )}
+        <div className="plasmo-text-xs plasmo-text-slate-400 plasmo-mt-1 plasmo-px-2 plasmo-text-right">
+          Press{" "}
+          <kbd className="plasmo-px-1 plasmo-py-0.5 plasmo-bg-slate-100 plasmo-rounded plasmo-text-slate-600 plasmo-font-mono plasmo-text-xs">
+            Ctrl+Enter
+          </kbd>{" "}
+          to send
+        </div>
       </form>
     </div>
   )
