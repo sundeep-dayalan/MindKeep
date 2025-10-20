@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import "~style.css"
 
@@ -33,6 +33,9 @@ function SidePanel() {
   const [noteTitle, setNoteTitle] = useState("")
   const [noteContent, setNoteContent] = useState("")
   const [noteCategory, setNoteCategory] = useState("general")
+  
+  // Add a ref to track the editor so we can update it when messages arrive
+  const editorRef = useRef<RichTextEditorRef | null>(null)
 
   // Load notes and categories
   useEffect(() => {
@@ -50,11 +53,29 @@ function SidePanel() {
         window.close()
       } else if (message.type === "FILL_EDITOR") {
         // Handle context menu "Save to MindKeep"
-        setNoteContent(message.data.content || "")
+        const content = message.data.content || ""
+        const isHtml = message.data.isHtml || false
+        
+        // Reset editor state
         setNoteTitle("")
         setNoteCategory("general")
         setEditingNote(null)
         setView("editor")
+        
+        // Set content appropriately based on type
+        if (isHtml) {
+          // For HTML content, set it and let the editor render
+          setNoteContent(content)
+          // If editor is already mounted, update it directly
+          setTimeout(() => {
+            if (editorRef.current) {
+              editorRef.current.setContent(content)
+            }
+          }, 100)
+        } else {
+          // For plain text, just set the state
+          setNoteContent(content)
+        }
       }
     }
 
@@ -408,6 +429,7 @@ function SidePanel() {
               onCategoryChange={setNoteCategory}
               onSave={handleSaveNote}
               onCancel={() => setView("list")}
+              externalEditorRef={editorRef}
             />
           )}
         </div>

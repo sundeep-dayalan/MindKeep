@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import CategorySuggestions from "~components/CategorySuggestions"
 import {
@@ -18,6 +18,7 @@ interface NoteEditorProps {
   onCategoryChange: (category: string) => void
   onSave: (editorRef: RichTextEditorRef | null, finalCategory?: string) => void
   onCancel: () => void
+  externalEditorRef?: React.MutableRefObject<RichTextEditorRef | null>
 }
 
 export function NoteEditor({
@@ -30,7 +31,8 @@ export function NoteEditor({
   onTitleChange,
   onCategoryChange,
   onSave,
-  onCancel
+  onCancel,
+  externalEditorRef
 }: NoteEditorProps) {
   const [showNewCategory, setShowNewCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState("")
@@ -39,7 +41,15 @@ export function NoteEditor({
   const [isSummarizing, setIsSummarizing] = useState(false)
   const [currentContent, setCurrentContent] = useState(content) // Track content for suggestions
 
-  const editorRef = useRef<RichTextEditorRef>(null)
+  const internalEditorRef = useRef<RichTextEditorRef>(null)
+  const editorRef = externalEditorRef || internalEditorRef
+  
+  // Update content when it changes from outside
+  useEffect(() => {
+    if (content && editorRef.current) {
+      editorRef.current.setContent(content)
+    }
+  }, [content])
 
   const handleGenerateTitle = async () => {
     const contentPlaintext = editorRef.current?.getText() || ""
