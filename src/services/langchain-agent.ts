@@ -729,7 +729,7 @@ Begin analysis. Respond ONLY with a complete JSON object with all 4 required fie
 
       // The API guarantees the output is a valid JSON string matching the schema
       const parsedResponse = JSON.parse(jsonStringResponse)
-      
+
       // Provide robust defaults for missing fields
       if (
         parsedResponse.dataType &&
@@ -764,7 +764,8 @@ Begin analysis. Respond ONLY with a complete JSON object with all 4 required fie
         if (parsedResponse.extractedData) {
           parsedResponse.aiResponse = "Here's the information I found for you."
         } else {
-          parsedResponse.aiResponse = "I couldn't find specific information matching your query."
+          parsedResponse.aiResponse =
+            "I couldn't find specific information matching your query."
         }
       }
 
