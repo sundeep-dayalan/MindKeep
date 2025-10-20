@@ -290,18 +290,28 @@ export function AISearchBar({
     value: any,
     pendingNoteData?: AgentResponse["pendingNoteData"]
   ) => {
-    console.log("Clarification option selected:", {
+    const callId = `${action}-${Date.now()}`
+    console.log(`[${callId}] Clarification option selected:`, {
       action,
       value,
       pendingNoteData
     })
 
     if (!pendingNoteData) {
-      console.error("No pending note data found")
+      console.error(`[${callId}] No pending note data found`)
       setIsInputDisabled(false)
       return
     }
 
+    // Prevent duplicate executions
+    if (isSearching) {
+      console.warn(
+        `[${callId}] Already processing clarification, ignoring duplicate call`
+      )
+      return
+    }
+
+    console.log(`[${callId}] Setting isSearching to true`)
     setIsSearching(true)
 
     try {
@@ -697,15 +707,18 @@ export function AISearchBar({
 
       // If we have both title and category, create the note
       if (finalTitle && finalCategory && noteContent) {
-        console.log("Creating note with:", {
+        const noteCreationId = `note-${Date.now()}`
+        console.log(`[${callId}] [${noteCreationId}] Creating note with:`, {
           finalTitle,
           finalCategory,
-          noteContent
+          noteContent: noteContent.substring(0, 100) + "..."
         })
 
         // Generate embedding (same as in sidepanel.tsx handleSaveNote)
         const saveStartTime = performance.now()
-        console.log("📝 [AI Chat] Creating new note via agent...")
+        console.log(
+          `[${noteCreationId}] 📝 [AI Chat] Creating new note via agent...`
+        )
 
         // Step 1: Generate embedding from plaintext content
         const embeddingStartTime = performance.now()
@@ -884,6 +897,7 @@ export function AISearchBar({
                         {message.clarificationOptions.map((option, idx) => (
                           <button
                             key={idx}
+                            disabled={isSearching}
                             onClick={() =>
                               handleClarificationOption(
                                 option.action,
@@ -895,7 +909,7 @@ export function AISearchBar({
                               option.type === "category_pill"
                                 ? "plasmo-px-3 plasmo-py-1.5 plasmo-bg-blue-50 hover:plasmo-bg-blue-100 plasmo-text-blue-700 plasmo-border plasmo-border-blue-200 hover:plasmo-border-blue-300"
                                 : "plasmo-px-4 plasmo-py-2 plasmo-bg-white hover:plasmo-bg-slate-50 plasmo-text-slate-700 plasmo-border plasmo-border-slate-300 hover:plasmo-border-slate-400"
-                            } plasmo-rounded-full plasmo-text-sm plasmo-font-medium plasmo-transition-all plasmo-cursor-pointer plasmo-shadow-sm hover:plasmo-shadow`}>
+                            } plasmo-rounded-full plasmo-text-sm plasmo-font-medium plasmo-transition-all plasmo-cursor-pointer plasmo-shadow-sm hover:plasmo-shadow disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed`}>
                             {option.label}
                           </button>
                         ))}

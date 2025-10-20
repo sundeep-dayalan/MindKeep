@@ -176,9 +176,13 @@ async function handleSaveNote(data: {
   embedding?: number[] // Optional pre-generated embedding from side panel
 }): Promise<{ success: boolean; note?: any; error?: string }> {
   const startTime = performance.now()
+  const saveId = `save-${Date.now()}-${Math.random().toString(36).substring(7)}`
 
   try {
-    console.log("📝 [BG Save] Starting save pipeline...")
+    console.log(`[${saveId}] 📝 [BG Save] Starting save pipeline...`, {
+      title: data.title,
+      hasEmbedding: !!data.embedding
+    })
 
     // Step 1: Data Reception (already done via message)
     const { title, category, content, contentPlaintext, sourceUrl, embedding } =
@@ -189,7 +193,7 @@ async function handleSaveNote(data: {
     let embeddingVector: number[]
     if (embedding && embedding.length > 0) {
       console.log(
-        `✅ [BG Save] Using pre-generated embedding: ${embedding.length} dimensions`
+        `[${saveId}] ✅ [BG Save] Using pre-generated embedding: ${embedding.length} dimensions`
       )
       embeddingVector = embedding
     } else {
@@ -223,14 +227,16 @@ async function handleSaveNote(data: {
     const dbStartTime = performance.now()
     const savedNote = await addNote(noteObject)
     const dbTime = performance.now() - dbStartTime
-    console.log(`⏱️ [BG Save] Database storage: ${dbTime.toFixed(2)}ms`)
+    console.log(
+      `[${saveId}] ⏱️ [BG Save] Database storage: ${dbTime.toFixed(2)}ms`
+    )
 
     const totalTime = performance.now() - startTime
     console.log(
-      `⏱️ [BG Save] TOTAL background save time: ${totalTime.toFixed(2)}ms`
+      `[${saveId}] ⏱️ [BG Save] TOTAL background save time: ${totalTime.toFixed(2)}ms`
     )
     console.log(
-      `📊 [BG Save] Breakdown: Encrypt=${encryptTime.toFixed(2)}ms, DB=${dbTime.toFixed(2)}ms`
+      `[${saveId}] 📊 [BG Save] Breakdown: Encrypt=${encryptTime.toFixed(2)}ms, DB=${dbTime.toFixed(2)}ms`
     )
 
     return {
