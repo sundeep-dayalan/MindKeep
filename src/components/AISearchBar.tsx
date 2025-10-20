@@ -23,7 +23,10 @@ interface Message {
 
 interface AISearchBarProps {
   placeholder?: string
-  onSearch?: (query: string) => Promise<string | AgentResponse>
+  onSearch?: (
+    query: string,
+    conversationHistory?: Array<{ role: string; content: string }>
+  ) => Promise<string | AgentResponse>
   onNoteCreated?: () => void // Callback when a note is successfully created
   onNotesChange?: () => Promise<void> // Callback when notes are modified (e.g., category changed)
   className?: string
@@ -180,7 +183,7 @@ export function AISearchBar({
     try {
       // Update the global agent with the new persona
       const agent = await getGlobalAgent()
-      agent.setPersona(persona)
+      await agent.setPersona(persona) // Now async - recreates session
 
       // Clear chat history when switching personas
       setMessages([])
@@ -252,7 +255,18 @@ export function AISearchBar({
       setIsSearching(true)
 
       try {
-        const aiResponse = await onSearch(query)
+        // Build conversation history (exclude system messages)
+        const conversationHistory = messages
+          .filter((m) => m.type === "user" || m.type === "ai")
+          .map((m) => ({
+            role: m.type === "user" ? "user" : "assistant",
+            content: m.content
+          }))
+
+        // Add current query
+        conversationHistory.push({ role: "user", content: query })
+
+        const aiResponse = await onSearch(query, conversationHistory)
 
         // Check if response is an AgentResponse object (has aiResponse field or referenceNotes)
         if (

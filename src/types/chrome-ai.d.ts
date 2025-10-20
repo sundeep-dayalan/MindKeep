@@ -140,5 +140,16 @@ declare global {
   const LanguageModel: LanguageModelStatic
 }
 
-// This is necessary to make the file a module and allow global declarations.
-export {}
+// Export types for use in other modules
+export type PromptRole = "system" | "user" | "assistant"
+
+export type PromptContentPart =
+  | { type: "text"; value: string }
+  | { type: "image"; value: Blob }
+  | { type: "audio"; value: Blob }
+
+export type PromptMessage = {
+  role: PromptRole
+  content: string | PromptContentPart[]
+  prefix?: boolean
+}

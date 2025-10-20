@@ -323,7 +323,7 @@ function SidePanel() {
     try {
       // Update the global agent with the new persona
       const agent = await getGlobalAgent()
-      agent.setPersona(persona)
+      await agent.setPersona(persona) // Now async - recreates session
 
       console.log("🎭 [SidePanel] Global agent updated with persona")
     } catch (error) {
@@ -365,7 +365,8 @@ function SidePanel() {
   }
 
   const handleAISearch = async (
-    query: string
+    query: string,
+    conversationHistory?: Array<{ role: string; content: string }>
   ): Promise<string | import("~services/langchain-agent").AgentResponse> => {
     const startTime = performance.now()
 
@@ -376,7 +377,7 @@ function SidePanel() {
       const { getGlobalAgent } = await import("~services/langchain-agent")
       const agent = await getGlobalAgent()
 
-      const response = await agent.run(query)
+      const response = await agent.run(query, conversationHistory)
 
       const totalTime = performance.now() - startTime
       console.log(`⏱️ [LangChain Agent] TOTAL time: ${totalTime.toFixed(2)}ms`)
