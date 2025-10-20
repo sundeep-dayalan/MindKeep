@@ -215,9 +215,12 @@ export class MindKeepAgent {
 
       // Handle conversational queries (no tools needed)
       if (toolResults.length === 0) {
-        console.log("[Agent] No tools needed - handling as conversational query")
-        
-        // Generate a conversational response using the model
+        console.log(
+          "[Agent] No tools needed - handling as conversational query"
+        )
+
+        // Generate a conversational response using a FRESH gemini nano session
+        // (not the LangChain model that's configured for tool selection)
         const conversationPrompt = `You are MindKeep AI, a helpful assistant for managing personal notes.
 
 User said: "${input}"
@@ -226,16 +229,25 @@ This is a general conversation or greeting. Respond naturally and helpfully. Kee
 Examples:
 - "Hello" → "Hi! I'm MindKeep AI. I can help you search your notes, create new notes, or answer questions about your saved information."
 - "Thanks" → "You're welcome! Let me know if you need anything else."
-- "How are you?" → "I'm doing great! How can I help you with your notes today?"`
+- "How are you?" → "I'm doing great! How can I help you with your notes today?"
 
-        const messages = [new HumanMessage(conversationPrompt)]
-        const response = await this.model.invoke(messages)
-        const conversationalResponse = (response.content as string).trim()
+Respond with ONLY the natural conversational text, no JSON or formatting.`
+
+        // Use executePrompt directly to get a clean response without session contamination
+        const conversationalResponse = await executePrompt(conversationPrompt, {
+          initialPrompts: [
+            {
+              role: "system",
+              content:
+                "You are a friendly AI assistant. Respond conversationally and naturally. Never use JSON formatting in your responses."
+            }
+          ]
+        })
 
         return {
           extractedData: null,
           referenceNotes: [],
-          aiResponse: conversationalResponse,
+          aiResponse: conversationalResponse.trim(),
           dataType: "text",
           confidence: 1.0
         }
