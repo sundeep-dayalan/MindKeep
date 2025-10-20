@@ -50,7 +50,12 @@ export interface AgentResponse {
   needsClarification?: boolean
 
   /** Type of clarification needed */
-  clarificationType?: "title" | "category" | "both" | "content"
+  clarificationType?:
+    | "title"
+    | "category"
+    | "both"
+    | "content"
+    | "organize_confirmation"
 
   /** Options for user to select (for clarification) */
   clarificationOptions?: Array<{
@@ -65,6 +70,9 @@ export interface AgentResponse {
     content?: string
     title?: string
     category?: string
+    noteId?: string
+    currentCategory?: string
+    suggestedCategory?: string
   }
 
   /** Indicates if a note was successfully created */
@@ -86,6 +94,8 @@ You have access to these tools:
 - delete_note: Delete a note
 - list_categories: List all note categories
 - get_statistics: Get comprehensive statistics about notes (total count, notes per category, creation/update dates)
+- organize_note: Automatically organize notes by finding semantically similar notes and suggesting better category placement
+- confirm_organize_note: Confirm and execute category reorganization after user approval
 
 When helping users:
 1. Understand their intent clearly
@@ -292,6 +302,90 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
       if (noteCreated) {
         const creationData = noteCreated.result
         console.log("[Agent] Note created successfully:", creationData)
+
+        // Automatically run the organize_note tool to suggest better category placement
+        if (creationData.noteData?.id) {
+          console.log(
+            "[Agent] Running organize_note tool for newly created note:",
+            creationData.noteData.id
+          )
+
+          try {
+            const organizeResult = await this.executeTools(
+              [
+                {
+                  name: "organize_note",
+                  params: {
+                    noteId: creationData.noteData.id
+                  }
+                }
+              ],
+              input
+            )
+
+            console.log("[Agent] Organize result:", organizeResult)
+
+            // Check if reorganization is needed
+            const organizeData = organizeResult[0]?.result
+            if (
+              organizeData?.needsReorganization &&
+              organizeData?.suggestedCategory
+            ) {
+              console.log(
+                "[Agent] Reorganization suggested:",
+                organizeData.suggestedCategory
+              )
+
+              // Return a response asking for user confirmation
+              return {
+                extractedData: null,
+                referenceNotes: [],
+                aiResponse: `${creationData.message}\n\n${organizeData.message}`,
+                dataType: "text",
+                confidence: 1.0,
+                noteCreated: true,
+                needsClarification: true,
+                clarificationType: "organize_confirmation",
+                clarificationOptions: [
+                  {
+                    type: "button",
+                    label: "Yes, move it",
+                    value: {
+                      action: "confirm_organize",
+                      noteId: organizeData.noteId,
+                      targetCategory: organizeData.suggestedCategory,
+                      confirmed: true
+                    },
+                    action: "confirm_organize"
+                  },
+                  {
+                    type: "button",
+                    label: "No, keep it here",
+                    value: {
+                      action: "confirm_organize",
+                      noteId: organizeData.noteId,
+                      targetCategory: organizeData.suggestedCategory,
+                      confirmed: false
+                    },
+                    action: "confirm_organize"
+                  }
+                ],
+                pendingNoteData: {
+                  noteId: organizeData.noteId,
+                  currentCategory: organizeData.currentCategory,
+                  suggestedCategory: organizeData.suggestedCategory
+                }
+              }
+            } else {
+              console.log(
+                "[Agent] No reorganization needed or no similar notes found"
+              )
+            }
+          } catch (error) {
+            console.error("[Agent] Error running organize_note:", error)
+            // Don't fail the entire operation, just log and continue
+          }
+        }
 
         return {
           extractedData: null,

@@ -9,6 +9,7 @@ import { z } from "zod"
 
 import * as aiService from "./ai-service"
 import * as dbService from "./db-service"
+import type { Note } from "./db-service"
 
 // ============================================================================
 // TOOL SCHEMAS (using Zod for validation)
@@ -79,6 +80,26 @@ const CreateNoteFromChatSchema = z.object({
     .describe(
       "If true, auto-generate missing title/category without asking user. Use when user explicitly says 'auto-generate' or similar."
     )
+})
+
+const OrganizeNoteSchema = z.object({
+  noteId: z.string().describe("The unique ID of the note to organize"),
+  suggestedCategory: z
+    .string()
+    .optional()
+    .describe(
+      "The suggested category to move the note to. If not provided, will search for similar notes."
+    )
+})
+
+const ConfirmOrganizeNoteSchema = z.object({
+  noteId: z.string().describe("The unique ID of the note to organize"),
+  targetCategory: z
+    .string()
+    .describe("The category to move the note to after user confirmation"),
+  userConfirmed: z
+    .boolean()
+    .describe("Whether the user confirmed the organization action")
 })
 
 // ============================================================================
@@ -558,6 +579,208 @@ export const createNoteFromChatTool = new DynamicStructuredTool({
   }
 })
 
+/**
+ * Organize Note Tool
+ * Finds semantically similar notes and suggests category reorganization
+ * This tool should be called automatically after a note is created
+ */
+export const organizeNoteTool = new DynamicStructuredTool({
+  name: "organize_note",
+  description: `Organize a newly created note by finding semantically similar notes and suggesting better category placement.
+  
+  This tool analyzes the note's title and content to find related notes in the database.
+  If related notes are found in a different category, it suggests reorganizing the note.
+  
+  Call this tool automatically after creating a note to help maintain organized categories.`,
+  schema: OrganizeNoteSchema,
+  func: async ({ noteId, suggestedCategory }) => {
+    try {
+      console.log(
+        `[Tool: organize_note] Organizing note: ${noteId}, suggested: ${suggestedCategory}`
+      )
+
+      // Get the note that was just created
+      const note = await dbService.getNote(noteId)
+      if (!note) {
+        return JSON.stringify({
+          success: false,
+          error: `Note with ID "${noteId}" not found.`
+        })
+      }
+
+      console.log(
+        `[Tool: organize_note] Found note: "${note.title}" in category "${note.category}"`
+      )
+
+      // Search for semantically similar notes based on title and content
+      const searchQuery = `${note.title} ${note.contentPlaintext}`.substring(
+        0,
+        500
+      ) // Limit search query length
+      const embedding = await aiService.generateEmbedding(searchQuery)
+      const similarNotes = await dbService.searchNotesByVector(embedding, 10) // Get top 10 similar notes
+
+      console.log(
+        `[Tool: organize_note] Found ${similarNotes.length} similar notes`
+      )
+
+      // Filter out the note itself and group by category
+      const otherNotes = similarNotes.filter(
+        (result) => result.note.id !== noteId
+      )
+      const categoryGroups = new Map<
+        string,
+        Array<{ note: Note; score: number }>
+      >()
+
+      otherNotes.forEach((result) => {
+        const category = result.note.category
+        if (!categoryGroups.has(category)) {
+          categoryGroups.set(category, [])
+        }
+        categoryGroups.get(category)!.push(result)
+      })
+
+      console.log(
+        `[Tool: organize_note] Category groups:`,
+        Array.from(categoryGroups.keys())
+      )
+
+      // Remove the current note's category from suggestions
+      categoryGroups.delete(note.category)
+
+      // If no similar notes in other categories, no reorganization needed
+      if (categoryGroups.size === 0) {
+        console.log(
+          `[Tool: organize_note] No similar notes found in other categories`
+        )
+        return JSON.stringify({
+          success: true,
+          needsReorganization: false,
+          message: `The note "${note.title}" is already in a good category. No reorganization needed.`
+        })
+      }
+
+      // Find the category with the most similar notes
+      let bestCategory = ""
+      let maxCount = 0
+      let relatedNotesInBestCategory: Array<{ note: Note; score: number }> = []
+
+      categoryGroups.forEach((notes, category) => {
+        if (notes.length > maxCount) {
+          maxCount = notes.length
+          bestCategory = category
+          relatedNotesInBestCategory = notes
+        }
+      })
+
+      console.log(
+        `[Tool: organize_note] Best matching category: "${bestCategory}" with ${maxCount} notes`
+      )
+
+      // Prepare suggestion for user
+      const relatedTitles = relatedNotesInBestCategory
+        .slice(0, 3)
+        .map((result) => `• ${result.note.title}`)
+        .join("\n")
+
+      return JSON.stringify({
+        success: true,
+        needsReorganization: true,
+        noteId: noteId,
+        currentCategory: note.category,
+        suggestedCategory: bestCategory,
+        relatedNotesCount: maxCount,
+        relatedNotesTitles: relatedTitles,
+        message: `Hey! I found that there's an existing category called "${bestCategory}" with ${maxCount} related note${maxCount > 1 ? "s" : ""}:\n\n${relatedTitles}\n\nWould you like to move the note "${note.title}" from "${note.category}" to "${bestCategory}" to keep related notes organized together?`
+      })
+    } catch (error) {
+      console.error("[Tool: organize_note] Error:", error)
+      return JSON.stringify({
+        success: false,
+        error: `Failed to organize note: ${error.message}`
+      })
+    }
+  }
+})
+
+/**
+ * Confirm Organize Note Tool
+ * Executes the category reorganization after user confirmation
+ */
+export const confirmOrganizeNoteTool = new DynamicStructuredTool({
+  name: "confirm_organize_note",
+  description: `Confirm and execute the note reorganization based on user's response.
+  
+  Call this tool after the user has responded to the organization suggestion from organize_note tool.
+  If user confirms (says yes/sure/ok), move the note to the suggested category.
+  If user declines (says no/not now), keep the note in its current category.`,
+  schema: ConfirmOrganizeNoteSchema,
+  func: async ({ noteId, targetCategory, userConfirmed }) => {
+    try {
+      console.log(
+        `[Tool: confirm_organize_note] User ${userConfirmed ? "confirmed" : "declined"} moving note ${noteId} to ${targetCategory}`
+      )
+
+      const note = await dbService.getNote(noteId)
+      if (!note) {
+        return JSON.stringify({
+          success: false,
+          error: `Note with ID "${noteId}" not found.`
+        })
+      }
+
+      if (!userConfirmed) {
+        console.log(
+          `[Tool: confirm_organize_note] User declined reorganization`
+        )
+        return JSON.stringify({
+          success: true,
+          action: "declined",
+          message: `Okay, I'll keep "${note.title}" in the "${note.category}" category.`
+        })
+      }
+
+      // User confirmed - update the note's category
+      console.log(
+        `[Tool: confirm_organize_note] Moving note from "${note.category}" to "${targetCategory}"`
+      )
+
+      const updatedNote = await dbService.updateNote(noteId, {
+        category: targetCategory
+      })
+
+      if (!updatedNote) {
+        return JSON.stringify({
+          success: false,
+          error: `Failed to update note category.`
+        })
+      }
+
+      console.log(
+        `[Tool: confirm_organize_note] Successfully moved note to "${targetCategory}"`
+      )
+
+      return JSON.stringify({
+        success: true,
+        action: "moved",
+        message: `Perfect! I've moved "${note.title}" to the "${targetCategory}" category. Your notes are now better organized.`,
+        updatedNote: {
+          id: updatedNote.id,
+          title: updatedNote.title,
+          category: updatedNote.category
+        }
+      })
+    } catch (error) {
+      console.error("[Tool: confirm_organize_note] Error:", error)
+      return JSON.stringify({
+        success: false,
+        error: `Failed to confirm organization: ${error.message}`
+      })
+    }
+  }
+})
+
 // ============================================================================
 // TOOL COLLECTION
 // ============================================================================
@@ -573,7 +796,9 @@ export const allTools = [
   deleteNoteTool,
   listCategoriesTool,
   getStatisticsTool,
-  createNoteFromChatTool
+  createNoteFromChatTool,
+  organizeNoteTool,
+  confirmOrganizeNoteTool
 ]
 
 /**

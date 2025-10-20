@@ -21,6 +21,7 @@ interface AISearchBarProps {
   placeholder?: string
   onSearch?: (query: string) => Promise<string | AgentResponse>
   onNoteCreated?: () => void // Callback when a note is successfully created
+  onNotesChange?: () => Promise<void> // Callback when notes are modified (e.g., category changed)
   className?: string
 }
 
@@ -136,6 +137,7 @@ export function AISearchBar({
   placeholder = "Ask me anything...",
   onSearch,
   onNoteCreated,
+  onNotesChange,
   className = ""
 }: AISearchBarProps) {
   const [messages, setMessages] = React.useState<Message[]>([])
@@ -699,6 +701,56 @@ export function AISearchBar({
           break
         }
 
+        case "confirm_organize": {
+          // Handle organization confirmation
+          console.log(`[${callId}] Organization confirmation:`, value)
+
+          const userMessage: Message = {
+            id: `user-${Date.now()}`,
+            type: "user",
+            content: value.confirmed
+              ? "✅ Yes, move it"
+              : "❌ No, keep it here",
+            timestamp: Date.now()
+          }
+          setMessages((prev) => [...prev, userMessage])
+
+          // Call the confirm_organize_note tool
+          const { getGlobalAgent } = await import("~services/langchain-agent")
+          const agent = await getGlobalAgent()
+
+          // Get the confirm tool directly
+          const { confirmOrganizeNoteTool } = await import(
+            "~services/langchain-tools"
+          )
+
+          const result = await confirmOrganizeNoteTool.func({
+            noteId: value.noteId,
+            targetCategory: value.targetCategory,
+            userConfirmed: value.confirmed
+          })
+
+          const parsedResult = JSON.parse(result)
+
+          const aiMessage: Message = {
+            id: `ai-${Date.now()}`,
+            type: "ai",
+            content: parsedResult.message,
+            timestamp: Date.now()
+          }
+          setMessages((prev) => [...prev, aiMessage])
+
+          setIsInputDisabled(false)
+          setIsSearching(false)
+
+          // Refresh notes if category was changed
+          if (parsedResult.action === "moved" && onNotesChange) {
+            await onNotesChange()
+          }
+
+          return
+        }
+
         default:
           console.warn("Unknown clarification action:", action)
           setIsInputDisabled(false)
@@ -878,6 +930,86 @@ export function AISearchBar({
         // Notify parent component to refresh notes list
         if (onNoteCreated) {
           onNoteCreated()
+        }
+
+        // Now check if we should organize the note
+        const noteId = response.note?.id
+        if (noteId) {
+          console.log(
+            `[${callId}] Running organize_note tool for newly created note:`,
+            noteId
+          )
+
+          try {
+            // Import and call the organize note tool
+            const { organizeNoteTool } = await import("~services/langchain-tools")
+
+            const organizeResult = await organizeNoteTool.func({
+              noteId: noteId
+            })
+
+            const organizeData = JSON.parse(organizeResult)
+            console.log(`[${callId}] Organize result:`, organizeData)
+
+            // Check if reorganization is needed
+            if (
+              organizeData.needsReorganization &&
+              organizeData.suggestedCategory
+            ) {
+              console.log(
+                `[${callId}] Reorganization suggested:`,
+                organizeData.suggestedCategory
+              )
+
+              // Show organization suggestion message
+              const organizeMessage: Message = {
+                id: `ai-organize-${Date.now()}`,
+                type: "ai",
+                content: organizeData.message,
+                timestamp: Date.now(),
+                clarificationOptions: [
+                  {
+                    type: "button",
+                    label: "Yes, move it",
+                    value: {
+                      action: "confirm_organize",
+                      noteId: organizeData.noteId,
+                      targetCategory: organizeData.suggestedCategory,
+                      confirmed: true
+                    },
+                    action: "confirm_organize"
+                  },
+                  {
+                    type: "button",
+                    label: "No, keep it here",
+                    value: {
+                      action: "confirm_organize",
+                      noteId: organizeData.noteId,
+                      targetCategory: organizeData.suggestedCategory,
+                      confirmed: false
+                    },
+                    action: "confirm_organize"
+                  }
+                ],
+                pendingNoteData: {
+                  noteId: organizeData.noteId,
+                  currentCategory: organizeData.currentCategory,
+                  suggestedCategory: organizeData.suggestedCategory
+                }
+              }
+              setMessages((prev) => [...prev, organizeMessage])
+              setIsInputDisabled(true) // Keep input disabled until user responds
+              setIsSearching(false)
+              return // Exit early to wait for user response
+            } else {
+              console.log(
+                `[${callId}] No reorganization needed or no similar notes found`
+              )
+            }
+          } catch (error) {
+            console.error(`[${callId}] Error running organize_note:`, error)
+            // Don't fail the entire operation, just log and continue
+          }
         }
 
         // Re-enable input

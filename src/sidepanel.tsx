@@ -440,6 +440,7 @@ function SidePanel() {
             placeholder="Ask me anything..."
             onSearch={handleAISearch}
             onNoteCreated={loadData}
+            onNotesChange={loadData}
           />
         </div>
       </div>
