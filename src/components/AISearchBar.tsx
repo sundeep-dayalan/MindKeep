@@ -147,6 +147,7 @@ export function AISearchBar({
   }>({ type: null })
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -155,6 +156,14 @@ export function AISearchBar({
   React.useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Auto-resize textarea as user types
+  React.useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto"
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+    }
+  }, [query])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -780,6 +789,7 @@ export function AISearchBar({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Allow Shift+Enter for new line, Enter alone submits
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       handleSubmit(e)
@@ -923,9 +933,9 @@ export function AISearchBar({
 
       {/* Search Input */}
       <form onSubmit={handleSubmit}>
-        <div className="plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-bg-slate-50 plasmo-rounded-full plasmo-px-4 plasmo-py-3 plasmo-border plasmo-border-slate-200 hover:plasmo-border-slate-300 plasmo-transition-all focus-within:plasmo-border-blue-400 focus-within:plasmo-ring-2 focus-within:plasmo-ring-blue-100">
+        <div className="plasmo-flex plasmo-items-end plasmo-gap-2 plasmo-bg-slate-50 plasmo-rounded-2xl plasmo-px-4 plasmo-py-3 plasmo-border plasmo-border-slate-200 hover:plasmo-border-slate-300 plasmo-transition-all focus-within:plasmo-border-blue-400 focus-within:plasmo-ring-2 focus-within:plasmo-ring-blue-100">
           <svg
-            className="plasmo-w-5 plasmo-h-5 plasmo-text-slate-400 plasmo-flex-shrink-0"
+            className="plasmo-w-5 plasmo-h-5 plasmo-text-slate-400 plasmo-flex-shrink-0 plasmo-mb-1"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24">
@@ -936,8 +946,8 @@ export function AISearchBar({
               d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
             />
           </svg>
-          <input
-            type="text"
+          <textarea
+            ref={textareaRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -945,12 +955,14 @@ export function AISearchBar({
               isInputDisabled ? "Please select an option above..." : placeholder
             }
             disabled={isSearching || isInputDisabled}
-            className="plasmo-flex-1 plasmo-bg-transparent plasmo-border-none plasmo-outline-none plasmo-text-slate-700 placeholder:plasmo-text-slate-400 plasmo-text-sm disabled:plasmo-opacity-50"
+            rows={1}
+            className="plasmo-flex-1 plasmo-bg-transparent plasmo-border-none plasmo-outline-none plasmo-text-slate-700 placeholder:plasmo-text-slate-400 plasmo-text-sm disabled:plasmo-opacity-50 plasmo-resize-none plasmo-max-h-32 plasmo-overflow-y-auto plasmo-leading-relaxed"
+            style={{ minHeight: "24px" }}
           />
           <button
             type="submit"
-            className="plasmo-flex-shrink-0 plasmo-w-8 plasmo-h-8 plasmo-bg-slate-900 plasmo-text-white plasmo-rounded-full plasmo-flex plasmo-items-center plasmo-justify-center hover:plasmo-bg-slate-800 plasmo-transition-colors disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed"
-            title="Send"
+            className="plasmo-flex-shrink-0 plasmo-w-8 plasmo-h-8 plasmo-bg-slate-900 plasmo-text-white plasmo-rounded-full plasmo-flex plasmo-items-center plasmo-justify-center hover:plasmo-bg-slate-800 plasmo-transition-colors disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed plasmo-mb-0.5"
+            title="Send (Enter) • New line (Shift+Enter)"
             disabled={!query.trim() || isSearching || isInputDisabled}>
             <svg
               className="plasmo-w-4 plasmo-h-4"
@@ -966,6 +978,16 @@ export function AISearchBar({
             </svg>
           </button>
         </div>
+        {/* Hint text for keyboard shortcuts */}
+        {query.trim() && (
+          <div className="plasmo-text-xs plasmo-text-slate-400 plasmo-mt-1 plasmo-px-2 plasmo-text-right">
+            Press{" "}
+            <kbd className="plasmo-px-1 plasmo-py-0.5 plasmo-bg-slate-100 plasmo-rounded plasmo-text-slate-600 plasmo-font-mono plasmo-text-xs">
+              Enter
+            </kbd>{" "}
+            to send
+          </div>
+        )}
       </form>
     </div>
   )
