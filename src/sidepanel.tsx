@@ -8,7 +8,9 @@ import { CategoryFilter } from "~components/CategoryFilter"
 import { Header } from "~components/Header"
 import { NoteEditor, type RichTextEditorRef } from "~components/NoteEditor"
 import { NotesList } from "~components/NotesList"
+import { PersonaManager } from "~components/PersonaManager"
 import { SearchBar } from "~components/SearchBar"
+import type { Persona } from "~types/persona"
 import { generateEmbedding, generateTitle } from "~services/ai-service"
 import {
   deleteNote,
@@ -17,8 +19,10 @@ import {
   searchNotesByTitle,
   type Note
 } from "~services/db-service"
+import { getGlobalAgent } from "~services/langchain-agent"
+import { initializeDefaultPersonas } from "~services/persona-defaults"
 
-type View = "list" | "editor"
+type View = "list" | "editor" | "personas"
 
 function SidePanel() {
   const [view, setView] = useState<View>("list")
@@ -40,6 +44,11 @@ function SidePanel() {
   // Load notes and categories
   useEffect(() => {
     loadData()
+
+    // Initialize default personas on first load
+    initializeDefaultPersonas().catch((error) => {
+      console.error("Failed to initialize default personas:", error)
+    })
 
     // Notify background that side panel is open
     chrome.runtime.sendMessage({ type: "SIDE_PANEL_OPENED" })
@@ -239,6 +248,8 @@ function SidePanel() {
 
         // Step 2: Send to background script with pre-generated embedding
         const messageStartTime = performance.now()
+        const saveId = `save_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
+        console.log(`🚀 [UI Save ${saveId}] Sending SAVE_NOTE message to background`)
         const response = await chrome.runtime.sendMessage({
           type: "SAVE_NOTE",
           data: {
@@ -247,7 +258,8 @@ function SidePanel() {
             contentPlaintext,
             category: categoryToSave,
             sourceUrl,
-            embedding
+            embedding,
+            _debugSaveId: saveId
           }
         })
         const messageTime = performance.now() - messageStartTime
@@ -296,6 +308,30 @@ function SidePanel() {
 
   const handleClose = () => {
     window.close()
+  }
+
+  const handlePersonasClick = () => {
+    console.log("🎭 [SidePanel] Switching to personas view")
+    setView("personas")
+  }
+
+  const handlePersonaActivated = async (persona: Persona | null) => {
+    console.log("🎭 [SidePanel] Persona activated:", persona?.name || "None")
+    
+    try {
+      // Update the global agent with the new persona
+      const agent = await getGlobalAgent()
+      agent.setPersona(persona)
+      
+      console.log("🎭 [SidePanel] Global agent updated with persona")
+    } catch (error) {
+      console.error("🎭 [SidePanel] Error updating agent persona:", error)
+    }
+  }
+
+  const handleBackToList = () => {
+    console.log("📝 [SidePanel] Switching back to list view")
+    setView("list")
   }
 
   const handleSearch = async () => {
@@ -372,14 +408,41 @@ function SidePanel() {
     <div className="plasmo-w-full plasmo-h-screen plasmo-bg-slate-50 plasmo-overflow-hidden">
       <div className="plasmo-h-full plasmo-flex plasmo-flex-col">
         {/* Header */}
-        <Header onClose={handleClose} />
+        <Header 
+          onClose={handleClose} 
+          onPersonasClick={handlePersonasClick}
+          view={view}
+        />
 
         {/* Content */}
-        <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-p-4 plasmo-pb-20">
-          {/* AI Status Banner */}
-          <AIStatusBanner />
+        <div className={`plasmo-flex-1 plasmo-overflow-y-auto plasmo-p-4 ${view === "personas" ? "plasmo-pb-4" : "plasmo-pb-20"}`}>
+          {/* AI Status Banner - only show in list view */}
+          {view === "list" && <AIStatusBanner />}
 
-          {view === "list" ? (
+          {view === "personas" ? (
+            <div className="plasmo-h-full">
+              <div className="plasmo-mb-4">
+                <button
+                  onClick={handleBackToList}
+                  className="plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-px-3 plasmo-py-2 plasmo-text-sm plasmo-text-slate-600 hover:plasmo-text-slate-900 plasmo-transition-colors">
+                  <svg
+                    className="plasmo-w-4 plasmo-h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                    />
+                  </svg>
+                  Back to Notes
+                </button>
+              </div>
+              <PersonaManager onPersonaActivated={handlePersonaActivated} />
+            </div>
+          ) : view === "list" ? (
             <>
               {/* Search and Filters */}
               <div className="plasmo-mb-4 plasmo-space-y-3">
@@ -434,15 +497,17 @@ function SidePanel() {
           )}
         </div>
 
-        {/* Fixed Bottom Search Bar */}
-        <div className="plasmo-fixed plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-bg-white plasmo-border-t plasmo-border-slate-200 plasmo-shadow-lg plasmo-p-4">
-          <AISearchBar
-            placeholder="Ask me anything..."
-            onSearch={handleAISearch}
-            onNoteCreated={loadData}
-            onNotesChange={loadData}
-          />
-        </div>
+        {/* Fixed Bottom Search Bar - hide in personas view */}
+        {view !== "personas" && (
+          <div className="plasmo-fixed plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-bg-white plasmo-border-t plasmo-border-slate-200 plasmo-shadow-lg plasmo-p-4">
+            <AISearchBar
+              placeholder="Ask me anything..."
+              onSearch={handleAISearch}
+              onNoteCreated={loadData}
+              onNotesChange={loadData}
+            />
+          </div>
+        )}
       </div>
     </div>
   )

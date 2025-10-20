@@ -1,10 +1,14 @@
 import React from "react"
 
+import { MarkdownRenderer } from "~components/MarkdownRenderer"
+import { PersonaSelector } from "~components/PersonaSelector"
 import {
   RichTextEditor,
   type RichTextEditorRef
 } from "~components/RichTextEditor"
+import type { Persona } from "~types/persona"
 import type { Note } from "~services/db-service"
+import { getGlobalAgent } from "~services/langchain-agent"
 import type { AgentResponse } from "~services/langchain-agent"
 
 interface Message {
@@ -165,6 +169,35 @@ export function AISearchBar({
   React.useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Handle persona changes
+  const handlePersonaChange = async (persona: Persona | null) => {
+    console.log("🎭 [AISearchBar] Persona changed to:", persona?.name || "Default Mode")
+    
+    try {
+      // Update the global agent with the new persona
+      const agent = await getGlobalAgent()
+      agent.setPersona(persona)
+      
+      // Clear chat history when switching personas
+      setMessages([])
+      
+      // Add a system message to indicate persona change
+      const systemMessage: Message = {
+        id: `system-${Date.now()}`,
+        type: "ai",
+        content: persona 
+          ? `🎭 Switched to ${persona.name} persona. Conversation history cleared.\n\n${persona.description}`
+          : "🤖 Switched to Default Mode. Full tool access restored.",
+        timestamp: Date.now()
+      }
+      setMessages([systemMessage])
+      
+      console.log("🎭 [AISearchBar] Agent persona updated successfully")
+    } catch (error) {
+      console.error("🎭 [AISearchBar] Error updating agent persona:", error)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -1043,25 +1076,32 @@ export function AISearchBar({
   return (
     <div
       className={`plasmo-flex plasmo-flex-col plasmo-space-y-2 ${className}`}>
-      {/* Ask AI Label with Toggle */}
-      <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-px-1">
-        <div className="plasmo-flex plasmo-items-center plasmo-gap-1.5">
-          <svg
-            className="plasmo-w-4 plasmo-h-4 plasmo-text-slate-600"
-            fill="currentColor"
-            viewBox="0 0 20 20">
-            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-          </svg>
-          <span className="plasmo-text-xs plasmo-font-medium plasmo-text-slate-600">
-            Ask AI
-          </span>
+      {/* Persona Selector & Ask AI Label with Toggle */}
+      <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-px-1 plasmo-gap-2">
+        {/* Left side: Persona Selector and Label */}
+        <div className="plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-flex-1 plasmo-min-w-0">
+          <PersonaSelector onPersonaChange={handlePersonaChange} />
+          
+          <div className="plasmo-flex plasmo-items-center plasmo-gap-1.5">
+            <svg
+              className="plasmo-w-4 plasmo-h-4 plasmo-text-slate-600"
+              fill="currentColor"
+              viewBox="0 0 20 20">
+              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+            </svg>
+            <span className="plasmo-text-xs plasmo-font-medium plasmo-text-slate-600">
+              Ask AI
+            </span>
+          </div>
         </div>
-
+        
+        {/* Right side: Toggle button */}
         {messages.length > 0 && (
-          <button
-            onClick={() => setIsChatExpanded(!isChatExpanded)}
-            className="plasmo-p-1 plasmo-rounded plasmo-text-slate-500 hover:plasmo-text-slate-700 hover:plasmo-bg-slate-100 plasmo-transition-colors"
-            title={isChatExpanded ? "Hide chat history" : "Show chat history"}>
+          <div className="plasmo-flex-shrink-0">
+            <button
+              onClick={() => setIsChatExpanded(!isChatExpanded)}
+              className="plasmo-p-1 plasmo-rounded plasmo-text-slate-500 hover:plasmo-text-slate-700 hover:plasmo-bg-slate-100 plasmo-transition-colors"
+              title={isChatExpanded ? "Hide chat history" : "Show chat history"}>
             {isChatExpanded ? (
               <svg
                 className="plasmo-w-4 plasmo-h-4"
@@ -1089,7 +1129,8 @@ export function AISearchBar({
                 />
               </svg>
             )}
-          </button>
+            </button>
+          </div>
         )}
       </div>
 
@@ -1105,14 +1146,18 @@ export function AISearchBar({
                     : "plasmo-justify-start"
                 }`}>
                 <div
-                  className={`plasmo-max-w-[80%] plasmo-px-4 plasmo-py-2 plasmo-rounded-lg ${
+                  className={`plasmo-px-4 plasmo-py-2 plasmo-rounded-lg plasmo-shadow-sm plasmo-max-w-[80%] ${
                     message.type === "user"
                       ? "plasmo-bg-blue-500 plasmo-text-white"
                       : "plasmo-bg-white plasmo-text-slate-700 plasmo-border plasmo-border-slate-200"
                   }`}>
-                  <div className="plasmo-text-sm plasmo-whitespace-pre-wrap">
-                    {message.content}
-                  </div>
+                  {message.type === "user" ? (
+                    <div className="plasmo-text-sm plasmo-whitespace-pre-wrap plasmo-text-white">
+                      {message.content}
+                    </div>
+                  ) : (
+                    <MarkdownRenderer content={message.content} />
+                  )}
                 </div>
               </div>
 

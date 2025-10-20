@@ -68,6 +68,9 @@ importers:
       langchain:
         specifier: ^1.0.1
         version: 1.0.1(@langchain/core@1.0.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(zod-to-json-schema@3.24.6(zod@4.1.12))
+      marked:
+        specifier: ^16.4.1
+        version: 16.4.1
       plasmo:
         specifier: 0.90.5
         version: 0.90.5(@swc/core@1.13.5(@swc/helpers@0.5.17))(@swc/helpers@0.5.17)(@types/node@20.11.5)(mustache@4.2.0)(postcss@8.4.33)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -2993,6 +2996,11 @@ packages:
 
   markdown-it@14.1.0:
     resolution: {integrity: sha512-a54IwgWPaeBCAAsv13YgmALOF1elABB08FxO9i+r4VFk5Vl4pKokRPeX8u5TCgSsPi6ec1otfLjdOpVcgbpshg==}
+    hasBin: true
+
+  marked@16.4.1:
+    resolution: {integrity: sha512-ntROs7RaN3EvWfy3EZi14H4YxmT6A5YvywfhO+0pm+cH/dnSQRmdAmoFIc3B9aiwTehyk7pESH4ofyBY+V5hZg==}
+    engines: {node: '>= 20'}
     hasBin: true
 
   mdn-data@2.0.14:
@@ -7038,6 +7046,8 @@ snapshots:
       mdurl: 2.0.0
       punycode.js: 2.3.1
       uc.micro: 2.1.0
+
+  marked@16.4.1: {}
 
   mdn-data@2.0.14: {}
 

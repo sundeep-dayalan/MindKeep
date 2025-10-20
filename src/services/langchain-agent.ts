@@ -10,6 +10,9 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { z } from "zod"
 import { zodToJsonSchema } from "zod-to-json-schema"
 
+import type { Persona } from "~types/persona"
+import { AgentMode } from "~types/persona"
+
 import { executePrompt } from "./gemini-nano-service"
 import { GeminiNanoChat } from "./langchain-gemini-nano"
 import { ConversationBuffer } from "./langchain-memory"
@@ -276,6 +279,8 @@ export class MindKeepAgent {
   private maxIterations: number
   private verbose: boolean
   private lastUserMessage: string = "" // Track the last user message content
+  private activePersona: Persona | null = null // Active persona for search-only mode
+  private mode: AgentMode = AgentMode.DEFAULT // Current operating mode
 
   constructor(config: AgentConfig = {}) {
     this.model = config.model!
@@ -283,6 +288,104 @@ export class MindKeepAgent {
     this.memory = config.memory || new ConversationBuffer(10)
     this.maxIterations = config.maxIterations || 5
     this.verbose = config.verbose || false
+  }
+
+  /**
+   * Set active persona (enters PERSONA mode with search-only tools)
+   * @param persona - The persona to activate, or null to return to DEFAULT mode
+   */
+  setPersona(persona: Persona | null): void {
+    console.log("🎭 [Agent] setPersona called with:", persona?.name || "null (default mode)")
+    
+    this.activePersona = persona
+    this.mode = persona ? AgentMode.PERSONA : AgentMode.DEFAULT
+    
+    // Clear conversation history when switching personas
+    console.log("🎭 [Agent] Clearing conversation history due to persona change")
+    this.memory.clear()
+    
+    console.log(`🎭 [Agent] Mode set to: ${this.mode}`)
+    console.log(`🎭 [Agent] Active persona: ${persona?.name || "None"}`)
+  }
+
+  /**
+   * Get the current active persona
+   */
+  getPersona(): Persona | null {
+    return this.activePersona
+  }
+
+  /**
+   * Get the current operating mode
+   */
+  getMode(): AgentMode {
+    return this.mode
+  }
+
+  /**
+   * Get available tools based on current mode
+   * DEFAULT mode: All tools
+   * PERSONA mode: Search-only tools (search_notes, get_note)
+   */
+  private getAvailableTools(): typeof allTools {
+    if (this.mode === AgentMode.PERSONA) {
+      console.log("🎭 [Agent] PERSONA mode - filtering to search-only tools")
+      
+      // Only allow read-only tools in persona mode
+      const searchOnlyTools = allTools.filter(tool => 
+        tool.name === "search_notes" || tool.name === "get_note"
+      )
+      
+      console.log(`🎭 [Agent] Available tools in PERSONA mode: ${searchOnlyTools.map(t => t.name).join(", ")}`)
+      
+      return searchOnlyTools as typeof allTools
+    }
+    
+    console.log(`🤖 [Agent] DEFAULT mode - all ${allTools.length} tools available`)
+    return this.tools
+  }
+
+  /**
+   * Build system prompt based on current mode and persona
+   */
+  private buildSystemPrompt(): string {
+    let systemPrompt = AGENT_SYSTEM_PROMPT
+    
+    if (this.mode === AgentMode.PERSONA && this.activePersona) {
+      console.log(`🎭 [Agent] Building PERSONA mode system prompt for: ${this.activePersona.name}`)
+      
+      systemPrompt = `You are MindKeep AI, operating in PERSONA mode as "${this.activePersona.name}".
+
+=== PERSONA CONTEXT ===
+${this.activePersona.context}
+
+${this.activePersona.outputTemplate ? `=== OUTPUT TEMPLATE ===\n${this.activePersona.outputTemplate}\n` : ""}
+=== IMPORTANT CONSTRAINTS ===
+- You can ONLY search and read notes (use search_notes and get_note tools)
+- You CANNOT create, update, delete, or organize notes
+- Your role is to find information and present it according to the persona's style
+- ALWAYS search for relevant notes first using search_notes tool
+- Format your responses according to the persona context above
+- If search returns no results, inform the user politely in your persona's style
+- Don't make up information - only use data from notes
+
+=== AVAILABLE TOOLS ===
+- search_notes: Search through notes using semantic similarity
+- get_note: Retrieve a specific note by ID
+
+When helping users:
+1. ALWAYS use search_notes tool first to find relevant information
+2. Extract and understand the information from the search results
+3. Format your response according to the persona's style and context
+4. Be helpful and stay in character
+5. If no notes are found, suggest creating a note about the topic`
+
+      console.log("🎭 [Agent] Persona system prompt built (length:", systemPrompt.length, "chars)")
+    } else {
+      console.log("🤖 [Agent] Using DEFAULT system prompt")
+    }
+    
+    return systemPrompt
   }
 
   /**
@@ -485,11 +588,17 @@ export class MindKeepAgent {
 
         // Generate a conversational response using a FRESH gemini nano session
         // (not the LangChain model that's configured for tool selection)
-        const conversationPrompt = `You are MindKeep AI, a helpful assistant for managing personal notes.
+        const baseIntro = this.mode === AgentMode.PERSONA && this.activePersona
+          ? `You are MindKeep AI, operating as "${this.activePersona.name}". ${this.activePersona.description}`
+          : `You are MindKeep AI, a helpful assistant for managing personal notes.`
+        
+        const conversationPrompt = `${baseIntro}
 
 User said: "${input}"
 
 This is a general conversation or greeting. Respond naturally and helpfully. Keep it brief (1-2 sentences).
+${this.mode === AgentMode.PERSONA && this.activePersona ? `Stay in character as ${this.activePersona.name}.` : ''}
+
 Examples:
 - "Hello" → "Hi! I'm MindKeep AI. I can help you search your notes, create new notes, or answer questions about your saved information."
 - "Thanks" → "You're welcome! Let me know if you need anything else."
@@ -497,6 +606,8 @@ Examples:
 
 Respond with ONLY the natural conversational text, no JSON or formatting.`
 
+        console.log(`💬 [Agent] Generating conversational response in ${this.mode} mode`)
+        
         // Use executePrompt directly to get a clean response without session contamination
         const conversationalResponse = await executePrompt(conversationPrompt, {
           initialPrompts: [
@@ -683,19 +794,32 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
     query: string,
     history: any[]
   ): Promise<Array<{ name: string; params: any }>> {
+    console.log(`🔧 [Agent] selectTools called in ${this.mode} mode`)
+    
     // Use Zod for reliable JSON parsing, which you're already using in your tools!
     const { z } = await import("zod")
 
+    // Get available tools based on current mode
+    const availableTools = this.getAvailableTools()
+    const availableToolNames = availableTools.map(t => t.name)
+    
+    console.log("🔧 [Agent] Available tool names:", availableToolNames)
+
     // Step 1: Define the structured output we want from the LLM
+    // In PERSONA mode, only allow search_notes and get_note
+    const toolEnum = this.mode === AgentMode.PERSONA 
+      ? z.enum(["search_notes", "get_note", "none"])
+      : z.enum([
+          "search_notes",
+          "get_note",
+          "list_categories",
+          "get_statistics",
+          "create_note_from_chat",
+          "none"
+        ])
+    
     const ToolSelectionSchema = z.object({
-      tool: z.enum([
-        "search_notes",
-        "get_note",
-        "list_categories",
-        "get_statistics",
-        "create_note_from_chat",
-        "none"
-      ]),
+      tool: toolEnum,
       search_query: z
         .string()
         .nullable()
@@ -731,17 +855,26 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
         )
     })
 
-    // Step 2: Create a more robust prompt
-    const toolSelectionPrompt = `You are an expert at understanding user requests and routing them to the correct tool.
-Analyze the user's query and determine which tool is most appropriate.
+    // Step 2: Create a more robust prompt (persona-aware)
+    const toolDescriptions = this.mode === AgentMode.PERSONA 
+      ? `Available tools (PERSONA MODE - Search Only):
+- search_notes: Find notes on a specific topic. Use this when user asks to FIND, RETRIEVE, SEARCH, or GET any information from their notes (passwords, emails, codes, etc.).
+- get_note: Get a specific note by its ID. Use this ONLY when user explicitly mentions a note ID.
+- none: For greetings (hi, hello, thanks) or if the request cannot be fulfilled with search.
 
-Available tools:
+NOTE: You are in PERSONA mode. You can ONLY search and read notes. You CANNOT create, update, delete, or organize notes.`
+      : `Available tools:
 - search_notes: Find notes on a specific topic. Use this when user asks to FIND, RETRIEVE, SEARCH, or GET any information from their notes (passwords, emails, codes, etc.).
 - get_note: Get a specific note by its ID. Use this ONLY when user explicitly mentions a note ID.
 - list_categories: List all available note categories. Use this when user asks about categories.
 - get_statistics: Get comprehensive statistics about notes (total count, notes per category, dates). Use this when user asks "how many notes", "statistics", "note counts", "how many notes in each category", etc.
 - create_note_from_chat: Create a note from the conversation. Use this when user says "add this as note", "save that as note", "can you add this as note", etc. Extract title and category if mentioned.
-- none: ONLY for greetings (hi, hello, thanks) or meta questions about the conversation itself (what did we talk about?).
+- none: ONLY for greetings (hi, hello, thanks) or meta questions about the conversation itself (what did we talk about?).`
+    
+    const toolSelectionPrompt = `You are an expert at understanding user requests and routing them to the correct tool.
+Analyze the user's query and determine which tool is most appropriate.
+
+${toolDescriptions}
 
 CRITICAL RULES:
 - If the user asks to FIND, GET, SEARCH, RETRIEVE, or LOOK UP any information → use "search_notes"
@@ -810,7 +943,19 @@ Respond with ONLY the JSON object and nothing else.`
       console.log("[Agent] Parsed tool selection:", parsed)
 
       // Step 4: Convert the parsed object into the tool call format
-      switch (parsed.tool) {
+      const toolName = parsed.tool as string
+      
+      console.log(`🔧 [Agent] Selected tool: ${toolName}`)
+      
+      // In PERSONA mode, block non-search tools
+      if (this.mode === AgentMode.PERSONA) {
+        if (toolName !== "search_notes" && toolName !== "get_note" && toolName !== "none") {
+          console.log(`🎭 [Agent] Tool "${toolName}" not available in PERSONA mode`)
+          return []
+        }
+      }
+      
+      switch (toolName) {
         case "search_notes":
           // CRITICAL: Use the optimized search_query, not the original user query!
           if (!parsed.search_query) {
@@ -830,10 +975,22 @@ Respond with ONLY the JSON object and nothing else.`
         case "get_note":
           return [{ name: "get_note", params: { noteId: parsed.note_id } }]
         case "list_categories":
+          if (this.mode === AgentMode.PERSONA) {
+            console.log(`🎭 [Agent] list_categories not available in PERSONA mode`)
+            return []
+          }
           return [{ name: "list_categories", params: {} }]
         case "get_statistics":
+          if (this.mode === AgentMode.PERSONA) {
+            console.log(`🎭 [Agent] get_statistics not available in PERSONA mode`)
+            return []
+          }
           return [{ name: "get_statistics", params: {} }]
         case "create_note_from_chat":
+          if (this.mode === AgentMode.PERSONA) {
+            console.log(`🎭 [Agent] create_note_from_chat not available in PERSONA mode`)
+            return []
+          }
           return [
             {
               name: "create_note_from_chat",
@@ -864,10 +1021,11 @@ Respond with ONLY the JSON object and nothing else.`
     query: string
   ): Promise<any[]> {
     const results: any[] = []
+    const availableTools = this.getAvailableTools()
 
     for (const toolCall of toolCalls) {
-      console.log(`[Agent] Executing tool: ${toolCall.name}`, toolCall.params)
-      const tool = this.tools.find((t) => t.name === toolCall.name)
+      console.log(`🔧 [Agent] Executing tool: ${toolCall.name}`, toolCall.params)
+      const tool = availableTools.find((t) => t.name === toolCall.name)
 
       if (!tool) {
         results.push({
@@ -1208,11 +1366,22 @@ Begin analysis. Respond ONLY with a complete JSON object with all 5 required fie
       referenceNotes.length
     )
 
+    // STAGE 3: Apply persona transformation if in PERSONA mode
+    let finalAiResponse = extracted.aiResponse
+    if (this.mode === AgentMode.PERSONA && this.activePersona) {
+      console.log(`🎭 [Stage 3] Applying persona transformation for: ${this.activePersona.name}`)
+      finalAiResponse = await this.applyPersonaTransformation(
+        query,
+        extracted,
+        toolResults
+      )
+    }
+
     // STAGE 2: Is now just assembling the final object. No more if/else logic!
     return {
       extractedData: extracted.data,
       referenceNotes: finalReferenceNotes,
-      aiResponse: extracted.aiResponse, // We use the response directly from the extraction stage!
+      aiResponse: finalAiResponse, // Use persona-transformed response if applicable
       dataType: extracted.type as any,
       confidence: extracted.confidence,
       suggestedActions: this.generateActions(
@@ -1220,6 +1389,80 @@ Begin analysis. Respond ONLY with a complete JSON object with all 5 required fie
         extracted.type,
         finalReferenceNotes
       )
+    }
+  }
+
+  /**
+   * STAGE 3: Apply persona transformation
+   * Takes extracted data and transforms it according to the active persona's role
+   */
+  private async applyPersonaTransformation(
+    query: string,
+    extracted: { data: string | null; type: string; confidence: number; aiResponse: string; sourceNoteIds: string[] },
+    toolResults: any[]
+  ): Promise<string> {
+    if (!this.activePersona) {
+      return extracted.aiResponse
+    }
+
+    console.log(`🎭 [Persona Transform] Input query: "${query}"`)
+    console.log(`🎭 [Persona Transform] Extracted data type: ${extracted.type}`)
+    console.log(`🎭 [Persona Transform] Source notes: ${extracted.sourceNoteIds.length}`)
+
+    // Build persona transformation prompt
+    const transformationPrompt = `You are MindKeep AI, operating as "${this.activePersona.name}".
+
+=== YOUR ROLE ===
+${this.activePersona.description}
+
+=== PERSONA CONTEXT ===
+${this.activePersona.context}
+
+${this.activePersona.outputTemplate ? `=== OUTPUT TEMPLATE ===
+${this.activePersona.outputTemplate}
+` : ""}
+
+=== USER REQUEST ===
+"${query}"
+
+=== RETRIEVED DATA ===
+The system found ${extracted.sourceNoteIds.length} relevant note(s):
+\`\`\`json
+${JSON.stringify(toolResults, null, 2)}
+\`\`\`
+
+=== YOUR TASK ===
+Based on the user's request and the retrieved notes, generate a response that:
+1. **Stays in character** as "${this.activePersona.name}"
+2. **Uses the retrieved information** from the notes to fulfill the request
+3. **Follows your output template** if one is provided
+4. **Addresses the user directly** with the requested content
+
+CRITICAL RULES:
+- DO NOT just say "I found a note" - actually PRODUCE the content the user requested
+- If the user asks you to write something, WRITE IT using the information from the notes
+- If the user asks for a specific format (email, letter, summary), PROVIDE IT in that format
+- Use ALL relevant information from the retrieved notes
+- Stay completely in character as "${this.activePersona.name}"
+
+${this.activePersona.outputTemplate ? `
+REMEMBER: Follow your output template structure:
+${this.activePersona.outputTemplate}
+` : ""}
+
+Now generate your response:`
+
+    console.log(`🎭 [Persona Transform] Sending transformation prompt (${transformationPrompt.length} chars)`)
+
+    try {
+      const transformedResponse = await executePrompt(transformationPrompt, {})
+      console.log(`🎭 [Persona Transform] Received transformed response (${transformedResponse.length} chars)`)
+      console.log(`🎭 [Persona Transform] Preview: ${transformedResponse.substring(0, 200)}...`)
+      return transformedResponse
+    } catch (error) {
+      console.error("❌ [Persona Transform] Failed to transform response:", error)
+      // Fallback to original response
+      return extracted.aiResponse
     }
   }
 
