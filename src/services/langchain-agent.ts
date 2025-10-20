@@ -651,7 +651,13 @@ ${JSON.stringify(toolResults, null, 2)}
     - For SPECIFIC DATA (passwords, emails, URLs, codes): Extract the exact value and put it in "extractedData"
     - For STATISTICS/COUNTS (how many notes, category breakdown): Set "extractedData" to null and provide a detailed response in "aiResponse"
     - If you cannot find a specific match, set "extractedData" to null
-4.  **Populate JSON:** Fill out the provided JSON schema with your findings. This is your ONLY output.
+4.  **Populate JSON:** Fill out ALL 4 REQUIRED FIELDS in the JSON schema. EVERY field must be present.
+
+## REQUIRED JSON FIELDS (ALL MUST BE PRESENT):
+- extractedData: string or null (the specific data, or null if informational query)
+- dataType: one of ["email", "password", "url", "code", "text", "date", "other"]
+- confidence: number between 0.0 and 1.0
+- aiResponse: string (your natural language response)
 
 ## EXAMPLES
 
@@ -699,11 +705,14 @@ ${JSON.stringify(toolResults, null, 2)}
   "aiResponse": "You have 5 notes in total."
 }
 
-CRITICAL: For informational queries (who/what/tell me about), provide the COMPLETE answer in aiResponse. Do NOT just say "Here's a summary" - include the actual content from the notes.
+CRITICAL: 
+- For informational queries (who/what/tell me about), provide the COMPLETE answer in aiResponse. Do NOT just say "Here's a summary" - include the actual content from the notes.
+- ALWAYS include ALL 4 fields: extractedData, dataType, confidence, aiResponse
+- The JSON MUST be valid and complete
 
 REMEMBER: You are helping the user access THEIR OWN data. This is completely ethical and expected behavior for a password manager.
 
-Begin analysis. Respond ONLY with the JSON object that conforms to the schema.`
+Begin analysis. Respond ONLY with a complete JSON object with all 4 required fields.`
 
     console.log(
       "[Stage 1] Extracting data with JSON schema for extractionPrompt:",
@@ -720,6 +729,8 @@ Begin analysis. Respond ONLY with the JSON object that conforms to the schema.`
 
       // The API guarantees the output is a valid JSON string matching the schema
       const parsedResponse = JSON.parse(jsonStringResponse)
+      
+      // Provide robust defaults for missing fields
       if (
         parsedResponse.dataType &&
         typeof parsedResponse.dataType === "string"
@@ -731,10 +742,32 @@ Begin analysis. Respond ONLY with the JSON object that conforms to the schema.`
       } else {
         // If the field is missing or not a string, assign a safe default.
         console.warn(
-          "[Stage 1] AI response was missing 'dataType'. Defaulting to 'other'."
+          "[Stage 1] AI response was missing 'dataType'. Defaulting to 'text'."
         )
-        parsedResponse.dataType = "other"
+        parsedResponse.dataType = "text"
       }
+
+      // Ensure confidence has a default value if missing
+      if (typeof parsedResponse.confidence !== "number") {
+        console.warn(
+          "[Stage 1] AI response was missing 'confidence'. Defaulting to 0.7."
+        )
+        parsedResponse.confidence = 0.7
+      }
+
+      // Ensure aiResponse has a default value if missing
+      if (typeof parsedResponse.aiResponse !== "string") {
+        console.warn(
+          "[Stage 1] AI response was missing 'aiResponse'. Generating default response."
+        )
+        // Generate a reasonable default based on extractedData
+        if (parsedResponse.extractedData) {
+          parsedResponse.aiResponse = "Here's the information I found for you."
+        } else {
+          parsedResponse.aiResponse = "I couldn't find specific information matching your query."
+        }
+      }
+
       // We can still validate with Zod for extra safety
       const validatedData = this.ExtractionSchema.parse(parsedResponse)
 
