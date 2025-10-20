@@ -1,12 +1,12 @@
 /**
  * MarkdownRenderer Component
- * 
+ *
  * Renders markdown content with rich formatting for AI responses
  * Supports headings, bold, italic, lists, code blocks, and more
  */
 
-import React, { useEffect, useRef } from "react"
 import { marked } from "marked"
+import { useEffect, useRef } from "react"
 
 import "./markdown.css"
 
@@ -18,10 +18,13 @@ interface MarkdownRendererProps {
 // Configure marked options
 marked.setOptions({
   breaks: true, // Convert \n to <br>
-  gfm: true, // GitHub Flavored Markdown
+  gfm: true // GitHub Flavored Markdown
 })
 
-export function MarkdownRenderer({ content, className = "" }: MarkdownRendererProps) {
+export function MarkdownRenderer({
+  content,
+  className = ""
+}: MarkdownRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -37,9 +40,9 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
       className={`plasmo-markdown-content ${className}`}
       style={{
         // Base styles
-        fontSize: '0.875rem',
-        lineHeight: '1.5',
-        color: '#334155',
+        fontSize: "0.875rem",
+        lineHeight: "1.5",
+        color: "#334155"
       }}
     />
   )

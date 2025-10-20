@@ -134,11 +134,14 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
  * Message handler for processing note operations
  */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log(`📨 [Background Listener] Received message type: ${message.type}`, {
-    saveId: message.data?._debugSaveId || 'N/A',
-    timestamp: Date.now()
-  })
-  
+  console.log(
+    `📨 [Background Listener] Received message type: ${message.type}`,
+    {
+      saveId: message.data?._debugSaveId || "N/A",
+      timestamp: Date.now()
+    }
+  )
+
   // Handle async operations properly
   ;(async () => {
     try {

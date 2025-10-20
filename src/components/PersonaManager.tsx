@@ -1,12 +1,10 @@
 /**
  * PersonaManager Component
- *  
+ *
  * Manages user personas - create, edit, delete, and activate personas
  */
 
 import { useEffect, useState } from "react"
-
-import type { Persona, PersonaInput } from "~types/persona"
 
 import {
   addPersona,
@@ -15,6 +13,7 @@ import {
   setActivePersona,
   updatePersona
 } from "~services/db-service"
+import type { Persona, PersonaInput } from "~types/persona"
 
 interface PersonaManagerProps {
   onPersonaActivated?: (persona: Persona | null) => void
@@ -82,7 +81,7 @@ export function PersonaManager({ onPersonaActivated }: PersonaManagerProps) {
 
   const handleSave = async () => {
     console.log("🎭 [PersonaManager] handleSave called with data:", formData)
-    
+
     if (!formData.name.trim()) {
       alert("Please enter a persona name")
       return
@@ -99,7 +98,10 @@ export function PersonaManager({ onPersonaActivated }: PersonaManagerProps) {
     setLoading(true)
     try {
       if (editingPersona) {
-        console.log("🎭 [PersonaManager] Updating existing persona:", editingPersona.id)
+        console.log(
+          "🎭 [PersonaManager] Updating existing persona:",
+          editingPersona.id
+        )
         await updatePersona(editingPersona.id, formData)
       } else {
         console.log("🎭 [PersonaManager] Creating new persona")
@@ -120,7 +122,7 @@ export function PersonaManager({ onPersonaActivated }: PersonaManagerProps) {
 
   const handleDelete = async (persona: Persona) => {
     console.log("🎭 [PersonaManager] handleDelete for persona:", persona.name)
-    
+
     if (persona.isDefault) {
       alert("Cannot delete default personas")
       return
@@ -136,7 +138,7 @@ export function PersonaManager({ onPersonaActivated }: PersonaManagerProps) {
       if (success) {
         console.log("🎭 [PersonaManager] Persona deleted successfully")
         await loadPersonas()
-        
+
         // If this was the active persona, notify parent
         if (persona.isActive && onPersonaActivated) {
           onPersonaActivated(null)
@@ -160,12 +162,15 @@ export function PersonaManager({ onPersonaActivated }: PersonaManagerProps) {
     try {
       await setActivePersona(personaId)
       await loadPersonas()
-      
+
       if (onPersonaActivated) {
         onPersonaActivated(persona)
       }
-      
-      console.log("🎭 [PersonaManager] Persona activated:", persona?.name || "None (default mode)")
+
+      console.log(
+        "🎭 [PersonaManager] Persona activated:",
+        persona?.name || "None (default mode)"
+      )
     } catch (error) {
       console.error("🎭 [PersonaManager] Error activating persona:", error)
       alert("Failed to activate persona. Please try again.")
@@ -220,7 +225,9 @@ export function PersonaManager({ onPersonaActivated }: PersonaManagerProps) {
             <input
               type="text"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
               placeholder="e.g., Email Writer"
               className="plasmo-w-full plasmo-px-3 plasmo-py-2 plasmo-border plasmo-border-gray-300 plasmo-rounded-lg focus:plasmo-ring-2 focus:plasmo-ring-purple-500 dark:plasmo-bg-gray-700 dark:plasmo-border-gray-600 dark:plasmo-text-white"
             />
@@ -308,7 +315,9 @@ export function PersonaManager({ onPersonaActivated }: PersonaManagerProps) {
         <div className="plasmo-mb-4 plasmo-p-3 plasmo-bg-purple-100 dark:plasmo-bg-purple-900/30 plasmo-border plasmo-border-purple-300 dark:plasmo-border-purple-700 plasmo-rounded-lg">
           <div className="plasmo-flex plasmo-items-center plasmo-justify-between">
             <div className="plasmo-flex plasmo-items-center plasmo-gap-2">
-              <span className="plasmo-text-2xl">{activePersona.emoji || "🤖"}</span>
+              <span className="plasmo-text-2xl">
+                {activePersona.emoji || "🤖"}
+              </span>
               <div>
                 <div className="plasmo-font-medium plasmo-text-purple-900 dark:plasmo-text-purple-100">
                   {activePersona.name}
@@ -353,7 +362,9 @@ export function PersonaManager({ onPersonaActivated }: PersonaManagerProps) {
               }`}>
               <div className="plasmo-flex plasmo-items-start plasmo-justify-between">
                 <div className="plasmo-flex plasmo-items-start plasmo-gap-2 plasmo-flex-1">
-                  <span className="plasmo-text-2xl">{persona.emoji || "🤖"}</span>
+                  <span className="plasmo-text-2xl">
+                    {persona.emoji || "🤖"}
+                  </span>
                   <div className="plasmo-flex-1 plasmo-min-w-0">
                     <div className="plasmo-font-medium plasmo-text-gray-900 dark:plasmo-text-gray-100 plasmo-truncate">
                       {persona.name}

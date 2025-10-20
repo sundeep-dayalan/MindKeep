@@ -1,6 +1,6 @@
 /**
  * Default Persona Templates
- * 
+ *
  * Pre-built personas that provide common use cases out of the box
  */
 
@@ -123,7 +123,8 @@ Best regards,
   {
     id: "default-casual-buddy",
     name: "Casual Buddy",
-    description: "Friendly, conversational tone for casual information retrieval",
+    description:
+      "Friendly, conversational tone for casual information retrieval",
     emoji: "😊",
     context: `You're a helpful, friendly buddy who makes finding information fun and easy!
 
@@ -193,16 +194,23 @@ export async function initializeDefaultPersonas(): Promise<void> {
 
   try {
     const existingPersonas = await getAllPersonas()
-    const existingNames = new Set(existingPersonas.map((p) => p.name.toLowerCase()))
+    const existingNames = new Set(
+      existingPersonas.map((p) => p.name.toLowerCase())
+    )
 
-    console.log(`🎭 [DefaultPersonas] Found ${existingPersonas.length} existing personas:`, Array.from(existingNames))
+    console.log(
+      `🎭 [DefaultPersonas] Found ${existingPersonas.length} existing personas:`,
+      Array.from(existingNames)
+    )
 
     for (const template of DEFAULT_PERSONAS) {
       const templateNameLower = template.name.toLowerCase()
-      
+
       if (!existingNames.has(templateNameLower)) {
-        console.log(`🎭 [DefaultPersonas] Creating default persona: ${template.name}`)
-        
+        console.log(
+          `🎭 [DefaultPersonas] Creating default persona: ${template.name}`
+        )
+
         await addPersona({
           name: template.name,
           description: template.description,
@@ -214,12 +222,17 @@ export async function initializeDefaultPersonas(): Promise<void> {
 
         console.log(`🎭 [DefaultPersonas] ✅ Created: ${template.name}`)
       } else {
-        console.log(`🎭 [DefaultPersonas] ⏭️  Skipping existing persona: ${template.name}`)
+        console.log(
+          `🎭 [DefaultPersonas] ⏭️  Skipping existing persona: ${template.name}`
+        )
       }
     }
 
     console.log("🎭 [DefaultPersonas] Default personas initialization complete")
   } catch (error) {
-    console.error("🎭 [DefaultPersonas] Error initializing default personas:", error)
+    console.error(
+      "🎭 [DefaultPersonas] Error initializing default personas:",
+      error
+    )
   }
 }

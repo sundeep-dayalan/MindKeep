@@ -1,14 +1,17 @@
 /**
  * PersonaSelector Component
- * 
+ *
  * Dropdown selector for choosing and managing active persona in AI chat
  */
 
 import { useEffect, useState } from "react"
 
+import {
+  getActivePersona,
+  getAllPersonas,
+  setActivePersona
+} from "~services/db-service"
 import type { Persona } from "~types/persona"
-
-import { getAllPersonas, getActivePersona, setActivePersona } from "~services/db-service"
 
 interface PersonaSelectorProps {
   onPersonaChange?: (persona: Persona | null) => void
@@ -32,10 +35,13 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
         getAllPersonas(),
         getActivePersona()
       ])
-      
+
       console.log(`🎭 [PersonaSelector] Loaded ${allPersonas.length} personas`)
-      console.log("🎭 [PersonaSelector] Active persona:", active?.name || "None")
-      
+      console.log(
+        "🎭 [PersonaSelector] Active persona:",
+        active?.name || "None"
+      )
+
       setPersonas(allPersonas)
       setActivePersonaState(active)
     } catch (error) {
@@ -44,19 +50,22 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
   }
 
   const handleSelect = async (persona: Persona | null) => {
-    console.log("🎭 [PersonaSelector] handleSelect for persona:", persona?.name || "None (default mode)")
-    
+    console.log(
+      "🎭 [PersonaSelector] handleSelect for persona:",
+      persona?.name || "None (default mode)"
+    )
+
     setLoading(true)
     setIsOpen(false)
-    
+
     try {
       await setActivePersona(persona?.id || null)
       setActivePersonaState(persona)
-      
+
       if (onPersonaChange) {
         onPersonaChange(persona)
       }
-      
+
       console.log("🎭 [PersonaSelector] Persona changed successfully")
     } catch (error) {
       console.error("🎭 [PersonaSelector] Error changing persona:", error)
@@ -69,11 +78,15 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
   // Trigger reload when personas change in storage
   useEffect(() => {
     console.log("🎭 [PersonaSelector] Setting up storage listener")
-    
-    const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }) => {
+
+    const handleStorageChange = (changes: {
+      [key: string]: chrome.storage.StorageChange
+    }) => {
       // Reload if persona-related data changes
       if (changes["mindkeep_persona_settings"]) {
-        console.log("🎭 [PersonaSelector] Persona settings changed in storage, reloading")
+        console.log(
+          "🎭 [PersonaSelector] Persona settings changed in storage, reloading"
+        )
         loadPersonas()
       }
     }
@@ -92,26 +105,39 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
       <button
         onClick={() => setIsOpen(!isOpen)}
         disabled={loading}
-        title={activePersona ? `${activePersona.name} (Search-only)` : "Default Mode (Full access)"}
+        title={
+          activePersona
+            ? `${activePersona.name} (Search-only)`
+            : "Default Mode (Full access)"
+        }
         className={`plasmo-flex plasmo-items-center plasmo-gap-1.5 plasmo-px-2.5 plasmo-py-1.5 plasmo-rounded-lg plasmo-border plasmo-transition-all plasmo-group ${
           activePersona
             ? "plasmo-bg-gradient-to-r plasmo-from-purple-50 plasmo-to-purple-100 plasmo-border-purple-300 hover:plasmo-from-purple-100 hover:plasmo-to-purple-150 plasmo-shadow-sm"
             : "plasmo-bg-white plasmo-border-slate-200 hover:plasmo-bg-slate-50 hover:plasmo-border-slate-300"
         } ${loading ? "plasmo-opacity-50 plasmo-cursor-not-allowed" : "plasmo-cursor-pointer"}`}>
         {/* Icon */}
-        <span className="plasmo-text-base plasmo-leading-none">{activePersona?.emoji || "⚡"}</span>
-        
+        <span className="plasmo-text-base plasmo-leading-none">
+          {activePersona?.emoji || "⚡"}
+        </span>
+
         {/* Dropdown Arrow */}
         <svg
           className={`plasmo-w-3.5 plasmo-h-3.5 plasmo-transition-transform plasmo-duration-200 ${
             isOpen ? "plasmo-rotate-180" : ""
           } ${
-            activePersona ? "plasmo-text-purple-600" : "plasmo-text-slate-500 group-hover:plasmo-text-slate-700"
+            activePersona
+              ? "plasmo-text-purple-600"
+              : "plasmo-text-slate-500 group-hover:plasmo-text-slate-700"
           }`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2.5}
+            d="M19 9l-7 7-7-7"
+          />
         </svg>
       </button>
 
@@ -143,8 +169,8 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
               <button
                 onClick={() => handleSelect(null)}
                 className={`plasmo-w-full plasmo-flex plasmo-items-start plasmo-gap-3 plasmo-px-4 plasmo-py-3 plasmo-transition-all plasmo-border-b plasmo-border-slate-100 ${
-                  !activePersona 
-                    ? "plasmo-bg-gradient-to-r plasmo-from-blue-50 plasmo-to-indigo-50 plasmo-border-l-4 plasmo-border-l-blue-500" 
+                  !activePersona
+                    ? "plasmo-bg-gradient-to-r plasmo-from-blue-50 plasmo-to-indigo-50 plasmo-border-l-4 plasmo-border-l-blue-500"
                     : "hover:plasmo-bg-slate-50 plasmo-border-l-4 plasmo-border-l-transparent hover:plasmo-border-l-slate-300"
                 }`}>
                 <div className="plasmo-flex-shrink-0 plasmo-w-10 plasmo-h-10 plasmo-bg-gradient-to-br plasmo-from-blue-500 plasmo-to-indigo-600 plasmo-rounded-lg plasmo-flex plasmo-items-center plasmo-justify-center plasmo-text-xl plasmo-shadow-md">
@@ -156,7 +182,10 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
                       Default Mode
                     </span>
                     {!activePersona && (
-                      <svg className="plasmo-w-4 plasmo-h-4 plasmo-text-blue-600 plasmo-flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <svg
+                        className="plasmo-w-4 plasmo-h-4 plasmo-text-blue-600 plasmo-flex-shrink-0"
+                        fill="currentColor"
+                        viewBox="0 0 20 20">
                         <path
                           fillRule="evenodd"
                           d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -199,7 +228,9 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
                     key={persona.id}
                     onClick={() => handleSelect(persona)}
                     className={`plasmo-w-full plasmo-flex plasmo-items-start plasmo-gap-3 plasmo-px-4 plasmo-py-3 plasmo-transition-all ${
-                      idx < personas.length - 1 ? "plasmo-border-b plasmo-border-slate-100" : ""
+                      idx < personas.length - 1
+                        ? "plasmo-border-b plasmo-border-slate-100"
+                        : ""
                     } ${
                       activePersona?.id === persona.id
                         ? "plasmo-bg-gradient-to-r plasmo-from-purple-50 plasmo-to-pink-50 plasmo-border-l-4 plasmo-border-l-purple-500"
@@ -214,7 +245,10 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
                           {persona.name}
                         </span>
                         {activePersona?.id === persona.id && (
-                          <svg className="plasmo-w-4 plasmo-h-4 plasmo-text-purple-600 plasmo-flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <svg
+                            className="plasmo-w-4 plasmo-h-4 plasmo-text-purple-600 plasmo-flex-shrink-0"
+                            fill="currentColor"
+                            viewBox="0 0 20 20">
                             <path
                               fillRule="evenodd"
                               d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -227,8 +261,17 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
                         {persona.description}
                       </p>
                       <div className="plasmo-flex plasmo-items-center plasmo-gap-1 plasmo-mt-1.5">
-                        <svg className="plasmo-w-3 plasmo-h-3 plasmo-text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        <svg
+                          className="plasmo-w-3 plasmo-h-3 plasmo-text-slate-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                          />
                         </svg>
                         <span className="plasmo-text-[10px] plasmo-text-slate-500 plasmo-uppercase plasmo-tracking-wide">
                           Search-only access

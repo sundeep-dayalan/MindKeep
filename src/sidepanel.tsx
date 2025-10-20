@@ -10,7 +10,6 @@ import { NoteEditor, type RichTextEditorRef } from "~components/NoteEditor"
 import { NotesList } from "~components/NotesList"
 import { PersonaManager } from "~components/PersonaManager"
 import { SearchBar } from "~components/SearchBar"
-import type { Persona } from "~types/persona"
 import { generateEmbedding, generateTitle } from "~services/ai-service"
 import {
   deleteNote,
@@ -21,6 +20,7 @@ import {
 } from "~services/db-service"
 import { getGlobalAgent } from "~services/langchain-agent"
 import { initializeDefaultPersonas } from "~services/persona-defaults"
+import type { Persona } from "~types/persona"
 
 type View = "list" | "editor" | "personas"
 
@@ -249,7 +249,9 @@ function SidePanel() {
         // Step 2: Send to background script with pre-generated embedding
         const messageStartTime = performance.now()
         const saveId = `save_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
-        console.log(`🚀 [UI Save ${saveId}] Sending SAVE_NOTE message to background`)
+        console.log(
+          `🚀 [UI Save ${saveId}] Sending SAVE_NOTE message to background`
+        )
         const response = await chrome.runtime.sendMessage({
           type: "SAVE_NOTE",
           data: {
@@ -317,12 +319,12 @@ function SidePanel() {
 
   const handlePersonaActivated = async (persona: Persona | null) => {
     console.log("🎭 [SidePanel] Persona activated:", persona?.name || "None")
-    
+
     try {
       // Update the global agent with the new persona
       const agent = await getGlobalAgent()
       agent.setPersona(persona)
-      
+
       console.log("🎭 [SidePanel] Global agent updated with persona")
     } catch (error) {
       console.error("🎭 [SidePanel] Error updating agent persona:", error)
@@ -408,14 +410,15 @@ function SidePanel() {
     <div className="plasmo-w-full plasmo-h-screen plasmo-bg-slate-50 plasmo-overflow-hidden">
       <div className="plasmo-h-full plasmo-flex plasmo-flex-col">
         {/* Header */}
-        <Header 
-          onClose={handleClose} 
+        <Header
+          onClose={handleClose}
           onPersonasClick={handlePersonasClick}
           view={view}
         />
 
         {/* Content */}
-        <div className={`plasmo-flex-1 plasmo-overflow-y-auto plasmo-p-4 ${view === "personas" ? "plasmo-pb-4" : "plasmo-pb-20"}`}>
+        <div
+          className={`plasmo-flex-1 plasmo-overflow-y-auto plasmo-p-4 ${view === "personas" ? "plasmo-pb-4" : "plasmo-pb-20"}`}>
           {/* AI Status Banner - only show in list view */}
           {view === "list" && <AIStatusBanner />}
 
