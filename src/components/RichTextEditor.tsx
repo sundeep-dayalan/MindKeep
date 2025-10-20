@@ -25,6 +25,7 @@ interface RichTextEditorProps {
   initialContent?: string // JSON string or plain text
   placeholder?: string
   onUpdate?: (plainText: string, json: any) => void
+  onSubmit?: () => void // New prop to handle Enter key press
   onSummarize?: () => void
   isSummarizing?: boolean
   showToolbar?: boolean // New prop to control toolbar visibility
@@ -47,6 +48,7 @@ export const RichTextEditor = forwardRef<
       initialContent,
       placeholder = "Start typing...",
       onUpdate,
+      onSubmit,
       onSummarize,
       isSummarizing,
       showToolbar = true,
@@ -98,6 +100,15 @@ export const RichTextEditor = forwardRef<
         attributes: {
           class:
             "plasmo-prose plasmo-prose-sm plasmo-max-w-none plasmo-min-h-[240px] plasmo-px-3 plasmo-py-2 plasmo-text-slate-900 focus:plasmo-outline-none"
+        },
+        handleKeyDown: (view, event) => {
+          // Handle Enter key to submit
+          if (event.key === "Enter" && !event.shiftKey && onSubmit) {
+            event.preventDefault()
+            onSubmit()
+            return true
+          }
+          return false
         }
       },
       onUpdate: ({ editor }) => {

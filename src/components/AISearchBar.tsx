@@ -202,8 +202,8 @@ export function AISearchBar({
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault()
 
     // Get both text and JSON from TipTap editor
     const query = editorRef.current?.getText()?.trim() || ""
@@ -1240,6 +1240,7 @@ export function AISearchBar({
               }
               showToolbar={false}
               compact={true}
+              onSubmit={handleSubmit}
               onUpdate={() => {
                 // Optional: could track changes if needed
               }}
@@ -1250,7 +1251,7 @@ export function AISearchBar({
           <button
             type="submit"
             className="plasmo-flex-shrink-0 plasmo-w-8 plasmo-h-8 plasmo-bg-slate-900 plasmo-text-white plasmo-rounded-full plasmo-flex plasmo-items-center plasmo-justify-center hover:plasmo-bg-slate-800 plasmo-transition-colors disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed plasmo-mb-0.5"
-            title="Send (Ctrl+Enter)"
+            title="Send (Enter)"
             disabled={isSearching || isInputDisabled}>
             <svg
               className="plasmo-w-4 plasmo-h-4"
@@ -1265,15 +1266,6 @@ export function AISearchBar({
               />
             </svg>
           </button>
-        </div>
-
-        {/* Hint text for keyboard shortcuts */}
-        <div className="plasmo-text-xs plasmo-text-slate-400 plasmo-mt-1 plasmo-px-2 plasmo-text-right">
-          Press{" "}
-          <kbd className="plasmo-px-1 plasmo-py-0.5 plasmo-bg-slate-100 plasmo-rounded plasmo-text-slate-600 plasmo-font-mono plasmo-text-xs">
-            Ctrl+Enter
-          </kbd>{" "}
-          to send
         </div>
       </form>
     </div>
