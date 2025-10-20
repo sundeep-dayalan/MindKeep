@@ -1,11 +1,11 @@
 import React from "react"
 
-import type { Note } from "~services/db-service"
-import type { AgentResponse } from "~services/langchain-agent"
 import {
   RichTextEditor,
   type RichTextEditorRef
 } from "~components/RichTextEditor"
+import type { Note } from "~services/db-service"
+import type { AgentResponse } from "~services/langchain-agent"
 
 interface Message {
   id: string
@@ -166,22 +166,18 @@ export function AISearchBar({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     // Get both text and JSON from TipTap editor
     const query = editorRef.current?.getText()?.trim() || ""
     const contentJSON = editorRef.current?.getJSON() // Capture rich formatting
-    
+
     if (query && onSearch && !isSearching) {
       // Store the rich content JSON for later use when saving
       setLastSubmittedContentJSON(contentJSON)
-      
+
       // Check if we're waiting for manual input (title or category)
       if (pendingManualInput.type && pendingManualInput.pendingNoteData) {
-        console.log(
-          "Processing manual input:",
-          pendingManualInput.type,
-          query
-        )
+        console.log("Processing manual input:", pendingManualInput.type, query)
 
         if (pendingManualInput.type === "category") {
           // User provided manual category
@@ -1065,7 +1061,7 @@ export function AISearchBar({
               }}
             />
           </div>
-          
+
           {/* Submit Button - aligned to bottom right */}
           <button
             type="submit"
@@ -1086,7 +1082,7 @@ export function AISearchBar({
             </svg>
           </button>
         </div>
-        
+
         {/* Hint text for keyboard shortcuts */}
         <div className="plasmo-text-xs plasmo-text-slate-400 plasmo-mt-1 plasmo-px-2 plasmo-text-right">
           Press{" "}
