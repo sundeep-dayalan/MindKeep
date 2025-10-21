@@ -373,8 +373,7 @@ function SidePanel() {
     try {
       console.log("🤖 [LangChain Agent] Processing query:", query)
 
-      // Use the LangChain agent for agentic search
-      const { getGlobalAgent } = await import("~services/langchain-agent")
+      // Use the LangChain agent for agentic search (already imported at top)
       const agent = await getGlobalAgent()
 
       const response = await agent.run(query, conversationHistory)

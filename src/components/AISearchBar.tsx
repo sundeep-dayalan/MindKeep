@@ -152,6 +152,16 @@ export function AISearchBar({
   const [isChatExpanded, setIsChatExpanded] = React.useState(true)
   const [isInputDisabled, setIsInputDisabled] = React.useState(false)
 
+  // Track token usage for warning banner
+  const [tokenUsage, setTokenUsage] = React.useState<{
+    usage: number
+    quota: number
+    percentage: number
+  } | null>(null)
+
+  // Track current input length for real-time validation
+  const [currentInputLength, setCurrentInputLength] = React.useState(0)
+
   // Track manual input flow state
   const [pendingManualInput, setPendingManualInput] = React.useState<{
     type: "title" | "category" | null
@@ -205,6 +215,111 @@ export function AISearchBar({
     }
   }
 
+  // Handle clearing the conversation
+  const handleClearChat = async () => {
+    console.log("🧹 [AISearchBar] Clearing chat...")
+
+    // Clear local messages
+    setMessages([])
+
+    // Clear the agent's session
+    const agent = await getGlobalAgent()
+    await agent.clearSession()
+
+    // Clear any pending input state
+    setPendingManualInput({ type: null })
+
+    // Clear the editor
+    editorRef.current?.setContent("")
+
+    // Clear last submitted content
+    setLastSubmittedContentJSON(null)
+
+    // Clear token usage warning
+    setTokenUsage(null)
+
+    // Clear input length tracker
+    setCurrentInputLength(0)
+
+    console.log("✅ [AISearchBar] Chat cleared")
+  }
+
+  // Check and update token usage
+  const checkTokenUsage = async () => {
+    try {
+      const { getSessionTokenUsage } = await import(
+        "~services/gemini-nano-service"
+      )
+      const agent = await getGlobalAgent()
+      const sessionId = agent.getSessionId()
+
+      if (sessionId) {
+        const usage = getSessionTokenUsage(sessionId)
+        if (usage) {
+          setTokenUsage(usage)
+
+          // Log token usage for debugging
+          console.log(
+            `📊 [Token Usage] ${usage.usage}/${usage.quota} tokens (${usage.percentage.toFixed(1)}% used) - ${(usage.quota - usage.usage).toFixed(0)} remaining`
+          )
+
+          // Warn if approaching limit
+          if (usage.percentage >= 80) {
+            console.warn(
+              `⚠️ [Token Warning] Approaching token limit! ${usage.percentage.toFixed(1)}% used`
+            )
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to check token usage:", error)
+    }
+  }
+
+  // Estimate token count (rough approximation: ~4 chars per token)
+  const estimateTokens = (text: string): number => {
+    // Rule of thumb: 1 token ≈ 4 characters or 0.75 words
+    return Math.ceil(text.length / 4)
+  }
+
+  // Validate if input would exceed safe token limits
+  const validateInputSize = (
+    inputText: string
+  ): { valid: boolean; reason?: string } => {
+    const estimatedInputTokens = estimateTokens(inputText)
+    const MAX_INPUT_TOKENS = 2000 // Safe threshold for single message (leaves room for response)
+    const SAFE_SESSION_THRESHOLD = 7000 // Don't allow new messages if session already at 7000 tokens
+
+    // Check 1: Input itself is too large
+    if (estimatedInputTokens > MAX_INPUT_TOKENS) {
+      return {
+        valid: false,
+        reason: `Input too long (~${estimatedInputTokens} tokens). Please limit to ${MAX_INPUT_TOKENS} tokens (~${MAX_INPUT_TOKENS * 4} characters).`
+      }
+    }
+
+    // Check 2: Session already too full
+    if (tokenUsage && tokenUsage.usage >= SAFE_SESSION_THRESHOLD) {
+      return {
+        valid: false,
+        reason: `Session limit reached (${tokenUsage.usage}/${tokenUsage.quota} tokens). Please start a new chat.`
+      }
+    }
+
+    // Check 3: Combined would exceed quota
+    if (tokenUsage) {
+      const projectedTotal = tokenUsage.usage + estimatedInputTokens + 500 // +500 for response
+      if (projectedTotal > tokenUsage.quota) {
+        return {
+          valid: false,
+          reason: `Input would exceed token limit (~${estimatedInputTokens} tokens). ${Math.floor(tokenUsage.quota - tokenUsage.usage - 500)} tokens remaining.`
+        }
+      }
+    }
+
+    return { valid: true }
+  }
+
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault()
 
@@ -252,6 +367,7 @@ export function AISearchBar({
 
       setMessages((prev) => [...prev, userMessage])
       editorRef.current?.setContent("") // Clear editor
+      setCurrentInputLength(0) // Clear input length tracker
       setIsSearching(true)
 
       try {
@@ -312,6 +428,9 @@ export function AISearchBar({
             console.log("Note created, calling onNoteCreated callback")
             onNoteCreated()
           }
+
+          // Check token usage after AI response
+          await checkTokenUsage()
         } else {
           // String response (legacy support - should not happen with new agent)
           const aiMessage: Message = {
@@ -322,6 +441,9 @@ export function AISearchBar({
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, aiMessage])
+
+          // Check token usage after AI response
+          await checkTokenUsage()
         }
       } catch (error) {
         console.error("Search error:", error)
@@ -380,6 +502,31 @@ export function AISearchBar({
 
       // Handle different actions
       switch (action) {
+        case "cancel_note_creation": {
+          // User chose to cancel the note creation flow
+          const userMessage: Message = {
+            id: `user-${Date.now()}`,
+            type: "user",
+            content: "❌ Cancel",
+            timestamp: Date.now()
+          }
+          setMessages((prev) => [...prev, userMessage])
+
+          const cancelMessage: Message = {
+            id: `ai-${Date.now()}`,
+            type: "ai",
+            content:
+              "No problem! Note creation cancelled. How else can I help you?",
+            timestamp: Date.now()
+          }
+          setMessages((prev) => [...prev, cancelMessage])
+
+          // Re-enable input
+          setIsSearching(false)
+          setIsInputDisabled(false)
+          return
+        }
+
         case "auto_generate_both": {
           // User chose to auto-generate both title and category
           const userMessage: Message = {
@@ -1112,9 +1259,29 @@ export function AISearchBar({
           </div>
         </div>
 
-        {/* Right side: Toggle button */}
+        {/* Right side: Clear & Toggle buttons */}
         {messages.length > 0 && (
-          <div className="plasmo-flex-shrink-0">
+          <div className="plasmo-flex-shrink-0 plasmo-flex plasmo-items-center plasmo-gap-1">
+            {/* Clear chat button */}
+            <button
+              onClick={handleClearChat}
+              className="plasmo-p-1 plasmo-rounded plasmo-text-slate-500 hover:plasmo-text-red-600 hover:plasmo-bg-red-50 plasmo-transition-colors"
+              title="Clear conversation">
+              <svg
+                className="plasmo-w-4 plasmo-h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+            </button>
+
+            {/* Toggle chat history button */}
             <button
               onClick={() => setIsChatExpanded(!isChatExpanded)}
               className="plasmo-p-1 plasmo-rounded plasmo-text-slate-500 hover:plasmo-text-slate-700 hover:plasmo-bg-slate-100 plasmo-transition-colors"
@@ -1152,6 +1319,47 @@ export function AISearchBar({
           </div>
         )}
       </div>
+
+      {/* Token Limit Warning Banner */}
+      {tokenUsage && tokenUsage.percentage >= 90 && (
+        <div
+          className={`plasmo-px-4 plasmo-py-3 plasmo-rounded-lg plasmo-border plasmo-flex plasmo-items-start plasmo-gap-3 ${
+            tokenUsage.percentage >= 95
+              ? "plasmo-border-red-300 plasmo-text-red-800"
+              : "plasmo-border-amber-300 plasmo-text-amber-800"
+          }`}>
+          <svg
+            className={`plasmo-w-5 plasmo-h-5 plasmo-flex-shrink-0 plasmo-mt-0.5 ${
+              tokenUsage.percentage >= 95
+                ? "plasmo-text-red-600"
+                : "plasmo-text-amber-600"
+            }`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+            />
+          </svg>
+          <div className="plasmo-flex-1">
+            <div className="plasmo-text-xs plasmo-mb-2">
+              {"Summarizing conversation history"}
+            </div>
+            {/* <button
+              onClick={handleClearChat}
+              className={`plasmo-px-3 plasmo-py-1.5 plasmo-rounded plasmo-text-xs plasmo-font-medium plasmo-transition-colors ${
+                tokenUsage.percentage >= 95
+                  ? "plasmo-bg-red-600 hover:plasmo-bg-red-700 plasmo-text-white"
+                  : "plasmo-bg-amber-600 hover:plasmo-bg-amber-700 plasmo-text-white"
+              }`}>
+              Start New Chat
+            </button> */}
+          </div>
+        </div>
+      )}
 
       {/* Chat Messages */}
       {messages.length > 0 && isChatExpanded && (
@@ -1242,6 +1450,21 @@ export function AISearchBar({
 
       {/* Search Input */}
       <form onSubmit={handleSubmit}>
+        {/* Input length indicator - show if getting close to limit */}
+        {currentInputLength > 4000 && (
+          <div
+            className={`plasmo-px-3 plasmo-py-1 plasmo-text-xs plasmo-mb-2 plasmo-rounded ${
+              currentInputLength > 7000
+                ? "plasmo-bg-red-50 plasmo-text-red-700"
+                : currentInputLength > 6000
+                  ? "plasmo-bg-amber-50 plasmo-text-amber-700"
+                  : "plasmo-bg-blue-50 plasmo-text-blue-700"
+            }`}>
+            Input: {currentInputLength.toLocaleString()} chars
+            {currentInputLength > 7000 && " - Too large! Please reduce."}
+          </div>
+        )}
+
         <div className="plasmo-flex plasmo-items-end plasmo-gap-2 plasmo-bg-slate-50 plasmo-rounded-2xl plasmo-px-4 plasmo-py-3 plasmo-border plasmo-border-slate-200 hover:plasmo-border-slate-300 plasmo-transition-all focus-within:plasmo-border-blue-400 focus-within:plasmo-ring-2 focus-within:plasmo-ring-blue-100">
           {/* Rich Text Editor - takes full width */}
           <div className="plasmo-flex-1 plasmo-min-h-[40px] plasmo-max-h-[200px] plasmo-overflow-y-auto">
@@ -1256,7 +1479,9 @@ export function AISearchBar({
               compact={true}
               onSubmit={handleSubmit}
               onUpdate={() => {
-                // Optional: could track changes if needed
+                // Track input length for validation feedback
+                const currentText = editorRef.current?.getText() || ""
+                setCurrentInputLength(currentText.length)
               }}
             />
           </div>
@@ -1265,8 +1490,19 @@ export function AISearchBar({
           <button
             type="submit"
             className="plasmo-flex-shrink-0 plasmo-w-8 plasmo-h-8 plasmo-bg-slate-900 plasmo-text-white plasmo-rounded-full plasmo-flex plasmo-items-center plasmo-justify-center hover:plasmo-bg-slate-800 plasmo-transition-colors disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed plasmo-mb-0.5"
-            title="Send (Enter)"
-            disabled={isSearching || isInputDisabled}>
+            title={
+              currentInputLength > 8000
+                ? "Input too large (max 8000 chars)"
+                : tokenUsage && tokenUsage.usage >= 7000
+                  ? "Session limit reached - start new chat"
+                  : "Send (Enter)"
+            }
+            disabled={
+              isSearching ||
+              isInputDisabled ||
+              currentInputLength > 8000 ||
+              (tokenUsage !== null && tokenUsage.usage >= 7000)
+            }>
             <svg
               className="plasmo-w-4 plasmo-h-4"
               fill="none"

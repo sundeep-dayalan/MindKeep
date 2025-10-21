@@ -476,6 +476,20 @@ export async function promptWithSession(
       metadata.lastUsedAt = new Date()
     }
 
+    // Check token usage BEFORE prompting
+    const currentUsage = session.inputUsage || 0
+    const quota = session.inputQuota || 9216
+    const usagePercent = (currentUsage / quota) * 100
+
+    if (usagePercent >= 90) {
+      console.warn(
+        `⚠️ [Session] Token limit nearly reached: ${currentUsage}/${quota} tokens (${usagePercent.toFixed(1)}%)`
+      )
+      console.warn(
+        `⚠️ [Session] Consider calling agent.clearSession() to reset conversation history`
+      )
+    }
+
     // Prompt the session (history is tracked automatically by native API)
     const response = await session.prompt(prompt, {
       signal: options.signal,
@@ -562,6 +576,56 @@ export async function* promptStreamWithSession(
     }
     throw error
   }
+}
+
+/**
+ * Check if a session is approaching token limits
+ * Returns percentage of quota used
+ *
+ * @param sessionId - The session to check
+ * @returns Usage percentage (0-100) or null if session not found
+ */
+export function getSessionTokenUsage(sessionId: string): {
+  usage: number
+  quota: number
+  percentage: number
+} | null {
+  const session = sessionStore.get(sessionId)
+  const metadata = sessionMetadata.get(sessionId)
+
+  if (!session || !metadata) {
+    return null
+  }
+
+  const usage = session.inputUsage || 0
+  const quota = session.inputQuota || 9216
+  const percentage = (usage / quota) * 100
+
+  return {
+    usage,
+    quota,
+    percentage
+  }
+}
+
+/**
+ * Check if a session needs to be cleared (approaching token limit)
+ *
+ * @param sessionId - The session to check
+ * @param threshold - Percentage threshold (default: 80%)
+ * @returns true if usage exceeds threshold
+ */
+export function shouldClearSession(
+  sessionId: string,
+  threshold: number = 80
+): boolean {
+  const usage = getSessionTokenUsage(sessionId)
+
+  if (!usage) {
+    return false
+  }
+
+  return usage.percentage >= threshold
 }
 
 /**

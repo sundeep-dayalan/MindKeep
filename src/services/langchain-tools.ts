@@ -445,7 +445,7 @@ export const createNoteFromChatTool = new DynamicStructuredTool({
   - "add this as note with title Amazon"
   
   The tool intelligently handles missing parameters:
-  - If content is missing, uses the last user message
+  - If content is missing but this is a confirmation phrase, it should already be extracted from conversation
   - If title is missing, either requests clarification or auto-generates
   - If category is missing, suggests existing categories or auto-generates
   
@@ -460,7 +460,7 @@ export const createNoteFromChatTool = new DynamicStructuredTool({
 
       // Determine what's missing
       const missingParams = {
-        content: !content,
+        content: !content || content.trim() === "",
         title: !title,
         category: !category
       }
@@ -473,6 +473,9 @@ export const createNoteFromChatTool = new DynamicStructuredTool({
       // If content is missing, we need to signal that we should use conversation history
       // This will be handled by the agent layer
       if (missingParams.content) {
+        console.error(
+          "[Tool: create_note_from_chat] Content is missing! This should have been extracted by the agent."
+        )
         return JSON.stringify({
           success: false,
           needsClarification: true,

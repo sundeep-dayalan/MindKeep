@@ -134,54 +134,6 @@ function estimateTokens(text: string): number {
 }
 
 /**
- * Extract structured data (passwords, emails, codes, URLs) from note content
- * @param noteContent The content to extract from
- * @returns Object containing extracted structured data and a summary
- */
-function extractStructuredData(noteContent: string): {
-  passwords: string[]
-  emails: string[]
-  codes: string[]
-  urls: string[]
-  structuredSummary: string
-} {
-  // Regex patterns for common data types
-  const patterns = {
-    passwords: /(?:password|pass|pwd|pw)[\s:]*([^\s\n,;]+)/gi,
-    emails: /[\w\.-]+@[\w\.-]+\.\w+/gi,
-    codes: /[A-Z0-9]{4,}-[A-Z0-9]{4,}/gi,
-    urls: /https?:\/\/[^\s]+/gi
-  }
-
-  // Extract all structured data
-  const extracted = {
-    passwords: [...noteContent.matchAll(patterns.passwords)].map((m) => m[1]),
-    emails: [...noteContent.matchAll(patterns.emails)].map((m) => m[0]),
-    codes: [...noteContent.matchAll(patterns.codes)].map((m) => m[0]),
-    urls: [...noteContent.matchAll(patterns.urls)].map((m) => m[0])
-  }
-
-  // Create a compact summary of structured data
-  const parts: string[] = []
-  if (extracted.passwords.length > 0) {
-    parts.push(`Passwords: ${extracted.passwords.join(", ")}`)
-  }
-  if (extracted.emails.length > 0) {
-    parts.push(`Emails: ${extracted.emails.join(", ")}`)
-  }
-  if (extracted.codes.length > 0) {
-    parts.push(`Codes: ${extracted.codes.join(", ")}`)
-  }
-  if (extracted.urls.length > 0) {
-    parts.push(`URLs: ${extracted.urls.join(", ")}`)
-  }
-
-  const structuredSummary = parts.join("\n")
-
-  return { ...extracted, structuredSummary }
-}
-
-/**
  * Extract relevant content based on query keywords (query-aware truncation)
  * @param noteContent The full note content
  * @param query The user's search query
@@ -367,6 +319,36 @@ export class MindKeepAgent {
   }
 
   /**
+   * Get the current session ID
+   */
+  getSessionId(): string | null {
+    return this.sessionId
+  }
+
+  /**
+   * Clear the conversation session and start fresh
+   * Destroys the current session and creates a new one
+   */
+  async clearSession(): Promise<void> {
+    console.log("🧹 [Agent] Clearing conversation session...")
+
+    // Destroy the current session
+    await GeminiNanoService.destroySession(this.sessionId)
+
+    // Create a new session with the same configuration
+    this.sessionId = await GeminiNanoService.createSession({
+      systemPrompt: this.buildSystemPrompt(),
+      temperature: this.temperature,
+      topK: this.topK
+    })
+
+    // Clear last user message
+    this.lastUserMessage = null
+
+    console.log(`✅ [Agent] Session cleared. New session: ${this.sessionId}`)
+  }
+
+  /**
    * Get available tools based on current mode
    * DEFAULT mode: All tools
    * PERSONA mode: Search-only tools (search_notes, get_note)
@@ -477,35 +459,8 @@ When helping users:
           // Preserve original content length for logging
           const originalLength = note.content?.length || 0
 
-          // Step 1: Try structured data extraction first (for password/email queries)
-          const structured = extractStructuredData(note.content || "")
-          const hasStructuredData =
-            structured.passwords.length > 0 ||
-            structured.emails.length > 0 ||
-            structured.codes.length > 0 ||
-            structured.urls.length > 0
-
-          if (hasStructuredData) {
-            console.log(
-              `[Optimizer] Found structured data in note ${note.id}: ${structured.passwords.length} passwords, ${structured.emails.length} emails, ${structured.codes.length} codes`
-            )
-
-            // For queries about passwords/emails/codes, prioritize structured data
-            // Keep structured summary + some context from original content
-            const contextSnippet = extractRelevantContent(
-              note.content || "",
-              query,
-              200
-            )
-            note.content = `${structured.structuredSummary}\n\nContext: ${contextSnippet}`
-          } else {
-            // Step 2: Query-guided extraction for non-structured data
-            note.content = extractRelevantContent(
-              note.content || "",
-              query,
-              400
-            )
-          }
+          // Apply query-aware content extraction to fit within token budget
+          note.content = extractRelevantContent(note.content || "", query, 400)
 
           console.log(
             `[Optimizer] Optimized note ${note.id}: ${originalLength} → ${note.content.length} chars`
@@ -580,31 +535,6 @@ When helping users:
     // Track the last user message for note creation from chat
     this.lastUserMessage = input
 
-    // Handle special debug commands
-    if (input.toLowerCase() === "/history") {
-      return {
-        extractedData: null,
-        referenceNotes: [],
-        aiResponse:
-          "📊 Session history is managed automatically by the native Prompt API. " +
-          JSON.stringify(conversationHistory, null, 2)
-      }
-    }
-    if (input.toLowerCase() === "/clear") {
-      // Recreate session to clear history
-      await GeminiNanoService.destroySession(this.sessionId)
-      this.sessionId = await GeminiNanoService.createSession({
-        systemPrompt: this.buildSystemPrompt(),
-        temperature: this.temperature,
-        topK: this.topK
-      })
-      return {
-        extractedData: null,
-        referenceNotes: [],
-        aiResponse: "✅ Conversation history cleared. Starting fresh!"
-      }
-    }
-
     try {
       // Step 1: Determine which tools to use (if any)
       const toolsNeeded = await this.selectTools(input, this.sessionId)
@@ -662,39 +592,44 @@ When helping users:
             ? `You are MindKeep AI, operating as "${this.activePersona.name}". ${this.activePersona.description}`
             : `You are MindKeep AI, a helpful assistant for managing personal notes.`
 
+        // Build conversation context from history (last 5 messages)
+        let conversationContext = ""
+        if (conversationHistory && conversationHistory.length > 0) {
+          const recentHistory = conversationHistory.slice(-5)
+          conversationContext =
+            "\n\nRecent conversation:\n" +
+            recentHistory
+              .map(
+                (msg) =>
+                  `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`
+              )
+              .join("\n")
+        }
+
         const conversationPrompt = `${baseIntro}
+${conversationContext}
 
-User said: "${input}"
+Current user message: "${input}"
 
-This is a general conversation or greeting. Respond naturally and helpfully. Keep it brief (1-2 sentences).
+This is a general conversation or greeting. Respond naturally and helpfully based on the conversation context. Keep it brief (1-2 sentences).
 ${this.mode === AgentMode.PERSONA && this.activePersona ? `Stay in character as ${this.activePersona.name}.` : ""}
+
+IMPORTANT: 
+- If the user is asking about something mentioned in the recent conversation, reference it in your response
+- Be contextually aware and maintain conversation flow
+- If asked "do you know why...", check if the reason was mentioned in the conversation context above
 
 Examples:
 - "Hello" → "Hi! I'm MindKeep AI. I can help you search your notes, create new notes, or answer questions about your saved information."
 - "Thanks" → "You're welcome! Let me know if you need anything else."
 - "How are you?" → "I'm doing great! How can I help you with your notes today?"
+- With context [User: "I got hurt"] + "do you know why i am sad?" → "Yes, you mentioned that you got hurt. I'm sorry to hear that."
 
-Respond with ONLY the natural conversational text, no JSON or formatting.
-
-Also detect the context of the conversation to respond appropriately. Be natural and make sure context is considered.`
+Respond with ONLY the natural conversational text, no JSON or formatting.`
 
         console.log(
-          `💬 [Agent] Generating conversational response in ${this.mode} mode`
+          `💬 [Agent] Generating conversational response in ${this.mode} mode with context`
         )
-
-        // Use executePrompt directly to get a clean response without session contamination
-        // const conversationalResponse = await GeminiNanoService.executePrompt(
-        //   conversationPrompt,
-        //   {
-        //     initialPrompts: [
-        //       {
-        //         role: "system",
-        //         content:
-        //           "You are a friendly AI assistant. Respond conversationally and naturally. Never use JSON formatting in your responses."
-        //       }
-        //     ]
-        //   }
-        // )
 
         const responseText = await GeminiNanoService.promptWithSession(
           this.sessionId!,
@@ -795,7 +730,7 @@ Also detect the context of the conversation to respond appropriately. Be natural
                 clarificationOptions: [
                   {
                     type: "button",
-                    label: "Yes, move it",
+                    label: "✅ Yes, move it",
                     value: {
                       action: "confirm_organize",
                       noteId: organizeData.noteId,
@@ -806,7 +741,7 @@ Also detect the context of the conversation to respond appropriately. Be natural
                   },
                   {
                     type: "button",
-                    label: "No, keep it here",
+                    label: "❌ No, keep it here",
                     value: {
                       action: "confirm_organize",
                       noteId: organizeData.noteId,
@@ -973,6 +908,20 @@ NOTE: You are in PERSONA mode. You can ONLY search and read notes. You CANNOT cr
 - create_note_from_chat: Create a NEW note from the conversation. Use when user wants to ADD, SAVE, CREATE, or MAKE a note. Keywords: "add note", "save note", "create note", "make note", "add this", "save this", "new note".
 - none: ONLY for greetings (hi, hello, thanks) or meta questions about the conversation itself (what did we talk about?).`
 
+    // Build conversation context for note creation detection
+    let conversationContext = ""
+    if (this.conversationHistory && this.conversationHistory.length > 0) {
+      const recentHistory = this.conversationHistory.slice(-4) // Last 4 messages
+      conversationContext =
+        "\n\nRecent conversation context:\n" +
+        recentHistory
+          .map(
+            (msg) =>
+              `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`
+          )
+          .join("\n")
+    }
+
     const toolSelectionPrompt = `You are an expert at understanding user requests and routing them to the correct tool.
 Analyze the user's query and determine which tool is most appropriate.
 
@@ -985,25 +934,44 @@ CRITICAL RULES:
 - "How many notes", "how many in each category", "statistics", "note counts" → use "get_statistics"
 - CREATE NOTE keywords: "add", "save", "create", "make" + "note" → use "create_note_from_chat"
   Examples: "add this as note", "save as note", "can you add this", "create a note", "make this a note", "add a new note"
+- REFERENTIAL NOTE CREATION: "add that as note", "save that", "can u add that" → extract content from PREVIOUS USER MESSAGE in conversation context
+- CONFIRMATION phrases for note creation: "yes", "yea", "yeah", "go for it", "do it", "sure", "ok", "okay" → IF the assistant JUST offered to create a note in the conversation context, use "create_note_from_chat" and extract content from the previous user message
 
 CRITICAL for create_note_from_chat - READ CAREFULLY:
-- note_content: Extract the text to be saved (usually the content before "create note" or "add as note" and dont forget to remove that user phrase from content)
+- note_content: 
+  * **PRESERVE FULL CONTENT** - Do NOT summarize, shorten, or extract only the first paragraph
+  * If user pastes/shares LONG text (articles, lists, multiple paragraphs), include **EVERYTHING** they shared - the ENTIRE text from start to finish
+  * If query contains "that" (e.g., "add that as note"), extract **FULL CONTENT** from the MOST RECENT PREVIOUS USER MESSAGE in conversation context
+  * If query contains "this" without inline content (e.g., "add this as note"), extract **FULL CONTENT** from the MOST RECENT PREVIOUS USER MESSAGE in conversation context
+  * If query is a confirmation phrase ("yes", "go for it", etc.), extract **FULL CONTENT** from the PREVIOUS USER MESSAGE in conversation context  
+  * If query contains the actual content (e.g., "Money Heist is... - add as note"), extract the **COMPLETE CONTENT** from the current query
+  * NEVER use placeholder values like "..." - ALWAYS extract the ACTUAL text content from the conversation context
+  * NEVER truncate or summarize - users want to save the FULL text they shared, not a summary
+  * LOOK AT THE CONVERSATION CONTEXT ABOVE to find the REAL content to save
 - note_title: MUST be null UNLESS user says "with title X" or "titled X" 
 - note_category: MUST be null UNLESS user says "under X category" or "in X category"
 - DEFAULT VALUES: note_title=null, note_category=null
 - DO NOT generate, infer, or guess title/category from content - always use null unless explicitly stated
+${conversationContext}
 
-User Query: "${query}"
+Current User Query: "${query}"
 
 Your task is to respond with a JSON object that strictly follows this schema:
 {
   "tool": "tool_name",
   "search_query": "text", // ONLY if tool is "search_notes"
   "note_id": "id", // ONLY if tool is "get_note"
-  "note_content": "text to save", // ONLY if tool is "create_note_from_chat"
+  "note_content": "COMPLETE FULL TEXT - NO TRUNCATION OR SUMMARY", // ONLY if tool is "create_note_from_chat" - Include EVERYTHING the user shared, from start to finish, word-for-word
   "note_title": null, // ONLY if tool is "create_note_from_chat" - USE null unless user explicitly provides title
   "note_category": null // ONLY if tool is "create_note_from_chat" - USE null unless user explicitly provides category
 }
+
+CRITICAL: For note_content, you MUST extract the **COMPLETE FULL TEXT** from the conversation context above. 
+- DO NOT summarize or shorten the content
+- DO NOT extract only the first paragraph or first few sentences
+- DO NOT use placeholder values like "..."
+- If the user shared a long article/list/text, include EVERY WORD from start to finish
+- Look at the recent conversation context and copy the **ENTIRE TEXT** word-for-word from the previous user message
 
 **Examples:**
 - Query: "find my password for netflix" -> {"tool": "search_notes", "search_query": "netflix password"}
@@ -1021,14 +989,35 @@ Your task is to respond with a JSON object that strictly follows this schema:
 CREATE NOTE EXAMPLES (note_title and note_category are null by default):
 - Query: "Manhattan is a borough... - create a note" -> {"tool": "create_note_from_chat", "note_content": "Manhattan is a borough...", "note_title": null, "note_category": null}
 - Query: "IBM completed certification... - can you add as note" -> {"tool": "create_note_from_chat", "note_content": "IBM completed certification...", "note_title": null, "note_category": null}
-- Query: "can u add this a new note?" -> {"tool": "create_note_from_chat", "note_content": "...", "note_title": null, "note_category": null}
-- Query: "add this as a note" -> {"tool": "create_note_from_chat", "note_content": "...", "note_title": null, "note_category": null}
-- Query: "make this a note" -> {"tool": "create_note_from_chat", "note_content": "...", "note_title": null, "note_category": null}
-- Query: "create a note from this" -> {"tool": "create_note_from_chat", "note_content": "...", "note_title": null, "note_category": null}
 - Query: "Figma AI info... save this as note" -> {"tool": "create_note_from_chat", "note_content": "Figma AI info...", "note_title": null, "note_category": null}
 - Query: "add this as note with title AWS Tips" -> {"tool": "create_note_from_chat", "note_content": "...", "note_title": "AWS Tips", "note_category": null}
 - Query: "save under passwords category" -> {"tool": "create_note_from_chat", "note_content": "...", "note_title": null, "note_category": "passwords"}
 - Query: "create note titled Netflix with password 123 under passwords" -> {"tool": "create_note_from_chat", "note_content": "password 123", "note_title": "Netflix", "note_category": "passwords"}
+
+REFERENTIAL NOTE CREATION (extract FULL COMPLETE content from previous user message in conversation context):
+- Context: [User: "Money Heist is a Spanish heist series created by Álex Pina. The story follows a group of robbers who plan and execute heists on the Royal Mint of Spain and the Bank of Spain.", Assistant: "The query is about the TV series Money Heist..."]
+  Query: "can u add that as note?" -> {"tool": "create_note_from_chat", "note_content": "Money Heist is a Spanish heist series created by Álex Pina. The story follows a group of robbers who plan and execute heists on the Royal Mint of Spain and the Bank of Spain.", "note_title": null, "note_category": null}
+- Context: [User: "The Eiffel Tower is 330m tall and was built in 1889", Assistant: "Interesting fact!"]
+  Query: "save that as a note" -> {"tool": "create_note_from_chat", "note_content": "The Eiffel Tower is 330m tall and was built in 1889", "note_title": null, "note_category": null}
+- Context: [User: "My Netflix password is abc123 and email is user@example.com", Assistant: "I can help you save that"]
+  Query: "can u add that" -> {"tool": "create_note_from_chat", "note_content": "My Netflix password is abc123 and email is user@example.com", "note_title": null, "note_category": null}
+- Context: [User: "Tirupati Travel Guide:\n\n1. Sri Venkateswara Temple - Main attraction\n2. Sri Kapileswara Swamy Temple - Ancient Shiva temple\n3. Silathoranam - Natural rock arch\n4. TTD Gardens - 460 acres of gardens\n\nBest time to visit: November to February", Assistant: "Great travel information about Tirupati!"]
+  Query: "Add this as note" -> {"tool": "create_note_from_chat", "note_content": "Tirupati Travel Guide:\n\n1. Sri Venkateswara Temple - Main attraction\n2. Sri Kapileswara Swamy Temple - Ancient Shiva temple\n3. Silathoranam - Natural rock arch\n4. TTD Gardens - 460 acres of gardens\n\nBest time to visit: November to February", "note_title": null, "note_category": null}
+
+INLINE CONTENT (content in current query, extract from query itself):
+- Query: "The sky is blue - add this as a note" -> {"tool": "create_note_from_chat", "note_content": "The sky is blue", "note_title": null, "note_category": null}
+- Query: "add this as a note: Paris is the capital of France" -> {"tool": "create_note_from_chat", "note_content": "Paris is the capital of France", "note_title": null, "note_category": null}
+- Query: "make this a note - Tokyo is in Japan" -> {"tool": "create_note_from_chat", "note_content": "Tokyo is in Japan", "note_title": null, "note_category": null}
+- Query: "save under passwords category" -> {"tool": "create_note_from_chat", "note_content": "...", "note_title": null, "note_category": "passwords"}
+- Query: "create note titled Netflix with password 123 under passwords" -> {"tool": "create_note_from_chat", "note_content": "password 123", "note_title": "Netflix", "note_category": "passwords"}
+
+CONFIRMATION EXAMPLES (extract content from previous user message in context):
+- Context: [User: "I got hurt so i am sad", Assistant: "Would you like to write about how you're feeling? I can create a new note for that."]
+  Query: "yea. go for it" -> {"tool": "create_note_from_chat", "note_content": "I got hurt so i am sad", "note_title": null, "note_category": null}
+- Context: [User: "Meeting notes from today...", Assistant: "I can save that as a note if you'd like?"]
+  Query: "yes please" -> {"tool": "create_note_from_chat", "note_content": "Meeting notes from today...", "note_title": null, "note_category": null}
+- Context: [User: "Here's my password: abc123", Assistant: "Would you like me to create a note for that?"]
+  Query: "sure" -> {"tool": "create_note_from_chat", "note_content": "Here's my password: abc123", "note_title": null, "note_category": null}
 
 Respond with ONLY the JSON object and nothing else.`
 
@@ -1406,8 +1395,7 @@ Begin analysis. Respond ONLY with a complete JSON object with all 5 required fie
       extractionPrompt
     )
     try {
-      const jsonStringResponse = await GeminiNanoService.promptWithSession(
-        sessionId,
+      const jsonStringResponse = await GeminiNanoService.executePrompt(
         extractionPrompt,
         {
           responseConstraint: { schema: jsonSchema }
@@ -1975,6 +1963,12 @@ ${this.activePersona ? `- Active persona: ${this.activePersona.name}` : ""}`
         value: "manual_flow",
         action: "start_manual_flow"
       })
+      options.push({
+        type: "button",
+        label: "❌ Cancel",
+        value: "cancel",
+        action: "cancel_note_creation"
+      })
 
       // Return early - don't show individual title/category options yet
       return options
@@ -1993,6 +1987,12 @@ ${this.activePersona ? `- Active persona: ${this.activePersona.name}` : ""}`
         label: "I'll provide a title",
         value: "manual",
         action: "manual_title"
+      })
+      options.push({
+        type: "button",
+        label: "❌ Cancel",
+        value: "cancel",
+        action: "cancel_note_creation"
       })
     }
 
@@ -2035,6 +2035,14 @@ ${this.activePersona ? `- Active persona: ${this.activePersona.name}` : ""}`
         label: "I'll provide a category",
         value: "manual",
         action: "manual_category"
+      })
+
+      // Always add cancel option
+      options.push({
+        type: "button",
+        label: "❌ Cancel",
+        value: "cancel",
+        action: "cancel_note_creation"
       })
     }
 
