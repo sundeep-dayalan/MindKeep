@@ -6,6 +6,7 @@ import {
   type RichTextEditorRef
 } from "~components/RichTextEditor"
 import { generateTitle, summarizeText } from "~services/ai-service"
+import { markdownToTipTapHTML } from "~util/markdown-to-tiptap"
 
 interface NoteEditorProps {
   title: string
@@ -103,8 +104,14 @@ export function NoteEditor({
 
     setIsSummarizing(true)
     try {
-      const summary = await summarizeText(contentPlaintext)
-      editorRef.current?.setContent(summary)
+      // Get markdown summary from AI
+      const markdownSummary = await summarizeText(contentPlaintext)
+
+      // Convert markdown to HTML for TipTap
+      const richHTML = await markdownToTipTapHTML(markdownSummary)
+
+      // Set the rich HTML content in the editor
+      editorRef.current?.setContent(richHTML)
 
       const totalTime = performance.now() - startTime
       console.log(
