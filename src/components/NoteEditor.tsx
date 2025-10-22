@@ -106,10 +106,10 @@ export function NoteEditor({
     try {
       // Get markdown summary from AI
       const markdownSummary = await summarizeText(contentPlaintext)
-      
+
       // Convert markdown to HTML for TipTap
       const richHTML = await markdownToTipTapHTML(markdownSummary)
-      
+
       // Set the rich HTML content in the editor
       editorRef.current?.setContent(richHTML)
 

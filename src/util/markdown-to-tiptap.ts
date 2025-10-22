@@ -7,7 +7,7 @@ import { marked } from "marked"
 
 /**
  * Convert markdown text to HTML that TipTap can parse
- * 
+ *
  * @param markdown - Markdown string (e.g., AI-generated summary)
  * @returns HTML string that can be passed to editor.setContent()
  */
