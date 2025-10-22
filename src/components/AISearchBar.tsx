@@ -29,6 +29,7 @@ interface AISearchBarProps {
   ) => Promise<string | AgentResponse>
   onNoteCreated?: () => void // Callback when a note is successfully created
   onNotesChange?: () => Promise<void> // Callback when notes are modified (e.g., category changed)
+  onMessagesChange?: (hasMessages: boolean) => void // Callback when messages are added/cleared
   className?: string
 }
 
@@ -145,6 +146,7 @@ export function AISearchBar({
   onSearch,
   onNoteCreated,
   onNotesChange,
+  onMessagesChange,
   className = ""
 }: AISearchBarProps) {
   const [messages, setMessages] = React.useState<Message[]>([])
@@ -174,6 +176,13 @@ export function AISearchBar({
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const editorRef = React.useRef<RichTextEditorRef>(null)
+
+  // Notify parent when messages change
+  React.useEffect(() => {
+    if (onMessagesChange) {
+      onMessagesChange(messages.length > 0)
+    }
+  }, [messages.length, onMessagesChange])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })

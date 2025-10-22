@@ -62,10 +62,16 @@ export const Tabs = ({
         return propTabs
       }
 
-      // Otherwise, just update counts while preserving order
+      // Otherwise, update counts AND content while preserving order
       return prevTabs.map((tab) => {
         const matchingPropTab = propTabs.find((pt) => pt.value === tab.value)
-        return matchingPropTab ? { ...tab, count: matchingPropTab.count } : tab
+        return matchingPropTab
+          ? {
+              ...tab,
+              count: matchingPropTab.count,
+              content: matchingPropTab.content
+            }
+          : tab
       })
     })
   }, [propTabs])

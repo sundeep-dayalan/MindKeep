@@ -8,7 +8,6 @@ import { AnimatedCategoryTabs } from "~components/AnimatedCategoryTabs"
 import { Header } from "~components/Header"
 import { NoteEditor, type RichTextEditorRef } from "~components/NoteEditor"
 import { PersonaManager } from "~components/PersonaManager"
-import { SearchBar } from "~components/SearchBar"
 import { generateEmbedding, generateTitle } from "~services/ai-service"
 import {
   deleteNote,
@@ -352,15 +351,10 @@ function SidePanel() {
 
   // Handle search input change with auto-search
   const handleSearchInput = (value: string) => {
+    console.log("🔍 [Search] Query changed to:", value)
     setSearchQuery(value)
-    // Auto-search as user types
-    if (value.trim()) {
-      setTimeout(() => {
-        searchNotesByTitle(value).then(setNotes).catch(console.error)
-      }, 300)
-    } else {
-      loadData()
-    }
+    // Note: Filtering is done via filteredNotes, no need for async search here
+    // Just update the query and let React handle the filtering
   }
 
   const handleAISearch = async (
@@ -394,16 +388,22 @@ function SidePanel() {
     }
   }
 
-  // Filter notes
+  // Filter notes by search query only
+  // Category filtering is handled by AnimatedCategoryTabs component
   const filteredNotes = notes.filter((note) => {
-    const matchesCategory =
-      selectedCategory === "all" || note.category === selectedCategory
     const matchesSearch =
       searchQuery === "" ||
       note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      note.content.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesCategory && matchesSearch
+      note.contentPlaintext.toLowerCase().includes(searchQuery.toLowerCase())
+    return matchesSearch
   })
+
+  // Debug logging for search
+  if (searchQuery) {
+    console.log(
+      `🔍 [Search] Query: "${searchQuery}", Total notes: ${notes.length}, Filtered: ${filteredNotes.length}`
+    )
+  }
 
   return (
     <div className="plasmo-w-full plasmo-h-screen plasmo-bg-slate-50 plasmo-overflow-hidden">
@@ -412,7 +412,11 @@ function SidePanel() {
         <Header
           onClose={handleClose}
           onPersonasClick={handlePersonasClick}
+          onCreateNote={handleCreateNew}
           view={view}
+          searchValue={searchQuery}
+          onSearchChange={handleSearchInput}
+          onSearchClear={clearSearchQuery}
         />
 
         {/* Content */}
@@ -442,34 +446,17 @@ function SidePanel() {
             </div>
           ) : view === "list" ? (
             <>
-              {/* Sticky Top Section - AI Banner, Search, Create Button */}
+              {/* Sticky Top Section - AI Banner only */}
               <div className="plasmo-flex-shrink-0 plasmo-bg-slate-50 plasmo-px-4 plasmo-pt-4">
                 {/* AI Status Banner */}
                 <AIStatusBanner />
-
-                {/* Search and Actions */}
-                <div className="plasmo-mb-4 plasmo-space-y-3">
-                  <SearchBar
-                    value={searchQuery}
-                    onChange={handleSearchInput}
-                    onClear={clearSearchQuery}
-                    onSearch={handleSearch}
-                  />
-
-                  <button
-                    onClick={handleCreateNew}
-                    disabled={loading}
-                    className="plasmo-w-full plasmo-px-4 plasmo-py-2 plasmo-bg-green-500 plasmo-text-white plasmo-rounded-lg plasmo-text-sm plasmo-font-medium hover:plasmo-bg-green-600 plasmo-transition-colors disabled:plasmo-opacity-50">
-                    + Create New Note
-                  </button>
-                </div>
               </div>
 
               {/* Category Tabs and Scrollable Notes Section */}
               <div className="plasmo-flex-1 plasmo-flex plasmo-flex-col plasmo-overflow-hidden plasmo-pb-32">
                 <AnimatedCategoryTabs
                   categories={categories}
-                  notes={notes}
+                  notes={filteredNotes}
                   selectedCategory={selectedCategory}
                   onCategoryChange={(category) => {
                     setSelectedCategory(category)
@@ -502,7 +489,7 @@ function SidePanel() {
 
           {/* Fixed Bottom Search Bar - hide in personas view */}
           {view !== "personas" && (
-            <div className="plasmo-fixed plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-bg-white plasmo-border-t plasmo-border-slate-200 plasmo-shadow-lg plasmo-p-4">
+            <div className="plasmo-fixed plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-bg-white plasmo-border-t plasmo-border-slate-200 plasmo-shadow-lg plasmo-p-4 plasmo-z-50">
               <AISearchBar
                 placeholder="Ask me anything..."
                 onSearch={handleAISearch}
