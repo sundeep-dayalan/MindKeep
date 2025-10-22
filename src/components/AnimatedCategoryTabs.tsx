@@ -1,6 +1,7 @@
 import type { Note } from "~services/db-service"
 
 import { NoteCard } from "./NoteCard"
+import { BentoGrid } from "./ui/bento-grid"
 import { Tabs } from "./ui/tabs"
 
 interface AnimatedCategoryTabsProps {
@@ -137,15 +138,25 @@ function NotesContent({
   }
 
   return (
-    <div className="plasmo-space-y-3">
-      {notes.map((note) => (
-        <NoteCard
-          key={note.id}
-          note={note}
-          onEdit={onEdit}
-          onDelete={onDelete}
-        />
-      ))}
-    </div>
+    <BentoGrid>
+      {notes.map((note, index) => {
+        // Dynamic column spanning for visual variety
+        // Every 7th card (index 6, 13, 20...) spans 2 columns on tablet+, 3 columns on wide
+        const isWideCard = (index + 1) % 7 === 0
+
+        // Responsive column spanning:
+        // Default (2 cols): Wide cards span 2, normal cards span 1
+        // Desktop (3 cols): Wide cards span 3, normal cards span 1
+        const colSpanClass = isWideCard
+          ? "plasmo-col-span-2 lg:plasmo-col-span-3"
+          : "plasmo-col-span-1"
+
+        return (
+          <div key={note.id} className={colSpanClass}>
+            <NoteCard note={note} onEdit={onEdit} onDelete={onDelete} />
+          </div>
+        )
+      })}
+    </BentoGrid>
   )
 }
