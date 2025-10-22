@@ -9,6 +9,76 @@
   box-sizing: border-box;
 }
 
+/* Hide scrollbar for Aceternity tabs */
+.no-visible-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.no-visible-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Additional scrollbar hiding with Plasmo prefix */
+.plasmo-no-visible-scrollbar {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.plasmo-no-visible-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.plasmo-no-visible-scrollbar::-webkit-scrollbar-track {
+  display: none !important;
+}
+
+.plasmo-no-visible-scrollbar::-webkit-scrollbar-thumb {
+  display: none !important;
+}
+
+/* Force hide scrollbar on overflow-x-auto elements */
+.plasmo-overflow-x-auto::-webkit-scrollbar {
+  display: none !important;
+  height: 0 !important;
+}
+
+.plasmo-overflow-x-auto {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+/* Custom scrollbar for tabs content */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thumb-slate-300::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 3px;
+}
+
+.scrollbar-thumb-slate-300::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;
+}
+
+.scrollbar-track-transparent::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+/* Prevent scroll when content doesn't overflow */
+.plasmo-overflow-y-auto {
+  overflow-y: auto !important;
+}
+
 /* Tiptap Editor Styles */
 .ProseMirror {
   outline: none;

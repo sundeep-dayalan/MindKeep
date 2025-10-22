@@ -4,10 +4,9 @@ import "~style.css"
 
 import { AISearchBar } from "~components/AISearchBar"
 import { AIStatusBanner } from "~components/AIStatusBanner"
-import { CategoryFilter } from "~components/CategoryFilter"
+import { AnimatedCategoryTabs } from "~components/AnimatedCategoryTabs"
 import { Header } from "~components/Header"
 import { NoteEditor, type RichTextEditorRef } from "~components/NoteEditor"
-import { NotesList } from "~components/NotesList"
 import { PersonaManager } from "~components/PersonaManager"
 import { SearchBar } from "~components/SearchBar"
 import { generateEmbedding, generateTitle } from "~services/ai-service"
@@ -417,13 +416,9 @@ function SidePanel() {
         />
 
         {/* Content */}
-        <div
-          className={`plasmo-flex-1 plasmo-overflow-y-auto plasmo-p-4 ${view === "personas" ? "plasmo-pb-4" : "plasmo-pb-20"}`}>
-          {/* AI Status Banner - only show in list view */}
-          {view === "list" && <AIStatusBanner />}
-
+        <div className="plasmo-flex-1 plasmo-flex plasmo-flex-col plasmo-overflow-hidden">
           {view === "personas" ? (
-            <div className="plasmo-h-full">
+            <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-no-visible-scrollbar plasmo-p-4">
               <div className="plasmo-mb-4">
                 <button
                   onClick={handleBackToList}
@@ -447,70 +442,76 @@ function SidePanel() {
             </div>
           ) : view === "list" ? (
             <>
-              {/* Search and Filters */}
-              <div className="plasmo-mb-4 plasmo-space-y-3">
-                <SearchBar
-                  value={searchQuery}
-                  onChange={handleSearchInput}
-                  onClear={clearSearchQuery}
-                  onSearch={handleSearch}
-                />
+              {/* Sticky Top Section - AI Banner, Search, Create Button */}
+              <div className="plasmo-flex-shrink-0 plasmo-bg-slate-50 plasmo-px-4 plasmo-pt-4">
+                {/* AI Status Banner */}
+                <AIStatusBanner />
 
-                <CategoryFilter
+                {/* Search and Actions */}
+                <div className="plasmo-mb-4 plasmo-space-y-3">
+                  <SearchBar
+                    value={searchQuery}
+                    onChange={handleSearchInput}
+                    onClear={clearSearchQuery}
+                    onSearch={handleSearch}
+                  />
+
+                  <button
+                    onClick={handleCreateNew}
+                    disabled={loading}
+                    className="plasmo-w-full plasmo-px-4 plasmo-py-2 plasmo-bg-green-500 plasmo-text-white plasmo-rounded-lg plasmo-text-sm plasmo-font-medium hover:plasmo-bg-green-600 plasmo-transition-colors disabled:plasmo-opacity-50">
+                    + Create New Note
+                  </button>
+                </div>
+              </div>
+
+              {/* Category Tabs and Scrollable Notes Section */}
+              <div className="plasmo-flex-1 plasmo-flex plasmo-flex-col plasmo-overflow-hidden plasmo-pb-32">
+                <AnimatedCategoryTabs
                   categories={categories}
+                  notes={notes}
                   selectedCategory={selectedCategory}
                   onCategoryChange={(category) => {
                     setSelectedCategory(category)
                     clearSearchQuery()
                   }}
+                  onEdit={handleEditNote}
+                  onDelete={handleDeleteNote}
+                  loading={loading}
                 />
-
-                <button
-                  onClick={handleCreateNew}
-                  disabled={loading}
-                  className="plasmo-w-full plasmo-px-4 plasmo-py-2 plasmo-bg-green-500 plasmo-text-white plasmo-rounded-lg plasmo-text-sm plasmo-font-medium hover:plasmo-bg-green-600 plasmo-transition-colors disabled:plasmo-opacity-50">
-                  + Create New Note
-                </button>
               </div>
-
-              {/* Notes List */}
-              <NotesList
-                notes={filteredNotes}
-                loading={loading}
-                onEdit={handleEditNote}
-                onDelete={handleDeleteNote}
-                onCreateNew={handleCreateNew}
-              />
             </>
           ) : (
             /* Editor View */
-            <NoteEditor
-              title={noteTitle}
-              content={noteContent}
-              category={noteCategory}
-              categories={categories}
-              isEditing={!!editingNote}
-              loading={loading}
-              onTitleChange={setNoteTitle}
-              onCategoryChange={setNoteCategory}
-              onSave={handleSaveNote}
-              onCancel={() => setView("list")}
-              externalEditorRef={editorRef}
-            />
+            <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-no-visible-scrollbar plasmo-p-4 plasmo-pb-32">
+              <NoteEditor
+                title={noteTitle}
+                content={noteContent}
+                category={noteCategory}
+                categories={categories}
+                isEditing={!!editingNote}
+                loading={loading}
+                onTitleChange={setNoteTitle}
+                onCategoryChange={setNoteCategory}
+                onSave={handleSaveNote}
+                onCancel={() => setView("list")}
+                externalEditorRef={editorRef}
+              />
+            </div>
+          )}
+
+          {/* Fixed Bottom Search Bar - hide in personas view */}
+          {view !== "personas" && (
+            <div className="plasmo-fixed plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-bg-white plasmo-border-t plasmo-border-slate-200 plasmo-shadow-lg plasmo-p-4">
+              <AISearchBar
+                placeholder="Ask me anything..."
+                onSearch={handleAISearch}
+                onNoteCreated={loadData}
+                onNotesChange={loadData}
+              />
+            </div>
           )}
         </div>
-
-        {/* Fixed Bottom Search Bar - hide in personas view */}
-        {view !== "personas" && (
-          <div className="plasmo-fixed plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-bg-white plasmo-border-t plasmo-border-slate-200 plasmo-shadow-lg plasmo-p-4">
-            <AISearchBar
-              placeholder="Ask me anything..."
-              onSearch={handleAISearch}
-              onNoteCreated={loadData}
-              onNotesChange={loadData}
-            />
-          </div>
-        )}
       </div>
     </div>
   )
