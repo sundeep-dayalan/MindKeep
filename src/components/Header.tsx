@@ -1,6 +1,7 @@
 import { useState } from "react"
 
 import { AnimatedShinyText } from "./ui/AnimatedShinyText"
+import { HoverBorderGradient } from "./ui/hover-border-gradient"
 
 interface HeaderProps {
   onClose: () => void
@@ -122,10 +123,11 @@ export function Header({
 
           {/* Create Note Button - only show in list view when search not expanded */}
           {view === "list" && onCreateNote && !searchExpanded && (
-            <button
+            <HoverBorderGradient
               onClick={onCreateNote}
-              className="plasmo-px-3 plasmo-py-2 plasmo-rounded-lg plasmo-bg-green-500 plasmo-text-white hover:plasmo-bg-green-600 plasmo-transition-colors plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-text-sm plasmo-font-medium plasmo-flex-shrink-0"
-              title="Create New Note">
+              containerClassName="rounded-full"
+              as="button"
+              className="plasmo-dark:bg-black plasmo-bg-blue-300  plasmo-text-white plasmo-dark:text-white flex plasmo-items-center plasmo-space-x-2">
               <svg
                 className="plasmo-w-4 plasmo-h-4"
                 fill="none"
@@ -139,7 +141,7 @@ export function Header({
                 />
               </svg>
               <span>New Note</span>
-            </button>
+            </HoverBorderGradient>
           )}
 
           {/* Personas Management Button - show in all views except when search is expanded */}
