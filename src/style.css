@@ -9,6 +9,29 @@
   box-sizing: border-box;
 }
 
+/* Image optimization for high-quality rendering */
+img {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: optimizeQuality;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Force maximum quality for note card images */
+.plasmo-object-cover {
+  image-rendering: -webkit-optimize-contrast !important;
+  image-rendering: optimizeQuality !important;
+  -webkit-backface-visibility: hidden !important;
+  backface-visibility: hidden !important;
+  transform: translate3d(0, 0, 0) !important;
+  -webkit-transform: translate3d(0, 0, 0) !important;
+}
+
 /* Hide scrollbar for Aceternity tabs */
 .no-visible-scrollbar {
   scrollbar-width: none;

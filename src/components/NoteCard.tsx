@@ -173,12 +173,27 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
       {imageUrl ? (
         // Image background with overlay
         <>
-          <img
-            src={imageUrl}
-            alt={note.title}
-            className="plasmo-absolute plasmo-inset-0 plasmo-w-full plasmo-h-full plasmo-object-cover plasmo-z-0"
+          {/* High-quality image container */}
+          <div 
+            className="plasmo-absolute plasmo-inset-0 plasmo-w-full plasmo-h-full plasmo-z-0 plasmo-overflow-hidden"
             style={{ borderRadius: "12px" }}
-          />
+          >
+            <img
+              src={imageUrl}
+              alt={note.title}
+              className="plasmo-absolute plasmo-inset-0 plasmo-w-full plasmo-h-full plasmo-object-cover"
+              style={{ 
+                imageRendering: "-webkit-optimize-contrast" as any,
+                WebkitFontSmoothing: "antialiased" as any,
+                filter: "contrast(1.02) saturate(1.05)",
+                willChange: "transform",
+                minWidth: "100%",
+                minHeight: "100%"
+              }}
+              loading="eager"
+              decoding="sync"
+            />
+          </div>
 
           {/* Layered gradient blur effect - 0% blur at top, 100% blur at bottom */}
           <div className="plasmo-absolute plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-h-28 plasmo-pointer-events-none plasmo-z-[5]">
