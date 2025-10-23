@@ -266,9 +266,14 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
             <div
               className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-text-xs"
               style={{ color: noteColor.text, opacity: 0.8 }}>
-              <span className="plasmo-font-medium plasmo-truncate plasmo-max-w-[60%]">
+              <div 
+                className="plasmo-font-medium plasmo-truncate plasmo-max-w-[60%] plasmo-px-2 plasmo-py-1 plasmo-rounded-full"
+                style={{ 
+                  backgroundColor: noteColor.border + '40', // 25% opacity
+                  color: noteColor.text
+                }}>
                 {truncatedCategory}
-              </span>
+              </div>
               <span className="plasmo-flex-shrink-0 plasmo-ml-2">
                 {timeAgo}
               </span>
