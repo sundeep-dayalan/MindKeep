@@ -149,16 +149,16 @@ function NotesContent({
 
     // Dynamic height based on content length
     // More granular height distribution for better visual variety
-    let height = 2 // Default: 2 rows (300px)
+    let height = 3 // Default: 2 rows (300px)
 
     if (hasImage) {
       // Images need more vertical space
-      if (contentLength < 100) height = 2
+      if (contentLength < 100) height = 3
       else if (contentLength < 300) height = 3
       else height = 4
     } else {
       // Text-only content
-      if (contentLength < 150) height = 2
+      if (contentLength < 150) height = 3
       else if (contentLength < 350) height = 3
       else if (contentLength < 600) height = 4
       else height = 5

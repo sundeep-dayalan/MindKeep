@@ -142,12 +142,14 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
   return (
     <div
       onClick={handleCardClick}
-      className="plasmo-relative plasmo-group plasmo-cursor-pointer plasmo-transition-all plasmo-duration-200 hover:plasmo-shadow-lg plasmo-bg-white plasmo-shadow-sm plasmo-h-full plasmo-min-h-[200px]"
+      className="plasmo-relative plasmo-group plasmo-cursor-pointer plasmo-transition-all plasmo-duration-200 hover:plasmo-shadow-lg plasmo-bg-white plasmo-shadow-sm plasmo-min-h-[200px]"
       style={{
         borderRadius: "12px",
         overflow: "hidden",
         boxShadow:
-          "inset 0 0 0 1px rgba(59, 130, 246, 0.5), 0 1px 2px 0 rgb(0 0 0 / 0.05)"
+          "inset 0 0 0 1px rgba(59, 130, 246, 0.5), 0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        height: "100%",
+        width: "100%"
       }}>
       {/* Delete button - only show on hover */}
       <button
@@ -174,12 +176,12 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
           <img
             src={imageUrl}
             alt={note.title}
-            className="plasmo-absolute plasmo-inset-0 plasmo-w-full plasmo-h-full plasmo-object-cover"
+            className="plasmo-absolute plasmo-inset-0 plasmo-w-full plasmo-h-full plasmo-object-cover plasmo-z-0"
             style={{ borderRadius: "12px" }}
           />
 
           {/* Layered gradient blur effect - 0% blur at top, 100% blur at bottom */}
-          <div className="plasmo-absolute plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-h-28 plasmo-pointer-events-none">
+          <div className="plasmo-absolute plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-h-28 plasmo-pointer-events-none plasmo-z-[5]">
             <div className="plasmo-absolute plasmo-inset-0 plasmo-bg-gradient-to-t plasmo-from-black/80 plasmo-via-black/40 plasmo-to-transparent" />
             <div
               className="plasmo-absolute plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-h-20 plasmo-backdrop-blur-[8px]"
@@ -195,8 +197,8 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
             />
           </div>
 
-          {/* Text overlay */}
-          <div className="plasmo-absolute plasmo-inset-0 plasmo-flex plasmo-flex-col plasmo-justify-end plasmo-p-3 plasmo-text-white plasmo-z-10">
+          {/* Text overlay - ensure always visible */}
+          <div className="plasmo-absolute plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-p-3 plasmo-text-white plasmo-z-20">
             <h3 className="plasmo-font-semibold plasmo-text-sm plasmo-line-clamp-1 plasmo-mb-1 plasmo-drop-shadow-lg">
               {truncatedTitle}
             </h3>
@@ -213,29 +215,41 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
         </>
       ) : (
         // No image - show TipTap preview with simple white background
-        <div
-          className="plasmo-relative plasmo-h-full plasmo-bg-white plasmo-flex plasmo-flex-col"
-          style={{ borderRadius: "12px", overflow: "hidden" }}>
-          {/* TipTap preview fills remaining space */}
-          <div className="plasmo-flex-1 plasmo-p-3 plasmo-overflow-hidden">
+        <>
+          {/* TipTap preview - fills all space except bottom 65px */}
+          <div
+            className="plasmo-absolute plasmo-top-0 plasmo-left-0 plasmo-right-0 plasmo-bg-white plasmo-p-3 plasmo-overflow-hidden"
+            style={{
+              bottom: "65px",
+              borderTopLeftRadius: "12px",
+              borderTopRightRadius: "12px"
+            }}>
             <TipTapPreview content={note.content} />
           </div>
 
-          {/* Solid white background for text - clean and simple */}
-          <div className="plasmo-bg-white plasmo-border-t plasmo-border-slate-100 plasmo-flex-shrink-0">
-            <div className="plasmo-p-3">
-              <h3 className="plasmo-font-semibold plasmo-text-sm plasmo-line-clamp-1 plasmo-mb-1 plasmo-text-slate-900">
+          {/* Fixed title section at bottom - always visible */}
+          <div
+            className="plasmo-absolute plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-bg-white plasmo-border-t plasmo-border-slate-100 plasmo-z-10"
+            style={{
+              height: "65px",
+              borderBottomLeftRadius: "12px",
+              borderBottomRightRadius: "12px"
+            }}>
+            <div className="plasmo-px-3 plasmo-py-2 plasmo-h-full plasmo-flex plasmo-flex-col plasmo-justify-center">
+              <h3 className="plasmo-font-semibold plasmo-text-sm plasmo-line-clamp-1 plasmo-mb-1.5 plasmo-text-slate-900">
                 {truncatedTitle}
               </h3>
               <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-text-xs plasmo-text-slate-600">
-                <span className="plasmo-font-medium plasmo-truncate plasmo-max-w-[25%]">
+                <span className="plasmo-font-medium plasmo-truncate plasmo-max-w-[60%]">
                   {truncatedCategory}
                 </span>
-                <span>{timeAgo}</span>
+                <span className="plasmo-flex-shrink-0 plasmo-ml-2">
+                  {timeAgo}
+                </span>
               </div>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   )
