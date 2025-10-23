@@ -39,28 +39,28 @@ const getColorForNote = (noteId: string): (typeof COLOR_PALETTE)[0] => {
   return COLOR_PALETTE[index]
 }
 
-// Extract first image URL from TipTap JSON
-const extractImageFromTipTap = (content: string): string | null => {
+// Extract ALL image URLs from TipTap JSON
+const extractImagesFromTipTap = (content: string): string[] => {
   try {
     const json = JSON.parse(content)
+    const images: string[] = []
 
     // Recursively search for image nodes
-    const findImage = (node: any): string | null => {
+    const findImages = (node: any): void => {
       if (node.type === "image" && node.attrs?.src) {
-        return node.attrs.src
+        images.push(node.attrs.src)
       }
       if (node.content && Array.isArray(node.content)) {
         for (const child of node.content) {
-          const img = findImage(child)
-          if (img) return img
+          findImages(child)
         }
       }
-      return null
     }
 
-    return findImage(json)
+    findImages(json)
+    return images
   } catch {
-    return null
+    return []
   }
 }
 
@@ -157,11 +157,15 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
     onDelete(note.id)
   }
 
-  const imageUrl = extractImageFromTipTap(note.content)
+  const imageUrls = extractImagesFromTipTap(note.content)
   const timeAgo = formatTimeAgo(note.updatedAt)
   const truncatedTitle = truncateText(note.title, 80)
   const truncatedCategory = truncateText(note.category, 25)
   const noteColor = getColorForNote(note.id)
+
+  // Show up to 4 images in avatar circles
+  const displayImages = imageUrls.slice(0, 4)
+  const remainingCount = imageUrls.length > 4 ? imageUrls.length - 4 : 0
 
   return (
     <BlurFade className="plasmo-h-full plasmo-w-full">
@@ -171,10 +175,8 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
         style={{
           borderRadius: "12px",
           overflow: "hidden",
-          backgroundColor: imageUrl ? "white" : noteColor.bg,
-          boxShadow: imageUrl
-            ? "inset 0 0 0 1px rgba(59, 130, 246, 0.5), 0 1px 2px 0 rgb(0 0 0 / 0.05)"
-            : `inset 0 0 0 1.5px ${noteColor.border}, 0 1px 2px 0 rgb(0 0 0 / 0.05)`,
+          backgroundColor: noteColor.bg,
+          boxShadow: `inset 0 0 0 1.5px ${noteColor.border}, 0 1px 2px 0 rgb(0 0 0 / 0.05)`,
           height: "100%",
           width: "100%"
         }}>
@@ -197,108 +199,78 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
           </svg>
         </button>
 
-        {imageUrl ? (
-          // Image background with overlay
-          <>
-            {/* High-quality image container */}
-            <div
-              className="plasmo-absolute plasmo-inset-0 plasmo-w-full plasmo-h-full plasmo-z-0 plasmo-overflow-hidden"
-              style={{ borderRadius: "12px" }}>
-              <img
-                src={imageUrl}
-                alt={note.title}
-                className="plasmo-absolute plasmo-inset-0 plasmo-w-full plasmo-h-full plasmo-object-cover"
-                style={{
-                  imageRendering: "-webkit-optimize-contrast" as any,
-                  WebkitFontSmoothing: "antialiased" as any,
-                  filter: "contrast(1.02) saturate(1.05)",
-                  willChange: "transform",
-                  minWidth: "100%",
-                  minHeight: "100%"
-                }}
-                loading="eager"
-                decoding="sync"
-              />
-            </div>
+        {/* TipTap preview - fills all space except bottom 65px */}
+        <div
+          className="plasmo-absolute plasmo-top-0 plasmo-left-0 plasmo-right-0 plasmo-p-3 plasmo-overflow-hidden"
+          style={{
+            bottom: "65px",
+            borderTopLeftRadius: "12px",
+            borderTopRightRadius: "12px",
+            backgroundColor: noteColor.bg
+          }}>
+          <TipTapPreview content={note.content} />
+        </div>
 
-            {/* Layered gradient blur effect - 0% blur at top, 100% blur at bottom */}
-            <div className="plasmo-absolute plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-h-28 plasmo-pointer-events-none plasmo-z-[5]">
-              <div className="plasmo-absolute plasmo-inset-0 plasmo-bg-gradient-to-t plasmo-from-black/80 plasmo-via-black/40 plasmo-to-transparent" />
+        {/* Image avatars in bottom-right corner (if images exist) */}
+        {displayImages.length > 0 && (
+          <div className="plasmo-absolute plasmo-bottom-[70px] plasmo-right-2 plasmo-z-20 plasmo-flex plasmo-items-center plasmo-flex-row-reverse">
+            {remainingCount > 0 && (
               <div
-                className="plasmo-absolute plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-h-20 plasmo-backdrop-blur-[8px]"
+                className="plasmo-w-10 plasmo-h-10 plasmo-rounded-md plasmo-border-2 plasmo-border-white plasmo-bg-slate-700 plasmo-flex plasmo-items-center plasmo-justify-center plasmo-text-white plasmo-text-xs plasmo-font-semibold"
                 style={{
-                  maskImage: "linear-gradient(to top, black, transparent)"
-                }}
-              />
+                  marginLeft: "-10px",
+                  zIndex: 0
+                }}>
+                +{remainingCount}
+              </div>
+            )}
+            {displayImages.map((imgUrl, index) => (
               <div
-                className="plasmo-absolute plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-h-16 plasmo-backdrop-blur-[4px]"
+                key={index}
+                className="plasmo-w-10 plasmo-h-10 plasmo-rounded-md plasmo-border-2 plasmo-border-white plasmo-overflow-hidden plasmo-bg-white"
                 style={{
-                  maskImage: "linear-gradient(to top, black 50%, transparent)"
-                }}
-              />
-            </div>
-
-            {/* Text overlay - ensure always visible */}
-            <div className="plasmo-absolute plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-p-3 plasmo-text-white plasmo-z-20">
-              <h3 className="plasmo-font-semibold plasmo-text-sm plasmo-line-clamp-1 plasmo-mb-1 plasmo-drop-shadow-lg">
-                {truncatedTitle}
-              </h3>
-              <p className="plasmo-text-xs plasmo-line-clamp-2 plasmo-mb-2 plasmo-opacity-95 plasmo-drop-shadow-md">
-                {note.contentPlaintext || "No content"}
-              </p>
-              <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-text-xs plasmo-drop-shadow-md">
-                <span className="plasmo-font-medium plasmo-truncate plasmo-max-w-[25%]">
-                  {truncatedCategory}
-                </span>
-                <span className="plasmo-opacity-90">{timeAgo}</span>
+                  marginLeft: index > 0 || remainingCount > 0 ? "-10px" : "0",
+                  zIndex: displayImages.length - index
+                }}>
+                <img
+                  src={imgUrl}
+                  alt=""
+                  className="plasmo-w-full plasmo-h-full plasmo-object-cover"
+                  loading="lazy"
+                />
               </div>
-            </div>
-          </>
-        ) : (
-          // No image - show TipTap preview with colorful background
-          <>
-            {/* TipTap preview - fills all space except bottom 65px */}
-            <div
-              className="plasmo-absolute plasmo-top-0 plasmo-left-0 plasmo-right-0 plasmo-p-3 plasmo-overflow-hidden"
-              style={{
-                bottom: "65px",
-                borderTopLeftRadius: "12px",
-                borderTopRightRadius: "12px",
-                backgroundColor: noteColor.bg
-              }}>
-              <TipTapPreview content={note.content} />
-            </div>
-
-            {/* Fixed title section at bottom - always visible */}
-            <div
-              className="plasmo-absolute plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-z-10"
-              style={{
-                height: "65px",
-                borderBottomLeftRadius: "12px",
-                borderBottomRightRadius: "12px",
-                backgroundColor: noteColor.bg,
-                borderTop: `1px solid ${noteColor.border}`
-              }}>
-              <div className="plasmo-px-3 plasmo-py-2 plasmo-h-full plasmo-flex plasmo-flex-col plasmo-justify-center">
-                <h3
-                  className="plasmo-font-semibold plasmo-text-sm plasmo-line-clamp-1 plasmo-mb-1.5"
-                  style={{ color: noteColor.text }}>
-                  {truncatedTitle}
-                </h3>
-                <div
-                  className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-text-xs"
-                  style={{ color: noteColor.text, opacity: 0.8 }}>
-                  <span className="plasmo-font-medium plasmo-truncate plasmo-max-w-[60%]">
-                    {truncatedCategory}
-                  </span>
-                  <span className="plasmo-flex-shrink-0 plasmo-ml-2">
-                    {timeAgo}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </>
+            ))}
+          </div>
         )}
+
+        {/* Fixed title section at bottom - always visible */}
+        <div
+          className="plasmo-absolute plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-z-10"
+          style={{
+            height: "65px",
+            borderBottomLeftRadius: "12px",
+            borderBottomRightRadius: "12px",
+            backgroundColor: noteColor.bg,
+            borderTop: `1px solid ${noteColor.border}`
+          }}>
+          <div className="plasmo-px-3 plasmo-py-2 plasmo-h-full plasmo-flex plasmo-flex-col plasmo-justify-center">
+            <h3
+              className="plasmo-font-semibold plasmo-text-sm plasmo-line-clamp-1 plasmo-mb-1.5"
+              style={{ color: noteColor.text }}>
+              {truncatedTitle}
+            </h3>
+            <div
+              className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-text-xs"
+              style={{ color: noteColor.text, opacity: 0.8 }}>
+              <span className="plasmo-font-medium plasmo-truncate plasmo-max-w-[60%]">
+                {truncatedCategory}
+              </span>
+              <span className="plasmo-flex-shrink-0 plasmo-ml-2">
+                {timeAgo}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
     </BlurFade>
   )
