@@ -140,7 +140,7 @@ export const Tabs = ({
   return (
     <>
       {/* Sticky Tabs Header with matching padding */}
-      <div className="plasmo-flex-shrink-0 plasmo-px-4 plasmo-pb-3">
+      <div className="plasmo-flex-shrink-0 plasmo-px-4 plasmo-pb-1">
         <div className="plasmo-relative plasmo-w-full">
           {/* Left Gradient & Arrow */}
           {canScrollLeft && (

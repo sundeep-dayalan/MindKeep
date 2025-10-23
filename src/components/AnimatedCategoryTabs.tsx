@@ -40,7 +40,7 @@ export function AnimatedCategoryTabs({
       value: "all",
       count: allNotesCount,
       content: (
-        <div className="plasmo-w-full plasmo-h-full plasmo-px-4 plasmo-pt-4">
+        <div className="plasmo-w-full plasmo-h-full ">
           <NotesContent
             notes={getNotesForCategory("all")}
             loading={loading}
@@ -57,7 +57,7 @@ export function AnimatedCategoryTabs({
         value: category,
         count: categoryNotes.length,
         content: (
-          <div className="plasmo-w-full plasmo-h-full plasmo-px-4 plasmo-pt-4">
+          <div className="plasmo-w-full plasmo-h-full plasmo-pt-2">
             <NotesContent
               notes={categoryNotes}
               loading={loading}
