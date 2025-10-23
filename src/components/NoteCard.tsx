@@ -3,6 +3,10 @@ import { Color } from "@tiptap/extension-color"
 import Highlight from "@tiptap/extension-highlight"
 import Image from "@tiptap/extension-image"
 import Link from "@tiptap/extension-link"
+import { Table } from "@tiptap/extension-table"
+import { TableCell } from "@tiptap/extension-table-cell"
+import { TableHeader } from "@tiptap/extension-table-header"
+import { TableRow } from "@tiptap/extension-table-row"
 import { TextStyle } from "@tiptap/extension-text-style"
 import Underline from "@tiptap/extension-underline"
 import { EditorContent, useEditor } from "@tiptap/react"
@@ -100,13 +104,24 @@ const truncateText = (text: string, maxWidthPercent: number): string => {
 }
 
 // TipTap Read-Only Preview Component
-const TipTapPreview = ({ content }: { content: string }) => {
-  let parsedContent
-  try {
-    parsedContent = JSON.parse(content)
-  } catch {
-    parsedContent = content
-  }
+const TipTapPreview = ({
+  content,
+  textColor
+}: {
+  content: string
+  textColor?: string
+}) => {
+  // Parse content immediately (synchronously)
+  const parsedContent = React.useMemo(() => {
+    try {
+      const parsed = JSON.parse(content)
+      console.log("🎨 TipTapPreview - Parsed JSON:", parsed)
+      return parsed
+    } catch (error) {
+      console.log("🎨 TipTapPreview - Plain text:", content)
+      return content
+    }
+  }, [content])
 
   const editor = useEditor({
     extensions: [
@@ -126,25 +141,112 @@ const TipTapPreview = ({ content }: { content: string }) => {
         HTMLAttributes: {
           class: "plasmo-hidden" // Hide images in preview
         }
-      })
+      }),
+      Table.configure({
+        resizable: false,
+        HTMLAttributes: {
+          class:
+            "plasmo-border-collapse plasmo-table-auto plasmo-w-full plasmo-my-2"
+        }
+      }),
+      TableRow,
+      TableHeader,
+      TableCell
     ],
     content: parsedContent,
     editable: false,
     editorProps: {
       attributes: {
-        class:
-          "plasmo-text-sm plasmo-text-slate-700 plasmo-leading-relaxed !plasmo-bg-transparent"
+        class: "plasmo-text-sm plasmo-leading-relaxed",
+        style: `color: ${textColor || "#334155"} !important; background: transparent !important;`
       }
+    },
+    onUpdate: ({ editor }) => {
+      console.log(
+        "🎨 TipTapPreview - Editor updated, content:",
+        editor.getJSON()
+      )
+    },
+    onCreate: ({ editor }) => {
+      console.log(
+        "🎨 TipTapPreview - Editor created, content:",
+        editor.getJSON()
+      )
     }
   })
+
+  // Ensure content is updated when it changes
+  React.useEffect(() => {
+    if (editor && parsedContent) {
+      // Small delay to ensure editor is fully initialized
+      const timer = setTimeout(() => {
+        editor.commands.setContent(parsedContent)
+      }, 0)
+      return () => clearTimeout(timer)
+    }
+  }, [editor, parsedContent])
 
   if (!editor) {
     return null
   }
 
+  const previewId = `tiptap-preview-${Math.random().toString(36).substr(2, 9)}`
+
   return (
-    <div className="plasmo-overflow-hidden plasmo-h-full plasmo-pointer-events-none [&_.ProseMirror]:!plasmo-bg-transparent [&_.ProseMirror]:plasmo-outline-none">
-      <EditorContent editor={editor} />
+    <div className="plasmo-overflow-hidden plasmo-h-full plasmo-pointer-events-none">
+      <style>{`
+        #${previewId} .ProseMirror {
+          background: transparent !important;
+          outline: none !important;
+          padding: 0 !important;
+          min-height: auto !important;
+          color: ${textColor || "#334155"} !important;
+        }
+        #${previewId} .ProseMirror * {
+          color: inherit !important;
+        }
+        #${previewId} .ProseMirror p {
+          margin: 0.5em 0 !important;
+          line-height: 1.5 !important;
+        }
+        #${previewId} .ProseMirror h1,
+        #${previewId} .ProseMirror h2,
+        #${previewId} .ProseMirror h3 {
+          margin: 0.75em 0 0.5em 0 !important;
+          font-weight: 600 !important;
+        }
+        #${previewId} .ProseMirror ul,
+        #${previewId} .ProseMirror ol {
+          margin: 0.5em 0 !important;
+          padding-left: 1.5em !important;
+        }
+        #${previewId} .ProseMirror img {
+          display: none !important;
+        }
+        #${previewId} .ProseMirror table {
+          border-collapse: collapse !important;
+          table-layout: auto !important;
+          width: 100% !important;
+          margin: 0.5em 0 !important;
+          font-size: 0.875em !important;
+        }
+        #${previewId} .ProseMirror table td,
+        #${previewId} .ProseMirror table th {
+          border: 1px solid currentColor !important;
+          opacity: 0.3;
+          padding: 0.25em 0.5em !important;
+          text-align: left !important;
+          vertical-align: top !important;
+        }
+        #${previewId} .ProseMirror table th {
+          font-weight: 600 !important;
+          background-color: currentColor !important;
+          opacity: 0.1;
+        }
+      `}</style>
+      <div id={previewId} className="tiptap-preview plasmo-h-full">
+        <EditorContent editor={editor} />
+      </div>
     </div>
   )
 }
@@ -210,7 +312,7 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
             borderTopRightRadius: "12px",
             backgroundColor: noteColor.bg
           }}>
-          <TipTapPreview content={note.content} />
+          <TipTapPreview content={note.content} textColor={noteColor.text} />
         </div>
 
         {/* Image avatars in bottom-right corner (if images exist) */}
@@ -266,10 +368,10 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
             <div
               className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-text-xs"
               style={{ color: noteColor.text, opacity: 0.8 }}>
-              <div 
+              <div
                 className="plasmo-font-medium plasmo-truncate plasmo-max-w-[60%] plasmo-px-2 plasmo-py-1 plasmo-rounded-full"
-                style={{ 
-                  backgroundColor: noteColor.border + '40', // 25% opacity
+                style={{
+                  backgroundColor: noteColor.border + "40", // 25% opacity
                   color: noteColor.text
                 }}>
                 {truncatedCategory}
