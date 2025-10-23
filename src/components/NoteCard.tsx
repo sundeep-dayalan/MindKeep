@@ -11,6 +11,8 @@ import React from "react"
 
 import type { Note } from "~services/db-service"
 
+import { LinkPreview } from "./ui/LinkPreview"
+
 interface NoteCardProps {
   note: Note
   onEdit: (note: Note) => void
@@ -225,20 +227,22 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
               </div>
             )}
             {displayImages.map((imgUrl, index) => (
-              <div
-                key={index}
-                className="plasmo-w-10 plasmo-h-10 plasmo-rounded-md plasmo-border-2 plasmo-border-white plasmo-overflow-hidden plasmo-bg-white"
-                style={{
-                  marginLeft: index > 0 || remainingCount > 0 ? "-10px" : "0",
-                  zIndex: displayImages.length - index
-                }}>
-                <img
-                  src={imgUrl}
-                  alt=""
-                  className="plasmo-w-full plasmo-h-full plasmo-object-cover"
-                  loading="lazy"
-                />
-              </div>
+              <LinkPreview url={imgUrl}>
+                <div
+                  key={index}
+                  className="plasmo-w-10 plasmo-h-10 plasmo-rounded-md plasmo-border-2 plasmo-border-white plasmo-overflow-hidden plasmo-bg-white"
+                  style={{
+                    marginLeft: index > 0 || remainingCount > 0 ? "-10px" : "0",
+                    zIndex: displayImages.length - index
+                  }}>
+                  <img
+                    src={imgUrl}
+                    alt=""
+                    className="plasmo-w-full plasmo-h-full plasmo-object-cover"
+                    loading="lazy"
+                  />
+                </div>
+              </LinkPreview>
             ))}
           </div>
         )}
