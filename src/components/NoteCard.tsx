@@ -174,15 +174,14 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
         // Image background with overlay
         <>
           {/* High-quality image container */}
-          <div 
+          <div
             className="plasmo-absolute plasmo-inset-0 plasmo-w-full plasmo-h-full plasmo-z-0 plasmo-overflow-hidden"
-            style={{ borderRadius: "12px" }}
-          >
+            style={{ borderRadius: "12px" }}>
             <img
               src={imageUrl}
               alt={note.title}
               className="plasmo-absolute plasmo-inset-0 plasmo-w-full plasmo-h-full plasmo-object-cover"
-              style={{ 
+              style={{
                 imageRendering: "-webkit-optimize-contrast" as any,
                 WebkitFontSmoothing: "antialiased" as any,
                 filter: "contrast(1.02) saturate(1.05)",
