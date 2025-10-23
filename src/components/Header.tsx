@@ -39,7 +39,7 @@ export function Header({
   }
 
   return (
-    <div className="plasmo-bg-white plasmo-border-b plasmo-border-slate-200 plasmo-p-4">
+    <div className="plasmo-bg-gradient-to-r plasmo-from-sky-100 plasmo-via-indigo-50 plasmo-to-white plasmo-border-b plasmo-border-slate-200 plasmo-p-4">
       <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-gap-2">
         {/* Left: Logo */}
         <h1 className="plasmo-text-xl plasmo-font-bold plasmo-text-slate-900 plasmo-flex-shrink-0">
@@ -76,7 +76,7 @@ export function Header({
                     onChange={handleSearchInput}
                     placeholder="Search notes..."
                     autoFocus
-                    className="plasmo-w-full plasmo-pl-10 plasmo-pr-10 plasmo-py-2 plasmo-border plasmo-border-slate-300 plasmo-rounded-lg plasmo-text-sm plasmo-bg-white focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-blue-500 focus:plasmo-border-blue-500 plasmo-transition-all"
+                    className="plasmo-w-full plasmo-pl-10 plasmo-pr-10 plasmo-py-2 plasmo-border plasmo-border-slate-300 plasmo-rounded-lg plasmo-text-sm plasmo-bg-white focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-blue-100 focus:plasmo-border-blue-100 plasmo-transition-all"
                   />
                   <button
                     onClick={handleSearchClose}
