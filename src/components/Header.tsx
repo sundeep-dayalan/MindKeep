@@ -1,5 +1,7 @@
 import { useState } from "react"
 
+import { AnimatedShinyText } from "./ui/AnimatedShinyText"
+
 interface HeaderProps {
   onClose: () => void
   onPersonasClick?: () => void
@@ -42,9 +44,9 @@ export function Header({
     <div className="plasmo-bg-gradient-to-r plasmo-from-sky-100 plasmo-via-indigo-50 plasmo-to-white plasmo-border-b plasmo-border-slate-200 plasmo-p-4">
       <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-gap-2">
         {/* Left: Logo */}
-        <h1 className="plasmo-text-xl plasmo-font-bold plasmo-text-slate-900 plasmo-flex-shrink-0">
+        <AnimatedShinyText className="plasmo-text-xl plasmo-inline-flex plasmo-items-center plasmo-justify-center plasmo-px-4 plasmo-py-1 plasmo-transition plasmo-ease-out plasmo-hover:text-neutral-600 plasmo-hover:duration-300 plasmo-hover:dark:text-neutral-400">
           MindKeep 🧠
-        </h1>
+        </AnimatedShinyText>
 
         {/* Center/Right: Search, Personas, Close */}
         <div className="plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-flex-1 plasmo-justify-end">
