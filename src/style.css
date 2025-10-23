@@ -16,8 +16,15 @@
   -webkit-overflow-scrolling: touch;
 }
 
-.no-visible-scrollbar::-webkit-scrollbar {
+.plasmo-no-visible-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* React Bento Grid - Remove extra padding/background from grid items */
+[class*="bento"] > div,
+[style*="grid"] > div {
+  padding: 0 !important;
+  background: transparent !important;
 }
 
 /* Additional scrollbar hiding with Plasmo prefix */

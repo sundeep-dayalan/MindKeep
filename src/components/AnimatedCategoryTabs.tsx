@@ -1,7 +1,8 @@
+import { BentoGrid, type BentoItem } from "react-bento"
+
 import type { Note } from "~services/db-service"
 
 import { NoteCard } from "./NoteCard"
-import { BentoGrid } from "./ui/bento-grid"
 import { Tabs } from "./ui/tabs"
 
 interface AnimatedCategoryTabsProps {
@@ -137,26 +138,54 @@ function NotesContent({
     )
   }
 
+  // Transform notes into BentoItem format
+  const bentoItems: BentoItem[] = notes.map((note, index) => {
+    // Calculate dynamic dimensions based on content
+    const contentLength = note.contentPlaintext?.length || 0
+    const hasImage = note.content?.includes('"type":"image"') || false
+
+    // All cards are 1 column wide (2 column grid total)
+    const width = 1
+
+    // Dynamic height based on content length
+    // More granular height distribution for better visual variety
+    let height = 2 // Default: 2 rows (300px)
+
+    if (hasImage) {
+      // Images need more vertical space
+      if (contentLength < 100) height = 2
+      else if (contentLength < 300) height = 3
+      else height = 4
+    } else {
+      // Text-only content
+      if (contentLength < 150) height = 2
+      else if (contentLength < 350) height = 3
+      else if (contentLength < 600) height = 4
+      else height = 5
+    }
+
+    return {
+      id: index,
+      title: note.title,
+      width,
+      height,
+      element: (
+        <div style={{ padding: 0, margin: 0, height: "100%", width: "100%" }}>
+          <NoteCard note={note} onEdit={onEdit} onDelete={onDelete} />
+        </div>
+      )
+    }
+  })
+
   return (
-    <BentoGrid>
-      {notes.map((note, index) => {
-        // Dynamic column spanning for visual variety
-        // Every 7th card (index 6, 13, 20...) spans 2 columns on tablet+, 3 columns on wide
-        const isWideCard = (index + 1) % 7 === 0
-
-        // Responsive column spanning:
-        // Default (2 cols): Wide cards span 2, normal cards span 1
-        // Desktop (3 cols): Wide cards span 3, normal cards span 1
-        const colSpanClass = isWideCard
-          ? "plasmo-col-span-2 lg:plasmo-col-span-3"
-          : "plasmo-col-span-1"
-
-        return (
-          <div key={note.id} className={colSpanClass}>
-            <NoteCard note={note} onEdit={onEdit} onDelete={onDelete} />
-          </div>
-        )
-      })}
-    </BentoGrid>
+    <BentoGrid
+      items={bentoItems}
+      gridCols={2}
+      rowHeight={75}
+      classNames={{
+        container: "plasmo-gap-3",
+        elementContainer: "plasmo-p-0 plasmo-m-0"
+      }}
+    />
   )
 }

@@ -118,7 +118,7 @@ const TipTapPreview = ({ content }: { content: string }) => {
   }
 
   return (
-    <div className="plasmo-overflow-hidden plasmo-min-h-[200px] plasmo-pointer-events-none [&_.ProseMirror]:!plasmo-bg-transparent [&_.ProseMirror]:plasmo-outline-none">
+    <div className="plasmo-overflow-hidden plasmo-h-full plasmo-pointer-events-none [&_.ProseMirror]:!plasmo-bg-transparent [&_.ProseMirror]:plasmo-outline-none">
       <EditorContent editor={editor} />
     </div>
   )
@@ -142,7 +142,13 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
   return (
     <div
       onClick={handleCardClick}
-      className="plasmo-relative plasmo-group plasmo-rounded-lg plasmo-overflow-hidden plasmo-cursor-pointer plasmo-transition-all plasmo-duration-200 hover:plasmo-shadow-lg plasmo-h-[160px] plasmo-border plasmo-border-slate-200 hover:plasmo-border-blue-300">
+      className="plasmo-relative plasmo-group plasmo-cursor-pointer plasmo-transition-all plasmo-duration-200 hover:plasmo-shadow-lg plasmo-bg-white plasmo-shadow-sm plasmo-h-full plasmo-min-h-[200px]"
+      style={{
+        borderRadius: "12px",
+        overflow: "hidden",
+        boxShadow:
+          "inset 0 0 0 1px rgba(59, 130, 246, 0.5), 0 1px 2px 0 rgb(0 0 0 / 0.05)"
+      }}>
       {/* Delete button - only show on hover */}
       <button
         onClick={handleDelete}
@@ -169,6 +175,7 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
             src={imageUrl}
             alt={note.title}
             className="plasmo-absolute plasmo-inset-0 plasmo-w-full plasmo-h-full plasmo-object-cover"
+            style={{ borderRadius: "12px" }}
           />
 
           {/* Layered gradient blur effect - 0% blur at top, 100% blur at bottom */}
@@ -206,14 +213,16 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
         </>
       ) : (
         // No image - show TipTap preview with simple white background
-        <div className="plasmo-relative plasmo-h-full plasmo-bg-white plasmo-overflow-hidden">
-          {/* TipTap preview fills entire card */}
-          <div className="plasmo-absolute plasmo-inset-0 plasmo-p-3 plasmo-overflow-hidden">
+        <div
+          className="plasmo-relative plasmo-h-full plasmo-bg-white plasmo-flex plasmo-flex-col"
+          style={{ borderRadius: "12px", overflow: "hidden" }}>
+          {/* TipTap preview fills remaining space */}
+          <div className="plasmo-flex-1 plasmo-p-3 plasmo-overflow-hidden">
             <TipTapPreview content={note.content} />
           </div>
 
           {/* Solid white background for text - clean and simple */}
-          <div className="plasmo-absolute plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-bg-white plasmo-border-t plasmo-border-slate-100">
+          <div className="plasmo-bg-white plasmo-border-t plasmo-border-slate-100 plasmo-flex-shrink-0">
             <div className="plasmo-p-3">
               <h3 className="plasmo-font-semibold plasmo-text-sm plasmo-line-clamp-1 plasmo-mb-1 plasmo-text-slate-900">
                 {truncatedTitle}
