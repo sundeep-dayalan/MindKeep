@@ -470,7 +470,7 @@ function SidePanel() {
             </>
           ) : (
             /* Editor View */
-            <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-no-visible-scrollbar plasmo-p-4 plasmo-pb-32 ">
+            <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-no-visible-scrollbar plasmo-p-4 plasmo-pb-8">
               <NoteEditor
                 title={noteTitle}
                 content={noteContent}
@@ -487,8 +487,8 @@ function SidePanel() {
             </div>
           )}
 
-          {/* Fixed Bottom Search Bar - hide in personas view */}
-          {view !== "personas" && (
+          {/* Fixed Bottom Search Bar - hide in personas view and editor view */}
+          {view !== "personas" && view !== "editor" && (
             <div className="plasmo-fixed plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-bg-white plasmo-border-t plasmo-border-slate-200 plasmo-shadow-lg plasmo-p-4 plasmo-z-50">
               <AISearchBar
                 placeholder="Ask me anything..."
