@@ -445,15 +445,15 @@ function SidePanel() {
               <PersonaManager onPersonaActivated={handlePersonaActivated} />
             </div>
           ) : view === "list" ? (
-            <>
+            <div className="plasmo-flex-1 plasmo-flex plasmo-flex-col plasmo-overflow-hidden">
               {/* Sticky Top Section - AI Banner only */}
-              <div className="plasmo-flex-shrink-0 ">
+              <div className="plasmo-flex-shrink-0">
                 {/* AI Status Banner */}
                 <AIStatusBanner />
               </div>
 
               {/* Category Tabs and Scrollable Notes Section */}
-              <div className="plasmo-flex-1 plasmo-flex plasmo-flex-col plasmo-overflow-hidden plasmo-pb-32 plasmo-mt-4">
+              <div className="plasmo-flex-1 plasmo-min-h-0 plasmo-mt-4">
                 <AnimatedCategoryTabs
                   categories={categories}
                   notes={filteredNotes}
@@ -467,7 +467,7 @@ function SidePanel() {
                   loading={loading}
                 />
               </div>
-            </>
+            </div>
           ) : (
             /* Editor View */
             <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-no-visible-scrollbar plasmo-p-4 plasmo-pb-8">
@@ -489,7 +489,7 @@ function SidePanel() {
 
           {/* Fixed Bottom Search Bar - hide in personas view and editor view */}
           {view !== "personas" && view !== "editor" && (
-            <div className="plasmo-fixed plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-bg-white plasmo-border-t plasmo-border-slate-200 plasmo-shadow-lg plasmo-p-4 plasmo-z-50">
+            <div className="plasmo-fixed plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-bg-transparent plasmo-backdrop-blur-xl plasmo-border-t plasmo-border-white/20 plasmo-shadow-lg plasmo-p-4 plasmo-z-50">
               <AISearchBar
                 placeholder="Ask me anything..."
                 onSearch={handleAISearch}

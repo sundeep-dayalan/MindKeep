@@ -77,7 +77,7 @@ export function AnimatedCategoryTabs({
         containerClassName=""
         activeTabClassName="plasmo-bg-slate-800"
         tabClassName=""
-        contentClassName=""
+        contentClassName="plasmo-h-full plasmo-overflow-auto"
         onTabChange={(tabValue) => {
           onCategoryChange(tabValue)
         }}

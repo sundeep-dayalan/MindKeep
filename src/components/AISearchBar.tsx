@@ -81,7 +81,7 @@ function ReferenceNotesSection({ notes }: { notes: Note[] }) {
             {notes.map((note) => (
               <div
                 key={note.id}
-                className="plasmo-group plasmo-relative plasmo-px-3 plasmo-py-1.5 plasmo-bg-white plasmo-border plasmo-border-slate-200 hover:plasmo-border-blue-300 plasmo-rounded-full plasmo-shadow-sm hover:plasmo-shadow-md plasmo-transition-all plasmo-cursor-pointer">
+                className="plasmo-group plasmo-relative plasmo-px-3 plasmo-py-1.5 plasmo-bg-white/20 plasmo-backdrop-blur-sm plasmo-border plasmo-border-white/40 hover:plasmo-border-blue-300 plasmo-rounded-full plasmo-shadow-sm hover:plasmo-shadow-md plasmo-transition-all plasmo-cursor-pointer">
                 <div className="plasmo-flex plasmo-items-center plasmo-gap-2">
                   <span className="plasmo-text-xs plasmo-font-medium plasmo-text-slate-800 plasmo-max-w-[200px] plasmo-truncate">
                     {note.title}
@@ -1372,7 +1372,7 @@ export function AISearchBar({
 
       {/* Chat Messages */}
       {messages.length > 0 && isChatExpanded && (
-        <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-space-y-3 plasmo-px-2 plasmo-py-3 plasmo-max-h-96 plasmo-bg-slate-50 plasmo-rounded-lg">
+        <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-space-y-3 plasmo-px-2 plasmo-py-3 plasmo-max-h-96 plasmo-bg-white/10 plasmo-backdrop-blur-lg plasmo-rounded-lg plasmo-border plasmo-border-white/20">
           {messages.map((message) => (
             <div key={message.id} className="plasmo-space-y-2">
               <div
@@ -1385,7 +1385,7 @@ export function AISearchBar({
                   className={`plasmo-px-4 plasmo-py-2 plasmo-rounded-lg plasmo-shadow-sm plasmo-max-w-[80%] ${
                     message.type === "user"
                       ? "plasmo-bg-blue-500 plasmo-text-white"
-                      : "plasmo-bg-white plasmo-text-slate-700 plasmo-border plasmo-border-slate-200"
+                      : "plasmo-bg-white/20 plasmo-backdrop-blur-md plasmo-text-slate-900 plasmo-border plasmo-border-white/40"
                   }`}>
                   {message.type === "user" ? (
                     <div className="plasmo-text-sm plasmo-whitespace-pre-wrap plasmo-text-white">
@@ -1420,7 +1420,7 @@ export function AISearchBar({
                             className={`${
                               option.type === "category_pill"
                                 ? "plasmo-px-3 plasmo-py-1.5 plasmo-bg-blue-50 hover:plasmo-bg-blue-100 plasmo-text-blue-700 plasmo-border plasmo-border-blue-200 hover:plasmo-border-blue-300"
-                                : "plasmo-px-4 plasmo-py-2 plasmo-bg-white hover:plasmo-bg-slate-50 plasmo-text-slate-700 plasmo-border plasmo-border-slate-300 hover:plasmo-border-slate-400"
+                                : "plasmo-px-4 plasmo-py-2 plasmo-bg-white/20 plasmo-backdrop-blur-sm hover:plasmo-bg-white/30 plasmo-text-slate-900 plasmo-border plasmo-border-white/40 hover:plasmo-border-white/50"
                             } plasmo-rounded-full plasmo-text-sm plasmo-font-medium plasmo-transition-all plasmo-cursor-pointer plasmo-shadow-sm hover:plasmo-shadow disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed`}>
                             {option.label}
                           </button>
@@ -1438,7 +1438,7 @@ export function AISearchBar({
           ))}
           {isSearching && (
             <div className="plasmo-flex plasmo-justify-start">
-              <div className="plasmo-max-w-[80%] plasmo-px-4 plasmo-py-2 plasmo-rounded-lg plasmo-bg-white plasmo-text-slate-700 plasmo-border plasmo-border-slate-200">
+              <div className="plasmo-max-w-[80%] plasmo-px-4 plasmo-py-2 plasmo-rounded-lg plasmo-bg-white/20 plasmo-backdrop-blur-md plasmo-text-slate-900 plasmo-border plasmo-border-white/40">
                 <div className="plasmo-flex plasmo-items-center plasmo-gap-2">
                   <div className="plasmo-w-2 plasmo-h-2 plasmo-bg-slate-400 plasmo-rounded-full plasmo-animate-bounce" />
                   <div
@@ -1474,7 +1474,7 @@ export function AISearchBar({
           </div>
         )}
 
-        <div className="plasmo-flex plasmo-items-end plasmo-gap-2 plasmo-bg-slate-50 plasmo-rounded-2xl plasmo-px-4 plasmo-py-3 plasmo-border plasmo-border-slate-200 hover:plasmo-border-slate-300 plasmo-transition-all focus-within:plasmo-border-blue-400 focus-within:plasmo-ring-2 focus-within:plasmo-ring-blue-100">
+        <div className="plasmo-flex plasmo-items-end plasmo-gap-2 plasmo-bg-white plasmo-rounded-2xl plasmo-px-4 plasmo-py-3 plasmo-border plasmo-border-slate-200 hover:plasmo-border-slate-300 plasmo-transition-all focus-within:plasmo-border-blue-400 focus-within:plasmo-ring-2 focus-within:plasmo-ring-blue-100 plasmo-shadow-sm">
           {/* Rich Text Editor - takes full width */}
           <div className="plasmo-flex-1 plasmo-min-h-[40px] plasmo-max-h-[200px] plasmo-overflow-y-auto">
             <RichTextEditor

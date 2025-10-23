@@ -194,7 +194,7 @@ export const RichTextEditor = forwardRef<
 
     return (
       <div
-        className={`plasmo-bg-white plasmo-overflow-hidden plasmo-transition-all ${
+        className={`plasmo-bg-transparent plasmo-overflow-hidden plasmo-transition-all ${
           compact
             ? "plasmo-border-none"
             : "plasmo-border plasmo-border-slate-300 plasmo-rounded-lg focus-within:plasmo-ring-2 focus-within:plasmo-ring-blue-500 focus-within:plasmo-border-blue-500"
@@ -757,10 +757,10 @@ export const RichTextEditor = forwardRef<
         <div
           className={
             compact
-              ? "plasmo-min-h-[40px] plasmo-max-h-[200px] plasmo-overflow-y-auto compact-editor"
-              : "plasmo-min-h-[240px] plasmo-max-h-[400px] plasmo-overflow-y-auto"
+              ? "plasmo-min-h-[40px] plasmo-max-h-[200px] plasmo-overflow-y-auto compact-editor plasmo-bg-transparent tiptap-editor-wrapper"
+              : "plasmo-min-h-[240px] plasmo-max-h-[400px] plasmo-overflow-y-auto plasmo-bg-transparent tiptap-editor-wrapper"
           }>
-          <EditorContent editor={editor} />
+          <EditorContent editor={editor} className="plasmo-bg-transparent" />
         </div>
 
         {/* Summarize Button */}
