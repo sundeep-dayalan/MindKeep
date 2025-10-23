@@ -98,7 +98,7 @@ export const LinkPreview = ({
         <HoverCardPrimitive.Content
           className="[transform-origin:var(--radix-hover-card-content-transform-origin)]"
           side="top"
-          align="center"
+          align="end"
           sideOffset={10}>
           <AnimatePresence>
             {isOpen && (
