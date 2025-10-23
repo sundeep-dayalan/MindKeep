@@ -49,7 +49,7 @@ const formatTimeAgo = (timestamp: number): string => {
   const diffHours = Math.floor(diffMs / 3600000)
 
   if (diffMins < 1) {
-    return "just now"
+    return "Just now"
   } else if (diffMins < 60) {
     return `${diffMins}m`
   } else if (diffHours < 24) {

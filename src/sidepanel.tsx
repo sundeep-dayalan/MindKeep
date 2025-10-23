@@ -406,7 +406,7 @@ function SidePanel() {
   }
 
   return (
-    <div className="plasmo-w-full plasmo-h-screen plasmo-bg-slate-50 plasmo-overflow-hidden">
+    <div className="plasmo-w-full plasmo-h-screen plasmo-bg-slate-50  plasmo-overflow-hidden">
       <div className="plasmo-h-full plasmo-flex plasmo-flex-col">
         {/* Header */}
         <Header
@@ -447,13 +447,13 @@ function SidePanel() {
           ) : view === "list" ? (
             <>
               {/* Sticky Top Section - AI Banner only */}
-              <div className="plasmo-flex-shrink-0 plasmo-bg-slate-50 plasmo-px-4 plasmo-pt-4">
+              <div className="plasmo-flex-shrink-0 ">
                 {/* AI Status Banner */}
                 <AIStatusBanner />
               </div>
 
               {/* Category Tabs and Scrollable Notes Section */}
-              <div className="plasmo-flex-1 plasmo-flex plasmo-flex-col plasmo-overflow-hidden plasmo-pb-32">
+              <div className="plasmo-flex-1 plasmo-flex plasmo-flex-col plasmo-overflow-hidden plasmo-pb-32 plasmo-mt-4">
                 <AnimatedCategoryTabs
                   categories={categories}
                   notes={filteredNotes}
@@ -470,7 +470,7 @@ function SidePanel() {
             </>
           ) : (
             /* Editor View */
-            <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-no-visible-scrollbar plasmo-p-4 plasmo-pb-32">
+            <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-no-visible-scrollbar plasmo-p-4 plasmo-pb-32 ">
               <NoteEditor
                 title={noteTitle}
                 content={noteContent}
