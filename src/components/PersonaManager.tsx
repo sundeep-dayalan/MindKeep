@@ -353,7 +353,8 @@ Return only the description sentence.`
         inputSource = `Basic Context: ${formData.context.trim()}`
       } else {
         // Use title and/or description
-        if (formData.name.trim()) inputSource += `Name: ${formData.name.trim()}\n`
+        if (formData.name.trim())
+          inputSource += `Name: ${formData.name.trim()}\n`
         if (formData.description.trim())
           inputSource += `Description: ${formData.description.trim()}`
       }
@@ -369,10 +370,7 @@ Write 3-5 concise paragraphs covering:
 
 Keep it focused and actionable. No markdown headers, just clear paragraphs.`
 
-      console.log(
-        "🤖 [PersonaManager] Generating context with prompt:",
-        prompt
-      )
+      console.log("🤖 [PersonaManager] Generating context with prompt:", prompt)
       const generatedContext = await executePrompt(prompt)
 
       // Clean up the response
