@@ -2,5 +2,12 @@
 module.exports = {
   content: ["./src/**/*.{tsx,html}"],
   darkMode: "media",
-  prefix: "plasmo-"
+  prefix: "plasmo-",
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ["Inter", "sans-serif"]
+      }
+    }
+  }
 }

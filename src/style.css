@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -7,6 +7,106 @@
 #plasmo-shadow-container {
   all: initial;
   box-sizing: border-box;
+}
+
+/* Image optimization for high-quality rendering */
+img {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: optimizeQuality;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Force maximum quality for note card images */
+.plasmo-object-cover {
+  image-rendering: -webkit-optimize-contrast !important;
+  image-rendering: optimizeQuality !important;
+  -webkit-backface-visibility: hidden !important;
+  backface-visibility: hidden !important;
+  transform: translate3d(0, 0, 0) !important;
+  -webkit-transform: translate3d(0, 0, 0) !important;
+}
+
+/* Hide scrollbar for Aceternity tabs */
+.no-visible-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.plasmo-no-visible-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* React Bento Grid - Remove extra padding/background from grid items */
+[class*="bento"] > div,
+[style*="grid"] > div {
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+/* Additional scrollbar hiding with Plasmo prefix */
+.plasmo-no-visible-scrollbar {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.plasmo-no-visible-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.plasmo-no-visible-scrollbar::-webkit-scrollbar-track {
+  display: none !important;
+}
+
+.plasmo-no-visible-scrollbar::-webkit-scrollbar-thumb {
+  display: none !important;
+}
+
+/* Force hide scrollbar on overflow-x-auto elements */
+.plasmo-overflow-x-auto::-webkit-scrollbar {
+  display: none !important;
+  height: 0 !important;
+}
+
+.plasmo-overflow-x-auto {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+/* Custom scrollbar for tabs content */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thumb-slate-300::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 3px;
+}
+
+.scrollbar-thumb-slate-300::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;
+}
+
+.scrollbar-track-transparent::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+/* Prevent scroll when content doesn't overflow */
+.plasmo-overflow-y-auto {
+  overflow-y: auto !important;
 }
 
 /* Tiptap Editor Styles */

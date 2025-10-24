@@ -9,12 +9,12 @@ import type { PersonaTemplate } from "~types/persona"
 import { addPersona, getAllPersonas } from "./db-service"
 
 export const DEFAULT_PERSONAS: PersonaTemplate[] = [
-  {
-    id: "default-email-writer",
-    name: "Email Writer",
-    description: "Formats information as professional business emails",
-    emoji: "📧",
-    context: `You are an expert professional email writer. When presenting information from notes:
+ {
+ id: "default-email-writer",
+ name: "Email Writer",
+ description: "Formats information as professional business emails",
+ emoji: "",
+ context: `You are an expert professional email writer. When presenting information from notes:
 
 **Writing Style:**
 - Use professional business email format
@@ -34,7 +34,7 @@ export const DEFAULT_PERSONAS: PersonaTemplate[] = [
 - Extract dates, details, and context from notes
 - Format the found information as a complete, ready-to-send email
 - If information is missing, note what additional details are needed`,
-    outputTemplate: `Subject: [Auto-generated based on query]
+ outputTemplate: `Subject: [Auto-generated based on query]
 
 Dear [Recipient],
 
@@ -42,14 +42,14 @@ Dear [Recipient],
 
 Best regards,
 [User's name if available in notes]`,
-    isDefault: true
-  },
-  {
-    id: "default-meeting-prep",
-    name: "Meeting Brief Generator",
-    description: "Creates structured meeting preparation briefs",
-    emoji: "📊",
-    context: `You are a meeting preparation specialist. When searching notes for meeting-related information:
+ isDefault: true
+ },
+ {
+ id: "default-meeting-prep",
+ name: "Meeting Brief Generator",
+ description: "Creates structured meeting preparation briefs",
+ emoji: "",
+ context: `You are a meeting preparation specialist. When searching notes for meeting-related information:
 
 **Brief Structure:**
 1. **Meeting Context:** Topic, participants, date/time
@@ -70,14 +70,14 @@ Best regards,
 - Extract chronological information
 - Identify patterns and important themes
 - Organize information logically for quick reference`,
-    isDefault: true
-  },
-  {
-    id: "default-code-doc",
-    name: "Code Documentation Writer",
-    description: "Formats technical notes into structured documentation",
-    emoji: "💻",
-    context: `You are a technical documentation specialist. When formatting information from notes:
+ isDefault: true
+ },
+ {
+ id: "default-code-doc",
+ name: "Code Documentation Writer",
+ description: "Formats technical notes into structured documentation",
+ emoji: "",
+ context: `You are a technical documentation specialist. When formatting information from notes:
 
 **Documentation Structure:**
 \`\`\`markdown
@@ -118,15 +118,15 @@ Best regards,
 - Organize chronologically or by logical flow
 - Include error messages and solutions if found
 - Reference source notes for detailed information`,
-    isDefault: true
-  },
-  {
-    id: "default-casual-buddy",
-    name: "Casual Buddy",
-    description:
-      "Friendly, conversational tone for casual information retrieval",
-    emoji: "😊",
-    context: `You're a helpful, friendly buddy who makes finding information fun and easy!
+ isDefault: true
+ },
+ {
+ id: "default-casual-buddy",
+ name: "Casual Buddy",
+ description:
+ "Friendly, conversational tone for casual information retrieval",
+ emoji: "",
+ context: `You're a helpful, friendly buddy who makes finding information fun and easy!
 
 **Your Personality:**
 - Casual, warm, and approachable
@@ -136,7 +136,7 @@ Best regards,
 - Be enthusiastic about helping
 
 **Response Style:**
-- "Hey! I found your [item] in your notes! 📝"
+- "Hey! I found your [item] in your notes! "
 - "Awesome! Here's what I dug up for you..."
 - "Yep, got it! You saved this on [date]:"
 - "So I checked your notes and here's the deal..."
@@ -146,21 +146,21 @@ Best regards,
 - Just package it in a friendly, casual way
 - Don't be overly casual - maintain helpfulness
 - If nothing found: "Hmm, couldn't find that one. Want to create a note about it?"`,
-    isDefault: true
-  },
-  {
-    id: "default-summarizer",
-    name: "Quick Summarizer",
-    description: "Provides concise, bullet-point summaries",
-    emoji: "📝",
-    context: `You are a master of concise summarization. When presenting information:
+ isDefault: true
+ },
+ {
+ id: "default-summarizer",
+ name: "Quick Summarizer",
+ description: "Provides concise, bullet-point summaries",
+ emoji: "",
+ context: `You are a master of concise summarization. When presenting information:
 
 **Summary Format:**
 **Quick Summary:** [One-line overview]
 
 **Key Points:**
 • [Main point 1]
-• [Main point 2]  
+• [Main point 2] 
 • [Main point 3]
 
 **Details:** [2-3 sentences of context]
@@ -181,8 +181,8 @@ Best regards,
 - Remove redundancy and filler
 - Present in order of importance
 - Make it scannable in 10 seconds`,
-    isDefault: true
-  }
+ isDefault: true
+ }
 ]
 
 /**
@@ -190,49 +190,49 @@ Best regards,
  * Only creates them if they don't already exist (checked by name)
  */
 export async function initializeDefaultPersonas(): Promise<void> {
-  console.log("🎭 [DefaultPersonas] Initializing default personas")
+ console.log(" [DefaultPersonas] Initializing default personas")
 
-  try {
-    const existingPersonas = await getAllPersonas()
-    const existingNames = new Set(
-      existingPersonas.map((p) => p.name.toLowerCase())
-    )
+ try {
+ const existingPersonas = await getAllPersonas()
+ const existingNames = new Set(
+ existingPersonas.map((p) => p.name.toLowerCase())
+ )
 
-    console.log(
-      `🎭 [DefaultPersonas] Found ${existingPersonas.length} existing personas:`,
-      Array.from(existingNames)
-    )
+ console.log(
+ ` [DefaultPersonas] Found ${existingPersonas.length} existing personas:`,
+ Array.from(existingNames)
+ )
 
-    for (const template of DEFAULT_PERSONAS) {
-      const templateNameLower = template.name.toLowerCase()
+ for (const template of DEFAULT_PERSONAS) {
+ const templateNameLower = template.name.toLowerCase()
 
-      if (!existingNames.has(templateNameLower)) {
-        console.log(
-          `🎭 [DefaultPersonas] Creating default persona: ${template.name}`
-        )
+ if (!existingNames.has(templateNameLower)) {
+ console.log(
+ ` [DefaultPersonas] Creating default persona: ${template.name}`
+ )
 
-        await addPersona({
-          name: template.name,
-          description: template.description,
-          context: template.context,
-          emoji: template.emoji,
-          outputTemplate: template.outputTemplate,
-          isDefault: true
-        })
+ await addPersona({
+ name: template.name,
+ description: template.description,
+ context: template.context,
+ emoji: template.emoji,
+ outputTemplate: template.outputTemplate,
+ isDefault: true
+ })
 
-        console.log(`🎭 [DefaultPersonas] ✅ Created: ${template.name}`)
-      } else {
-        console.log(
-          `🎭 [DefaultPersonas] ⏭️  Skipping existing persona: ${template.name}`
-        )
-      }
-    }
+ console.log(` [DefaultPersonas] Created: ${template.name}`)
+ } else {
+ console.log(
+ ` [DefaultPersonas] Skipping existing persona: ${template.name}`
+ )
+ }
+ }
 
-    console.log("🎭 [DefaultPersonas] Default personas initialization complete")
-  } catch (error) {
-    console.error(
-      "🎭 [DefaultPersonas] Error initializing default personas:",
-      error
-    )
-  }
+ console.log(" [DefaultPersonas] Default personas initialization complete")
+ } catch (error) {
+ console.error(
+ " [DefaultPersonas] Error initializing default personas:",
+ error
+ )
+ }
 }

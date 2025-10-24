@@ -129,7 +129,7 @@ export async function addNote(noteData: {
     const now = Date.now()
 
     console.log(
-      `💾 [DB Service] addNote() called for title: "${noteData.title}"`,
+      ` [DB Service] addNote() called for title: "${noteData.title}"`,
       {
         id,
         timestamp: now
@@ -360,11 +360,11 @@ export async function searchNotesByVector(
       .toArray()
     const fetchTime = performance.now() - fetchStartTime
     console.log(
-      `⏱️ [DB Vector Search] Fetch notes from DB: ${fetchTime.toFixed(2)}ms (${storedNotes.length} notes)`
+      `⏱ [DB Vector Search] Fetch notes from DB: ${fetchTime.toFixed(2)}ms (${storedNotes.length} notes)`
     )
 
     if (storedNotes.length === 0) {
-      console.log(`⏱️ [DB Vector Search] No notes with embeddings found`)
+      console.log(` [DB Vector Search] No notes with embeddings found`)
       return []
     }
 
@@ -376,7 +376,7 @@ export async function searchNotesByVector(
     }))
     const scoreTime = performance.now() - scoreStartTime
     console.log(
-      `⏱️ [DB Vector Search] Calculate similarity scores: ${scoreTime.toFixed(2)}ms`
+      `⏱ [DB Vector Search] Calculate similarity scores: ${scoreTime.toFixed(2)}ms`
     )
 
     // Sort by score (descending) and take top results
@@ -385,7 +385,7 @@ export async function searchNotesByVector(
     const topResults = scored.slice(0, limit)
     const sortTime = performance.now() - sortStartTime
     console.log(
-      `⏱️ [DB Vector Search] Sort and slice top ${limit} results: ${sortTime.toFixed(2)}ms`
+      `⏱ [DB Vector Search] Sort and slice top ${limit} results: ${sortTime.toFixed(2)}ms`
     )
 
     // Decrypt ONLY the top matching notes (critical optimization)
@@ -409,24 +409,24 @@ export async function searchNotesByVector(
           },
           score
         })
-        console.log(`  📄 Note "${note.title}" (score: ${score.toFixed(4)})`)
+        console.log(` Note "${note.title}" (score: ${score.toFixed(4)})`)
       } catch (error) {
         console.error(`Error decrypting note ${note.id}:`, error)
       }
     }
     const decryptTime = performance.now() - decryptStartTime
     console.log(
-      `⏱️ [DB Vector Search] Decrypt top ${limit} notes: ${decryptTime.toFixed(2)}ms`
+      `⏱ [DB Vector Search] Decrypt top ${limit} notes: ${decryptTime.toFixed(2)}ms`
     )
 
     const totalTime = performance.now() - startTime
-    console.log(`⏱️ [DB Vector Search] TOTAL time: ${totalTime.toFixed(2)}ms`)
+    console.log(` [DB Vector Search] TOTAL time: ${totalTime.toFixed(2)}ms`)
 
     return decryptedResults
   } catch (error) {
     const totalTime = performance.now() - startTime
     console.error(
-      `❌ [DB Vector Search] Failed after ${totalTime.toFixed(2)}ms:`,
+      ` [DB Vector Search] Failed after ${totalTime.toFixed(2)}ms:`,
       error
     )
     return []
@@ -452,11 +452,11 @@ export async function searchNotesSemanticWithContent(
     const matchingNotes = await searchNotesByVector(vector, limit)
     const searchTime = performance.now() - searchStartTime
     console.log(
-      `⏱️ [Semantic Search With Content] Vector search: ${searchTime.toFixed(2)}ms`
+      `⏱ [Semantic Search With Content] Vector search: ${searchTime.toFixed(2)}ms`
     )
 
     if (matchingNotes.length === 0) {
-      console.log(`⏱️ [Semantic Search With Content] No matching notes found`)
+      console.log(` [Semantic Search With Content] No matching notes found`)
       return { notes: [], combinedContent: "" }
     }
 
@@ -469,12 +469,12 @@ export async function searchNotesSemanticWithContent(
       .join("\n\n")
     const combineTime = performance.now() - combineStartTime
     console.log(
-      `⏱️ [Semantic Search With Content] Combine content: ${combineTime.toFixed(2)}ms (${combinedContent.length} chars)`
+      `⏱ [Semantic Search With Content] Combine content: ${combineTime.toFixed(2)}ms (${combinedContent.length} chars)`
     )
 
     const totalTime = performance.now() - startTime
     console.log(
-      `⏱️ [Semantic Search With Content] TOTAL time: ${totalTime.toFixed(2)}ms`
+      `⏱ [Semantic Search With Content] TOTAL time: ${totalTime.toFixed(2)}ms`
     )
 
     return {
@@ -484,7 +484,7 @@ export async function searchNotesSemanticWithContent(
   } catch (error) {
     const totalTime = performance.now() - startTime
     console.error(
-      `❌ [Semantic Search With Content] Failed after ${totalTime.toFixed(2)}ms:`,
+      ` [Semantic Search With Content] Failed after ${totalTime.toFixed(2)}ms:`,
       error
     )
     return { notes: [], combinedContent: "" }
@@ -852,7 +852,7 @@ function generatePersonaId(): string {
  * @returns The created persona with generated ID and timestamps
  */
 export async function addPersona(personaData: PersonaInput): Promise<Persona> {
-  console.log("🎭 [DB] addPersona called with:", personaData)
+  console.log(" [DB] addPersona called with:", personaData)
 
   const now = Date.now()
   const persona: Persona = {
@@ -868,10 +868,10 @@ export async function addPersona(personaData: PersonaInput): Promise<Persona> {
     updatedAt: now
   }
 
-  console.log("🎭 [DB] Generated persona object:", persona)
+  console.log(" [DB] Generated persona object:", persona)
 
   await db.personas.add(persona)
-  console.log("🎭 [DB] Persona added successfully with ID:", persona.id)
+  console.log(" [DB] Persona added successfully with ID:", persona.id)
 
   return persona
 }
@@ -883,14 +883,14 @@ export async function addPersona(personaData: PersonaInput): Promise<Persona> {
  * @returns The persona or undefined if not found
  */
 export async function getPersona(id: string): Promise<Persona | undefined> {
-  console.log("🎭 [DB] getPersona called with ID:", id)
+  console.log(" [DB] getPersona called with ID:", id)
 
   const persona = await db.personas.get(id)
 
   if (persona) {
-    console.log("🎭 [DB] Persona found:", persona.name)
+    console.log(" [DB] Persona found:", persona.name)
   } else {
-    console.log("🎭 [DB] Persona not found with ID:", id)
+    console.log(" [DB] Persona not found with ID:", id)
   }
 
   return persona
@@ -902,12 +902,12 @@ export async function getPersona(id: string): Promise<Persona | undefined> {
  * @returns Array of all personas, sorted by name (deduplicated by ID)
  */
 export async function getAllPersonas(): Promise<Persona[]> {
-  console.log("🎭 [DB] getAllPersonas called")
+  console.log(" [DB] getAllPersonas called")
 
   const personas = await db.personas.orderBy("name").toArray()
 
   console.log(
-    `🎭 [DB] Retrieved ${personas.length} personas (before deduplication):`,
+    ` [DB] Retrieved ${personas.length} personas (before deduplication):`,
     personas.map((p) => ({ id: p.id, name: p.name }))
   )
 
@@ -918,11 +918,11 @@ export async function getAllPersonas(): Promise<Persona[]> {
 
   if (uniquePersonas.length < personas.length) {
     console.warn(
-      `🎭 [DB] Found ${personas.length - uniquePersonas.length} duplicate personas, removed them from results`
+      ` [DB] Found ${personas.length - uniquePersonas.length} duplicate personas, removed them from results`
     )
   }
 
-  console.log(`🎭 [DB] Returning ${uniquePersonas.length} unique personas`)
+  console.log(` [DB] Returning ${uniquePersonas.length} unique personas`)
 
   return uniquePersonas
 }
@@ -939,7 +939,7 @@ export async function updatePersona(
   updates: Partial<PersonaInput>
 ): Promise<Persona | undefined> {
   console.log(
-    "🎭 [DB] updatePersona called for ID:",
+    " [DB] updatePersona called for ID:",
     id,
     "with updates:",
     updates
@@ -947,7 +947,7 @@ export async function updatePersona(
 
   const existing = await db.personas.get(id)
   if (!existing) {
-    console.log("🎭 [DB] Persona not found for update:", id)
+    console.log(" [DB] Persona not found for update:", id)
     return undefined
   }
 
@@ -958,7 +958,7 @@ export async function updatePersona(
   }
 
   await db.personas.update(id, updated)
-  console.log("🎭 [DB] Persona updated successfully:", updated.name)
+  console.log(" [DB] Persona updated successfully:", updated.name)
 
   return updated
 }
@@ -970,22 +970,22 @@ export async function updatePersona(
  * @returns True if deleted, false if not found or is a default persona
  */
 export async function deletePersona(id: string): Promise<boolean> {
-  console.log("🎭 [DB] deletePersona called for ID:", id)
+  console.log(" [DB] deletePersona called for ID:", id)
 
   const persona = await db.personas.get(id)
 
   if (!persona) {
-    console.log("🎭 [DB] Persona not found for deletion:", id)
+    console.log(" [DB] Persona not found for deletion:", id)
     return false
   }
 
   if (persona.isDefault) {
-    console.log("🎭 [DB] Cannot delete default persona:", persona.name)
+    console.log(" [DB] Cannot delete default persona:", persona.name)
     return false
   }
 
   await db.personas.delete(id)
-  console.log("🎭 [DB] Persona deleted successfully:", persona.name)
+  console.log(" [DB] Persona deleted successfully:", persona.name)
 
   return true
 }
@@ -996,11 +996,11 @@ export async function deletePersona(id: string): Promise<boolean> {
  * @returns Array of active personas
  */
 export async function getActivePersonas(): Promise<Persona[]> {
-  console.log("🎭 [DB] getActivePersonas called")
+  console.log(" [DB] getActivePersonas called")
 
   const personas = await db.personas.where("isActive").equals(1).toArray()
 
-  console.log(`🎭 [DB] Found ${personas.length} active personas`)
+  console.log(` [DB] Found ${personas.length} active personas`)
 
   return personas
 }
@@ -1012,12 +1012,12 @@ export async function getActivePersonas(): Promise<Persona[]> {
  * @returns True if successful
  */
 export async function setActivePersona(id: string | null): Promise<boolean> {
-  console.log("🎭 [DB] setActivePersona called with ID:", id)
+  console.log(" [DB] setActivePersona called with ID:", id)
 
   try {
     // Deactivate all personas first
     const allPersonas = await db.personas.toArray()
-    console.log(`🎭 [DB] Deactivating ${allPersonas.length} personas`)
+    console.log(` [DB] Deactivating ${allPersonas.length} personas`)
 
     await Promise.all(
       allPersonas.map((p) => db.personas.update(p.id, { isActive: false }))
@@ -1027,19 +1027,24 @@ export async function setActivePersona(id: string | null): Promise<boolean> {
     if (id) {
       const persona = await db.personas.get(id)
       if (!persona) {
-        console.log("🎭 [DB] Persona not found for activation:", id)
+        console.log(" [DB] Persona not found for activation:", id)
         return false
       }
 
       await db.personas.update(id, { isActive: true })
-      console.log("🎭 [DB] Activated persona:", persona.name)
+      console.log(" [DB] Activated persona:", persona.name)
     } else {
-      console.log("🎭 [DB] All personas deactivated (default mode)")
+      console.log(" [DB] All personas deactivated (default mode)")
     }
+
+    // Persist selection to chrome.storage for restoration on next load
+    const { setSelectedPersona } = await import("./persona-settings")
+    await setSelectedPersona(id)
+    console.log(" [DB] Saved persona selection to chrome.storage")
 
     return true
   } catch (error) {
-    console.error("🎭 [DB] Error setting active persona:", error)
+    console.error(" [DB] Error setting active persona:", error)
     return false
   }
 }
@@ -1050,16 +1055,16 @@ export async function setActivePersona(id: string | null): Promise<boolean> {
  * @returns The active persona or null if none active
  */
 export async function getActivePersona(): Promise<Persona | null> {
-  console.log("🎭 [DB] getActivePersona called")
+  console.log(" [DB] getActivePersona called")
 
   const personas = await db.personas.where("isActive").equals(1).toArray()
 
   if (personas.length > 0) {
-    console.log("🎭 [DB] Active persona found:", personas[0].name)
+    console.log(" [DB] Active persona found:", personas[0].name)
     return personas[0]
   }
 
-  console.log("🎭 [DB] No active persona (default mode)")
+  console.log(" [DB] No active persona (default mode)")
   return null
 }
 
@@ -1070,13 +1075,11 @@ export async function getActivePersona(): Promise<Persona | null> {
  * @returns Number of duplicate personas removed
  */
 export async function cleanupDuplicatePersonas(): Promise<number> {
-  console.log("🎭 [DB] cleanupDuplicatePersonas called")
+  console.log(" [DB] cleanupDuplicatePersonas called")
 
   try {
     const allPersonas = await db.personas.toArray()
-    console.log(
-      `🎭 [DB] Found ${allPersonas.length} total personas in database`
-    )
+    console.log(` [DB] Found ${allPersonas.length} total personas in database`)
 
     // Group personas by name
     const personasByName = new Map<string, Persona[]>()
@@ -1091,7 +1094,7 @@ export async function cleanupDuplicatePersonas(): Promise<number> {
     // For each group, keep only the most recent one
     for (const [name, personas] of personasByName.entries()) {
       if (personas.length > 1) {
-        console.log(`🎭 [DB] Found ${personas.length} duplicates of "${name}"`)
+        console.log(` [DB] Found ${personas.length} duplicates of "${name}"`)
 
         // Sort by updatedAt (newest first)
         personas.sort((a, b) => b.updatedAt - a.updatedAt)
@@ -1101,25 +1104,25 @@ export async function cleanupDuplicatePersonas(): Promise<number> {
         const toDelete = personas.slice(1)
 
         console.log(
-          `🎭 [DB] Keeping persona "${name}" with ID: ${toKeep.id} (updated: ${new Date(toKeep.updatedAt).toISOString()})`
+          ` [DB] Keeping persona "${name}" with ID: ${toKeep.id} (updated: ${new Date(toKeep.updatedAt).toISOString()})`
         )
 
         for (const duplicate of toDelete) {
           await db.personas.delete(duplicate.id)
           removedCount++
           console.log(
-            `🎭 [DB] Deleted duplicate "${name}" with ID: ${duplicate.id}`
+            ` [DB] Deleted duplicate "${name}" with ID: ${duplicate.id}`
           )
         }
       }
     }
 
     console.log(
-      `🎭 [DB] Cleanup complete. Removed ${removedCount} duplicate personas`
+      ` [DB] Cleanup complete. Removed ${removedCount} duplicate personas`
     )
     return removedCount
   } catch (error) {
-    console.error("🎭 [DB] Error during cleanup:", error)
+    console.error(" [DB] Error during cleanup:", error)
     return 0
   }
 }

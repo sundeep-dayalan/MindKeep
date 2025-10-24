@@ -11,6 +11,21 @@ import type { AgentResponse } from "~services/langchain-agent"
 import { getGlobalAgent } from "~services/langchain-agent"
 import type { Persona } from "~types/persona"
 
+// Helper function to get dynamic greeting based on time of day
+function getTimeBasedGreeting(): string {
+  const hour = new Date().getHours()
+
+  if (hour >= 5 && hour < 12) {
+    return "Good morning"
+  } else if (hour >= 12 && hour < 17) {
+    return "Good afternoon"
+  } else if (hour >= 17 && hour < 21) {
+    return "Good evening"
+  } else {
+    return "Good night"
+  }
+}
+
 interface Message {
   id: string
   type: "user" | "ai"
@@ -29,11 +44,19 @@ interface AISearchBarProps {
   ) => Promise<string | AgentResponse>
   onNoteCreated?: () => void // Callback when a note is successfully created
   onNotesChange?: () => Promise<void> // Callback when notes are modified (e.g., category changed)
+  onMessagesChange?: (hasMessages: boolean) => void // Callback when messages are added/cleared
+  onNoteClick?: (note: Note) => void // Callback when a reference note is clicked
   className?: string
 }
 
 // Reference Notes Component - Collapsible chip design
-function ReferenceNotesSection({ notes }: { notes: Note[] }) {
+function ReferenceNotesSection({
+  notes,
+  onNoteClick
+}: {
+  notes: Note[]
+  onNoteClick?: (note: Note) => void
+}) {
   const [isExpanded, setIsExpanded] = React.useState(false)
 
   return (
@@ -74,13 +97,14 @@ function ReferenceNotesSection({ notes }: { notes: Note[] }) {
           </svg>
         </button>
 
-        {/* Expanded View - Note Chips */}
+        {/* Expanded View - Note Chips (Clickable) */}
         {isExpanded && (
           <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-2 plasmo-mt-2">
             {notes.map((note) => (
-              <div
+              <button
                 key={note.id}
-                className="plasmo-group plasmo-relative plasmo-px-3 plasmo-py-1.5 plasmo-bg-white plasmo-border plasmo-border-slate-200 hover:plasmo-border-blue-300 plasmo-rounded-full plasmo-shadow-sm hover:plasmo-shadow-md plasmo-transition-all plasmo-cursor-pointer">
+                onClick={() => onNoteClick?.(note)}
+                className="plasmo-px-3 plasmo-py-1.5 plasmo-bg-white/20 plasmo-backdrop-blur-sm plasmo-border plasmo-border-white/40 hover:plasmo-border-blue-400 hover:plasmo-bg-blue-50/50 plasmo-rounded-full plasmo-shadow-sm hover:plasmo-shadow-md plasmo-transition-all plasmo-cursor-pointer">
                 <div className="plasmo-flex plasmo-items-center plasmo-gap-2">
                   <span className="plasmo-text-xs plasmo-font-medium plasmo-text-slate-800 plasmo-max-w-[200px] plasmo-truncate">
                     {note.title}
@@ -89,49 +113,7 @@ function ReferenceNotesSection({ notes }: { notes: Note[] }) {
                     {note.category}
                   </span>
                 </div>
-
-                {/* Tooltip on hover */}
-                <div className="plasmo-hidden group-hover:plasmo-block plasmo-absolute plasmo-left-0 plasmo-top-full plasmo-mt-2 plasmo-z-10 plasmo-w-72 plasmo-p-3 plasmo-bg-white plasmo-border plasmo-border-slate-200 plasmo-rounded-lg plasmo-shadow-lg">
-                  <div className="plasmo-flex plasmo-items-start plasmo-justify-between plasmo-gap-2 plasmo-mb-2">
-                    <h4 className="plasmo-text-sm plasmo-font-semibold plasmo-text-slate-800">
-                      {note.title}
-                    </h4>
-                    <span className="plasmo-px-2 plasmo-py-0.5 plasmo-bg-blue-50 plasmo-text-blue-700 plasmo-text-xs plasmo-rounded-full plasmo-flex-shrink-0">
-                      {note.category}
-                    </span>
-                  </div>
-                  <p className="plasmo-text-xs plasmo-text-slate-600 plasmo-line-clamp-3 plasmo-mb-2">
-                    {note.contentPlaintext}
-                  </p>
-                  <div className="plasmo-flex plasmo-items-center plasmo-gap-3 plasmo-pt-2 plasmo-border-t plasmo-border-slate-100">
-                    <span className="plasmo-text-xs plasmo-text-slate-400">
-                      {new Date(note.updatedAt).toLocaleDateString()}
-                    </span>
-                    {note.sourceUrl && (
-                      <a
-                        href={note.sourceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="plasmo-text-xs plasmo-text-blue-500 hover:plasmo-text-blue-700 plasmo-flex plasmo-items-center plasmo-gap-1">
-                        <svg
-                          className="plasmo-w-3 plasmo-h-3"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24">
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                          />
-                        </svg>
-                        Source
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </div>
+              </button>
             ))}
           </div>
         )}
@@ -145,12 +127,21 @@ export function AISearchBar({
   onSearch,
   onNoteCreated,
   onNotesChange,
+  onMessagesChange,
+  onNoteClick,
   className = ""
 }: AISearchBarProps) {
   const [messages, setMessages] = React.useState<Message[]>([])
   const [isSearching, setIsSearching] = React.useState(false)
   const [isChatExpanded, setIsChatExpanded] = React.useState(true)
   const [isInputDisabled, setIsInputDisabled] = React.useState(false)
+  const [isPersonaInitializing, setIsPersonaInitializing] = React.useState(true) // Track persona loading
+  const [greeting, setGreeting] = React.useState(getTimeBasedGreeting())
+
+  // Track which messages have had their clarifications handled (to hide buttons after click)
+  const [handledClarifications, setHandledClarifications] = React.useState<
+    Set<string>
+  >(new Set())
 
   // Track token usage for warning banner
   const [tokenUsage, setTokenUsage] = React.useState<{
@@ -175,6 +166,22 @@ export function AISearchBar({
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const editorRef = React.useRef<RichTextEditorRef>(null)
 
+  // Notify parent when messages change
+  React.useEffect(() => {
+    if (onMessagesChange) {
+      onMessagesChange(messages.length > 0)
+    }
+  }, [messages.length, onMessagesChange])
+
+  // Update greeting every minute to keep it current
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      setGreeting(getTimeBasedGreeting())
+    }, 60000) // Update every minute
+
+    return () => clearInterval(interval)
+  }, [])
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
@@ -184,10 +191,14 @@ export function AISearchBar({
   }, [messages])
 
   // Handle persona changes
-  const handlePersonaChange = async (persona: Persona | null) => {
+  const handlePersonaChange = async (
+    persona: Persona | null,
+    isManualChange: boolean = true
+  ) => {
     console.log(
-      "🎭 [AISearchBar] Persona changed to:",
-      persona?.name || "Default Mode"
+      " [AISearchBar] Persona changed to:",
+      persona?.name || "Default Mode",
+      isManualChange ? "(manual)" : "(auto-restored)"
     )
 
     try {
@@ -198,29 +209,37 @@ export function AISearchBar({
       // Clear chat history when switching personas
       setMessages([])
 
-      // Add a system message to indicate persona change
-      const systemMessage: Message = {
-        id: `system-${Date.now()}`,
-        type: "ai",
-        content: persona
-          ? `🎭 Switched to ${persona.name} persona. Conversation history cleared.\n\n${persona.description}`
-          : "🤖 Switched to Default Mode. Full tool access restored.",
-        timestamp: Date.now()
-      }
-      setMessages([systemMessage])
+      // Clear handled clarifications
+      setHandledClarifications(new Set())
 
-      console.log("🎭 [AISearchBar] Agent persona updated successfully")
+      // Only show system message if this is a manual change (not auto-restoration)
+      if (isManualChange) {
+        const systemMessage: Message = {
+          id: `system-${Date.now()}`,
+          type: "ai",
+          content: persona
+            ? ` Switched to ${persona.name} persona. Conversation history cleared.\n\n${persona.description}`
+            : " Switched to Default Mode. Full tool access restored.",
+          timestamp: Date.now()
+        }
+        setMessages([systemMessage])
+      }
+
+      console.log(" [AISearchBar] Agent persona updated successfully")
     } catch (error) {
-      console.error("🎭 [AISearchBar] Error updating agent persona:", error)
+      console.error(" [AISearchBar] Error updating agent persona:", error)
     }
   }
 
   // Handle clearing the conversation
   const handleClearChat = async () => {
-    console.log("🧹 [AISearchBar] Clearing chat...")
+    console.log(" [AISearchBar] Clearing chat...")
 
     // Clear local messages
     setMessages([])
+
+    // Clear handled clarifications
+    setHandledClarifications(new Set())
 
     // Clear the agent's session
     const agent = await getGlobalAgent()
@@ -241,7 +260,7 @@ export function AISearchBar({
     // Clear input length tracker
     setCurrentInputLength(0)
 
-    console.log("✅ [AISearchBar] Chat cleared")
+    console.log(" [AISearchBar] Chat cleared")
   }
 
   // Check and update token usage
@@ -260,13 +279,13 @@ export function AISearchBar({
 
           // Log token usage for debugging
           console.log(
-            `📊 [Token Usage] ${usage.usage}/${usage.quota} tokens (${usage.percentage.toFixed(1)}% used) - ${(usage.quota - usage.usage).toFixed(0)} remaining`
+            ` [Token Usage] ${usage.usage}/${usage.quota} tokens (${usage.percentage.toFixed(1)}% used) - ${(usage.quota - usage.usage).toFixed(0)} remaining`
           )
 
           // Warn if approaching limit
           if (usage.percentage >= 80) {
             console.warn(
-              `⚠️ [Token Warning] Approaching token limit! ${usage.percentage.toFixed(1)}% used`
+              ` [Token Warning] Approaching token limit! ${usage.percentage.toFixed(1)}% used`
             )
           }
         }
@@ -463,14 +482,21 @@ export function AISearchBar({
   const handleClarificationOption = async (
     action: string,
     value: any,
-    pendingNoteData?: AgentResponse["pendingNoteData"]
+    pendingNoteData?: AgentResponse["pendingNoteData"],
+    messageId?: string
   ) => {
     const callId = `${action}-${Date.now()}`
     console.log(`[${callId}] Clarification option selected:`, {
       action,
       value,
-      pendingNoteData
+      pendingNoteData,
+      messageId
     })
+
+    // Mark this message's clarification as handled (hide buttons)
+    if (messageId) {
+      setHandledClarifications((prev) => new Set(prev).add(messageId))
+    }
 
     if (!pendingNoteData) {
       console.error(`[${callId}] No pending note data found`)
@@ -507,7 +533,7 @@ export function AISearchBar({
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
-            content: "❌ Cancel",
+            content: " Cancel",
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, userMessage])
@@ -521,6 +547,9 @@ export function AISearchBar({
           }
           setMessages((prev) => [...prev, cancelMessage])
 
+          // Clear pending manual input state
+          setPendingManualInput({ type: null })
+
           // Re-enable input
           setIsSearching(false)
           setIsInputDisabled(false)
@@ -532,7 +561,7 @@ export function AISearchBar({
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
-            content: "✨ Auto-generate both title and category",
+            content: " Auto-generate both title and category",
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, userMessage])
@@ -560,7 +589,7 @@ export function AISearchBar({
           const confirmMessage: Message = {
             id: `ai-${Date.now()}`,
             type: "ai",
-            content: `Great! I've generated:\n📝 Title: "${finalTitle}"\n📁 Category: "${finalCategory}"\n\nCreating your note now...`,
+            content: `Great! I've generated:\n Title: "${finalTitle}"\n Category: "${finalCategory}"\n\nCreating your note now...`,
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, confirmMessage])
@@ -574,7 +603,7 @@ export function AISearchBar({
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
-            content: "✍️ I'll choose manually",
+            content: " I'll choose manually",
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, userMessage])
@@ -628,7 +657,7 @@ export function AISearchBar({
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
-            content: "🤖 Auto-generate title",
+            content: " Auto-generate title",
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, userMessage])
@@ -687,7 +716,7 @@ export function AISearchBar({
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
-            content: "✍️ I'll provide a title",
+            content: " I'll provide a title",
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, userMessage])
@@ -720,7 +749,7 @@ export function AISearchBar({
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
-            content: "🤖 Auto-generate category",
+            content: " Auto-generate category",
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, userMessage])
@@ -780,7 +809,7 @@ export function AISearchBar({
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
-            content: `📁 ${value}`,
+            content: ` ${value}`,
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, userMessage])
@@ -824,7 +853,7 @@ export function AISearchBar({
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
-            content: "✍️ I'll provide a category",
+            content: " I'll provide a category",
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, userMessage])
@@ -858,7 +887,7 @@ export function AISearchBar({
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
-            content: `📝 "${value}"`,
+            content: ` "${value}"`,
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, userMessage])
@@ -905,9 +934,7 @@ export function AISearchBar({
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
-            content: value.confirmed
-              ? "✅ Yes, move it"
-              : "❌ No, keep it here",
+            content: value.confirmed ? " Yes, move it" : " No, keep it here",
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, userMessage])
@@ -967,7 +994,7 @@ export function AISearchBar({
         // Generate embedding (same as in sidepanel.tsx handleSaveNote)
         const saveStartTime = performance.now()
         console.log(
-          `[${noteCreationId}] 📝 [AI Chat] Creating new note via agent...`
+          `[${noteCreationId}] [AI Chat] Creating new note via agent...`
         )
 
         // Step 1: Generate embedding from plaintext content
@@ -976,7 +1003,7 @@ export function AISearchBar({
         const embedding = await generateEmbedding(noteContent)
         const embeddingTime = performance.now() - embeddingStartTime
         console.log(
-          `⏱️ [AI Chat] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embedding.length} dimensions)`
+          `⏱ [AI Chat] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embedding.length} dimensions)`
         )
 
         // Get current tab URL for sourceUrl
@@ -995,9 +1022,7 @@ export function AISearchBar({
         let contentJSONString: string
         if (lastSubmittedContentJSON && noteContent) {
           // Extract only the portion of TipTap JSON that matches the agent's extracted content
-          console.log(
-            "✨ Extracting relevant portion from rich content JSON..."
-          )
+          console.log(" Extracting relevant portion from rich content JSON...")
 
           // Get the full plaintext from the stored JSON to compare
           const extractPlainTextFromJSON = (json: any): string => {
@@ -1023,7 +1048,7 @@ export function AISearchBar({
             fullText.length > noteContent.length
           ) {
             console.log(
-              "⚠️ Agent extracted partial content, filtering TipTap nodes..."
+              " Agent extracted partial content, filtering TipTap nodes..."
             )
 
             // Filter TipTap nodes to only include those that are part of noteContent
@@ -1051,21 +1076,21 @@ export function AISearchBar({
                 content: filteredNodes
               })
               console.log(
-                `✅ Filtered to ${filteredNodes.length} nodes (removed prompt)`
+                ` Filtered to ${filteredNodes.length} nodes (removed prompt)`
               )
             } else {
               // Fallback: use the full content if filtering failed
               contentJSONString = JSON.stringify(lastSubmittedContentJSON)
-              console.log("⚠️ Filtering failed, using full content")
+              console.log(" Filtering failed, using full content")
             }
           } else {
             // Content matches exactly, use full JSON
-            console.log("✅ Content matches exactly, using full rich JSON")
+            console.log(" Content matches exactly, using full rich JSON")
             contentJSONString = JSON.stringify(lastSubmittedContentJSON)
           }
         } else {
           // Fallback: Convert plain text to TipTap JSON format (for backward compatibility)
-          console.log("⚠️ No rich content found, converting plain text to JSON")
+          console.log(" No rich content found, converting plain text to JSON")
           const contentJSON = {
             type: "doc",
             content: noteContent
@@ -1100,7 +1125,7 @@ export function AISearchBar({
         })
         const messageTime = performance.now() - messageStartTime
         console.log(
-          `⏱️ [AI Chat] Background processing (encrypt + DB): ${messageTime.toFixed(2)}ms`
+          `⏱ [AI Chat] Background processing (encrypt + DB): ${messageTime.toFixed(2)}ms`
         )
 
         if (!response.success) {
@@ -1108,15 +1133,15 @@ export function AISearchBar({
         }
 
         const totalTime = performance.now() - saveStartTime
-        console.log(`⏱️ [AI Chat] TOTAL save time: ${totalTime.toFixed(2)}ms`)
+        console.log(` [AI Chat] TOTAL save time: ${totalTime.toFixed(2)}ms`)
         console.log(
-          `📊 [AI Chat] Breakdown: Embedding=${embeddingTime.toFixed(2)}ms, Background=${messageTime.toFixed(2)}ms`
+          ` [AI Chat] Breakdown: Embedding=${embeddingTime.toFixed(2)}ms, Background=${messageTime.toFixed(2)}ms`
         )
 
         const successMessage: Message = {
           id: `ai-${Date.now()}`,
           type: "ai",
-          content: `✅ Note created successfully!\n\n📝 Title: "${finalTitle}"\n📁 Category: ${finalCategory}`,
+          content: ` Note created successfully!\n\n Title: "${finalTitle}"\n Category: ${finalCategory}`,
           timestamp: Date.now()
         }
         setMessages((prev) => [...prev, successMessage])
@@ -1238,34 +1263,31 @@ export function AISearchBar({
   }
 
   return (
-    <div
-      className={`plasmo-flex plasmo-flex-col plasmo-space-y-2 ${className}`}>
-      {/* Persona Selector & Ask AI Label with Toggle */}
-      <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-px-1 plasmo-gap-2">
-        {/* Left side: Persona Selector and Label */}
-        <div className="plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-flex-1 plasmo-min-w-0">
-          <PersonaSelector onPersonaChange={handlePersonaChange} />
-
-          <div className="plasmo-flex plasmo-items-center plasmo-gap-1.5">
-            <svg
-              className="plasmo-w-4 plasmo-h-4 plasmo-text-slate-600"
-              fill="currentColor"
-              viewBox="0 0 20 20">
-              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-            </svg>
-            <span className="plasmo-text-xs plasmo-font-medium plasmo-text-slate-600">
-              Ask AI
+    <div className={`plasmo-flex plasmo-flex-col plasmo-h-full ${className}`}>
+      {/* Header Section - Dynamic Greeting and Controls */}
+      <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-py-2 plasmo-px-3 plasmo-border-b plasmo-border-slate-200">
+        {/* Left: MIND KEEP label and greeting */}
+        <div className="plasmo-flex plasmo-flex-col plasmo-gap-1">
+          <span className="plasmo-text-[8px] plasmo-font-medium plasmo-text-slate-500 plasmo-uppercase plasmo-tracking-wider">
+            Mind Keep
+          </span>
+          <div className="plasmo-flex plasmo-flex-col plasmo-gap-0.5">
+            <span className="plasmo-text-base plasmo-font-light plasmo-text-slate-700">
+              {greeting}!
+            </span>
+            <span className="plasmo-text-base plasmo-font-normal plasmo-text-slate-800">
+              May I help you with anything?
             </span>
           </div>
         </div>
 
-        {/* Right side: Clear & Toggle buttons */}
+        {/* Right: Clear & Toggle buttons */}
         {messages.length > 0 && (
-          <div className="plasmo-flex-shrink-0 plasmo-flex plasmo-items-center plasmo-gap-1">
+          <div className="plasmo-flex-shrink-0 plasmo-flex plasmo-items-center plasmo-gap-2">
             {/* Clear chat button */}
             <button
               onClick={handleClearChat}
-              className="plasmo-p-1 plasmo-rounded plasmo-text-slate-500 hover:plasmo-text-red-600 hover:plasmo-bg-red-50 plasmo-transition-colors"
+              className="plasmo-p-1.5 plasmo-rounded-lg plasmo-text-slate-500 hover:plasmo-text-red-600 hover:plasmo-bg-red-50 plasmo-transition-colors"
               title="Clear conversation">
               <svg
                 className="plasmo-w-4 plasmo-h-4"
@@ -1284,7 +1306,7 @@ export function AISearchBar({
             {/* Toggle chat history button */}
             <button
               onClick={() => setIsChatExpanded(!isChatExpanded)}
-              className="plasmo-p-1 plasmo-rounded plasmo-text-slate-500 hover:plasmo-text-slate-700 hover:plasmo-bg-slate-100 plasmo-transition-colors"
+              className="plasmo-p-1.5 plasmo-rounded-lg plasmo-text-slate-500 hover:plasmo-text-slate-700 hover:plasmo-bg-slate-100 plasmo-transition-colors"
               title={
                 isChatExpanded ? "Hide chat history" : "Show chat history"
               }>
@@ -1328,42 +1350,26 @@ export function AISearchBar({
               ? "plasmo-border-red-300 plasmo-text-red-800"
               : "plasmo-border-amber-300 plasmo-text-amber-800"
           }`}>
-          <svg
-            className={`plasmo-w-5 plasmo-h-5 plasmo-flex-shrink-0 plasmo-mt-0.5 ${
-              tokenUsage.percentage >= 95
-                ? "plasmo-text-red-600"
-                : "plasmo-text-amber-600"
-            }`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-            />
-          </svg>
           <div className="plasmo-flex-1">
             <div className="plasmo-text-xs plasmo-mb-2">
               {"Summarizing conversation history"}
             </div>
             {/* <button
-              onClick={handleClearChat}
-              className={`plasmo-px-3 plasmo-py-1.5 plasmo-rounded plasmo-text-xs plasmo-font-medium plasmo-transition-colors ${
-                tokenUsage.percentage >= 95
-                  ? "plasmo-bg-red-600 hover:plasmo-bg-red-700 plasmo-text-white"
-                  : "plasmo-bg-amber-600 hover:plasmo-bg-amber-700 plasmo-text-white"
-              }`}>
-              Start New Chat
-            </button> */}
+ onClick={handleClearChat}
+ className={`plasmo-px-3 plasmo-py-1.5 plasmo-rounded plasmo-text-xs plasmo-font-medium plasmo-transition-colors ${
+ tokenUsage.percentage >= 95
+ ? "plasmo-bg-red-600 hover:plasmo-bg-red-700 plasmo-text-white"
+ : "plasmo-bg-amber-600 hover:plasmo-bg-amber-700 plasmo-text-white"
+ }`}>
+ Start New Chat
+ </button> */}
           </div>
         </div>
       )}
 
       {/* Chat Messages */}
       {messages.length > 0 && isChatExpanded && (
-        <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-space-y-3 plasmo-px-2 plasmo-py-3 plasmo-max-h-96 plasmo-bg-slate-50 plasmo-rounded-lg">
+        <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-space-y-4 plasmo-px-4 plasmo-py-4 plasmo-max-h-[500px] plasmo-bg-white/10 plasmo-backdrop-blur-lg plasmo-rounded-2xl plasmo-border plasmo-border-white/30 plasmo-mb-4">
           {messages.map((message) => (
             <div key={message.id} className="plasmo-space-y-2">
               <div
@@ -1373,13 +1379,13 @@ export function AISearchBar({
                     : "plasmo-justify-start"
                 }`}>
                 <div
-                  className={`plasmo-px-4 plasmo-py-2 plasmo-rounded-lg plasmo-shadow-sm plasmo-max-w-[80%] ${
+                  className={`plasmo-px-4 plasmo-py-3 plasmo-rounded-2xl plasmo-shadow-sm plasmo-max-w-[85%] ${
                     message.type === "user"
-                      ? "plasmo-bg-blue-500 plasmo-text-white"
-                      : "plasmo-bg-white plasmo-text-slate-700 plasmo-border plasmo-border-slate-200"
+                      ? "plasmo-bg-gradient-to-br plasmo-from-gray-50 plasmo-via-gray-100/80 plasmo-to-gray-100 plasmo-text-slate-900 plasmo-border plasmo-border-gray-200/50"
+                      : "plasmo-bg-gradient-to-br plasmo-from-white plasmo-via-blue-50/30 plasmo-to-purple-50/20 plasmo-backdrop-blur-md plasmo-text-slate-900 plasmo-border plasmo-border-slate-200/50"
                   }`}>
                   {message.type === "user" ? (
-                    <div className="plasmo-text-sm plasmo-whitespace-pre-wrap plasmo-text-white">
+                    <div className="plasmo-text-sm plasmo-whitespace-pre-wrap plasmo-text-slate-900">
                       {message.content}
                     </div>
                   ) : (
@@ -1388,12 +1394,13 @@ export function AISearchBar({
                 </div>
               </div>
 
-              {/* Clarification Options */}
+              {/* Clarification Options - Only show if not handled */}
               {message.clarificationOptions &&
-                message.clarificationOptions.length > 0 && (
-                  <div className="plasmo-flex plasmo-justify-start plasmo-pl-4">
+                message.clarificationOptions.length > 0 &&
+                !handledClarifications.has(message.id) && (
+                  <div className="plasmo-flex plasmo-justify-start">
                     <div className="plasmo-max-w-[80%] plasmo-space-y-2">
-                      <div className="plasmo-text-xs plasmo-font-medium plasmo-text-slate-600 plasmo-pl-2">
+                      <div className="plasmo-text-xs plasmo-font-light plasmo-text-slate-600 plasmo-pl-2">
                         Choose an option:
                       </div>
                       <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-2">
@@ -1405,14 +1412,15 @@ export function AISearchBar({
                               handleClarificationOption(
                                 option.action,
                                 option.value,
-                                message.pendingNoteData
+                                message.pendingNoteData,
+                                message.id
                               )
                             }
                             className={`${
                               option.type === "category_pill"
                                 ? "plasmo-px-3 plasmo-py-1.5 plasmo-bg-blue-50 hover:plasmo-bg-blue-100 plasmo-text-blue-700 plasmo-border plasmo-border-blue-200 hover:plasmo-border-blue-300"
-                                : "plasmo-px-4 plasmo-py-2 plasmo-bg-white hover:plasmo-bg-slate-50 plasmo-text-slate-700 plasmo-border plasmo-border-slate-300 hover:plasmo-border-slate-400"
-                            } plasmo-rounded-full plasmo-text-sm plasmo-font-medium plasmo-transition-all plasmo-cursor-pointer plasmo-shadow-sm hover:plasmo-shadow disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed`}>
+                                : "plasmo-px-4 plasmo-py-2 plasmo-bg-white/20 plasmo-backdrop-blur-sm hover:plasmo-bg-white/30 plasmo-text-slate-900 plasmo-border plasmo-border-white/40 hover:plasmo-border-white/50"
+                            } plasmo-rounded-full plasmo-text-[12px] plasmo-font-normal plasmo-transition-all plasmo-cursor-pointer plasmo-shadow-sm hover:plasmo-shadow disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed`}>
                             {option.label}
                           </button>
                         ))}
@@ -1423,13 +1431,16 @@ export function AISearchBar({
 
               {/* Reference Notes */}
               {message.referenceNotes && message.referenceNotes.length > 0 && (
-                <ReferenceNotesSection notes={message.referenceNotes} />
+                <ReferenceNotesSection
+                  notes={message.referenceNotes}
+                  onNoteClick={onNoteClick}
+                />
               )}
             </div>
           ))}
           {isSearching && (
             <div className="plasmo-flex plasmo-justify-start">
-              <div className="plasmo-max-w-[80%] plasmo-px-4 plasmo-py-2 plasmo-rounded-lg plasmo-bg-white plasmo-text-slate-700 plasmo-border plasmo-border-slate-200">
+              <div className="plasmo-max-w-[80%] plasmo-px-4 plasmo-py-2 plasmo-rounded-lg plasmo-bg-white/20 plasmo-backdrop-blur-md plasmo-text-slate-900 plasmo-border plasmo-border-white/40">
                 <div className="plasmo-flex plasmo-items-center plasmo-gap-2">
                   <div className="plasmo-w-2 plasmo-h-2 plasmo-bg-slate-400 plasmo-rounded-full plasmo-animate-bounce" />
                   <div
@@ -1449,11 +1460,11 @@ export function AISearchBar({
       )}
 
       {/* Search Input */}
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="plasmo-mt-auto">
         {/* Input length indicator - show if getting close to limit */}
         {currentInputLength > 4000 && (
           <div
-            className={`plasmo-px-3 plasmo-py-1 plasmo-text-xs plasmo-mb-2 plasmo-rounded ${
+            className={`plasmo-px-3 plasmo-py-1 plasmo-text-xs plasmo-mb-2 plasmo-rounded-lg ${
               currentInputLength > 7000
                 ? "plasmo-bg-red-50 plasmo-text-red-700"
                 : currentInputLength > 6000
@@ -1465,9 +1476,9 @@ export function AISearchBar({
           </div>
         )}
 
-        <div className="plasmo-flex plasmo-items-end plasmo-gap-2 plasmo-bg-slate-50 plasmo-rounded-2xl plasmo-px-4 plasmo-py-3 plasmo-border plasmo-border-slate-200 hover:plasmo-border-slate-300 plasmo-transition-all focus-within:plasmo-border-blue-400 focus-within:plasmo-ring-2 focus-within:plasmo-ring-blue-100">
-          {/* Rich Text Editor - takes full width */}
-          <div className="plasmo-flex-1 plasmo-min-h-[40px] plasmo-max-h-[200px] plasmo-overflow-y-auto">
+        <div className="plasmo-bg-white/90 plasmo-backdrop-blur-sm plasmo-rounded-[10px] plasmo-px-4 plasmo-py-3 plasmo-border plasmo-border-slate-200/80 hover:plasmo-border-slate-300 plasmo-transition-all focus-within:plasmo-border-slate-400 plasmo-shadow-sm plasmo-space-y-3">
+          {/* Rich Text Editor - Full Width on Top */}
+          <div className="plasmo-w-full plasmo-min-h-[44px] plasmo-max-h-[200px] plasmo-overflow-y-auto">
             <RichTextEditor
               ref={editorRef}
               placeholder={
@@ -1486,36 +1497,50 @@ export function AISearchBar({
             />
           </div>
 
-          {/* Submit Button - aligned to bottom right */}
-          <button
-            type="submit"
-            className="plasmo-flex-shrink-0 plasmo-w-8 plasmo-h-8 plasmo-bg-slate-900 plasmo-text-white plasmo-rounded-full plasmo-flex plasmo-items-center plasmo-justify-center hover:plasmo-bg-slate-800 plasmo-transition-colors disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed plasmo-mb-0.5"
-            title={
-              currentInputLength > 8000
-                ? "Input too large (max 8000 chars)"
-                : tokenUsage && tokenUsage.usage >= 7000
-                  ? "Session limit reached - start new chat"
-                  : "Send (Enter)"
-            }
-            disabled={
-              isSearching ||
-              isInputDisabled ||
-              currentInputLength > 8000 ||
-              (tokenUsage !== null && tokenUsage.usage >= 7000)
-            }>
-            <svg
-              className="plasmo-w-4 plasmo-h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M14 5l7 7m0 0l-7 7m7-7H3"
+          {/* Bottom Row: Persona Selector + Submit Button */}
+          <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-gap-3 plasmo-pt-2 plasmo-border-t plasmo-border-slate-100">
+            {/* Persona Selector - Left Side */}
+            <div className="plasmo-flex-shrink-0">
+              <PersonaSelector
+                onPersonaChange={handlePersonaChange}
+                onInitializationChange={setIsPersonaInitializing}
               />
-            </svg>
-          </button>
+            </div>
+
+            {/* Submit Button - Right Side */}
+            <button
+              type="submit"
+              className="plasmo-flex-shrink-0 plasmo-w-9 plasmo-h-9 plasmo-bg-slate-900 plasmo-text-white plasmo-rounded-lg plasmo-flex plasmo-items-center plasmo-justify-center hover:plasmo-bg-slate-700 plasmo-transition-colors disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed"
+              title={
+                isPersonaInitializing
+                  ? "Loading persona..."
+                  : currentInputLength > 8000
+                    ? "Input too large (max 8000 chars)"
+                    : tokenUsage && tokenUsage.usage >= 7000
+                      ? "Session limit reached - start new chat"
+                      : "Send (Enter)"
+              }
+              disabled={
+                isPersonaInitializing ||
+                isSearching ||
+                isInputDisabled ||
+                currentInputLength > 8000 ||
+                (tokenUsage !== null && tokenUsage.usage >= 7000)
+              }>
+              <svg
+                className="plasmo-w-4 plasmo-h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M14 5l7 7m0 0l-7 7m7-7H3"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
       </form>
     </div>

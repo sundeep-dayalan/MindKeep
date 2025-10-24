@@ -11,47 +11,117 @@ import {
   getAllPersonas,
   setActivePersona
 } from "~services/db-service"
+import { getSelectedPersonaId } from "~services/persona-settings"
 import type { Persona } from "~types/persona"
 
 interface PersonaSelectorProps {
-  onPersonaChange?: (persona: Persona | null) => void
+  onPersonaChange?: (persona: Persona | null, isManualChange?: boolean) => void
+  onInitializationChange?: (isInitializing: boolean) => void // Notify parent of initialization state
 }
 
-export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
+export function PersonaSelector({
+  onPersonaChange,
+  onInitializationChange
+}: PersonaSelectorProps) {
   const [personas, setPersonas] = useState<Persona[]>([])
   const [activePersona, setActivePersonaState] = useState<Persona | null>(null)
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [isInitializing, setIsInitializing] = useState(true) // Start as true - we're loading
 
   useEffect(() => {
-    console.log("🎭 [PersonaSelector] Component mounted, loading personas")
+    console.log(" [PersonaSelector] Component mounted, loading personas")
     loadPersonas()
   }, [])
 
   const loadPersonas = async () => {
-    console.log("🎭 [PersonaSelector] loadPersonas called")
+    console.log(" [PersonaSelector] loadPersonas called")
     try {
+      setIsInitializing(true) // Start initialization
+      if (onInitializationChange) {
+        onInitializationChange(true)
+      }
+
       const [allPersonas, active] = await Promise.all([
         getAllPersonas(),
         getActivePersona()
       ])
 
-      console.log(`🎭 [PersonaSelector] Loaded ${allPersonas.length} personas`)
-      console.log(
-        "🎭 [PersonaSelector] Active persona:",
-        active?.name || "None"
-      )
+      console.log(` [PersonaSelector] Loaded ${allPersonas.length} personas`)
+      console.log(" [PersonaSelector] Active persona:", active?.name || "None")
 
       setPersonas(allPersonas)
       setActivePersonaState(active)
+
+      // On first load, restore saved persona from chrome.storage
+      if (isInitializing) {
+        console.log(" [PersonaSelector] First load - restoring saved persona")
+        await restoreSavedPersona(allPersonas)
+      }
     } catch (error) {
-      console.error("🎭 [PersonaSelector] Error loading personas:", error)
+      console.error(" [PersonaSelector] Error loading personas:", error)
+    } finally {
+      // Mark initialization complete
+      setIsInitializing(false)
+      if (onInitializationChange) {
+        onInitializationChange(false)
+      }
+      console.log(" [PersonaSelector] Initialization complete")
+    }
+  }
+
+  const restoreSavedPersona = async (allPersonas: Persona[]) => {
+    try {
+      const savedPersonaId = await getSelectedPersonaId()
+
+      if (!savedPersonaId) {
+        console.log(
+          " [PersonaSelector] No saved persona, staying in default mode"
+        )
+        return
+      }
+
+      console.log(
+        " [PersonaSelector] Restoring saved persona ID:",
+        savedPersonaId
+      )
+
+      const savedPersona = allPersonas.find((p) => p.id === savedPersonaId)
+
+      if (savedPersona) {
+        console.log(
+          " [PersonaSelector] Found saved persona:",
+          savedPersona.name
+        )
+
+        // Just update local state - don't call setActivePersona() to avoid triggering storage listener
+        setActivePersonaState(savedPersona)
+
+        // Notify parent to update agent (isManualChange = false for restoration)
+        if (onPersonaChange) {
+          console.log(
+            " [PersonaSelector] Notifying parent of restored persona (silent)"
+          )
+          onPersonaChange(savedPersona, false) // false = don't show "Switched to..." message
+        }
+      } else {
+        console.log(
+          " [PersonaSelector] Saved persona not found in database, clearing selection"
+        )
+        // Clear invalid saved persona from storage only
+        const { setSelectedPersona } = await import(
+          "~services/persona-settings"
+        )
+        await setSelectedPersona(null)
+      }
+    } catch (error) {
+      console.error(" [PersonaSelector] Error restoring saved persona:", error)
     }
   }
 
   const handleSelect = async (persona: Persona | null) => {
     console.log(
-      "🎭 [PersonaSelector] handleSelect for persona:",
+      " [PersonaSelector] handleSelect for persona:",
       persona?.name || "None (default mode)"
     )
 
@@ -63,79 +133,76 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
       setActivePersonaState(persona)
 
       if (onPersonaChange) {
-        onPersonaChange(persona)
+        onPersonaChange(persona, true) // true = manual change, show "Switched to..." message
       }
 
-      console.log("🎭 [PersonaSelector] Persona changed successfully")
+      console.log(" [PersonaSelector] Persona changed successfully")
     } catch (error) {
-      console.error("🎭 [PersonaSelector] Error changing persona:", error)
+      console.error(" [PersonaSelector] Error changing persona:", error)
       alert("Failed to change persona. Please try again.")
     } finally {
       setLoading(false)
     }
   }
 
-  // Trigger reload when personas change in storage
-  useEffect(() => {
-    console.log("🎭 [PersonaSelector] Setting up storage listener")
-
-    const handleStorageChange = (changes: {
-      [key: string]: chrome.storage.StorageChange
-    }) => {
-      // Reload if persona-related data changes
-      if (changes["mindkeep_persona_settings"]) {
-        console.log(
-          "🎭 [PersonaSelector] Persona settings changed in storage, reloading"
-        )
-        loadPersonas()
-      }
-    }
-
-    chrome.storage.onChanged.addListener(handleStorageChange)
-
-    return () => {
-      console.log("🎭 [PersonaSelector] Removing storage listener")
-      chrome.storage.onChanged.removeListener(handleStorageChange)
-    }
-  }, [])
+  // Note: We don't need a storage listener for persona selection changes
+  // because handleSelect() already updates the UI immediately.
+  // We could add a listener here if we want to detect when personas are
+  // created/updated/deleted from PersonaManager, but that's not critical
+  // since the user would manually refresh or reopen the dropdown.
 
   return (
     <div className="plasmo-relative">
-      {/* Compact Icon Button with Dropdown */}
+      {/* Model Selector Style Dropdown Button - Exact Reference Match */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        disabled={loading}
-        title={
-          activePersona
-            ? `${activePersona.name} (Search-only)`
-            : "Default Mode (Full access)"
-        }
-        className={`plasmo-flex plasmo-items-center plasmo-gap-1.5 plasmo-px-2.5 plasmo-py-1.5 plasmo-rounded-lg plasmo-border plasmo-transition-all plasmo-group ${
-          activePersona
-            ? "plasmo-bg-gradient-to-r plasmo-from-purple-50 plasmo-to-purple-100 plasmo-border-purple-300 hover:plasmo-from-purple-100 hover:plasmo-to-purple-150 plasmo-shadow-sm"
-            : "plasmo-bg-white plasmo-border-slate-200 hover:plasmo-bg-slate-50 hover:plasmo-border-slate-300"
-        } ${loading ? "plasmo-opacity-50 plasmo-cursor-not-allowed" : "plasmo-cursor-pointer"}`}>
-        {/* Icon */}
-        <span className="plasmo-text-base plasmo-leading-none">
-          {activePersona?.emoji || "⚡"}
-        </span>
+        disabled={loading || isInitializing}
+        type="button"
+        className="plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-px-2.5 plasmo-py-1.5 plasmo-rounded-lg plasmo-border plasmo-border-slate-100 plasmo-bg-slate-50 hover:plasmo-bg-slate-200 plasmo-transition-colors plasmo-min-w-[120px] disabled:plasmo-opacity-60 disabled:plasmo-cursor-not-allowed">
+        {/* Loading Spinner or Name */}
+        {isInitializing ? (
+          <>
+            <svg
+              className="plasmo-animate-spin plasmo-h-3 plasmo-w-3 plasmo-text-slate-500"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24">
+              <circle
+                className="plasmo-opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="plasmo-opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
+            <span className="plasmo-text-[13px] plasmo-font-medium plasmo-text-slate-500 plasmo-flex-1 plasmo-text-left">
+              Loading...
+            </span>
+          </>
+        ) : (
+          <span className="plasmo-text-[13px] plasmo-font-medium plasmo-text-slate-700 plasmo-flex-1 plasmo-text-left plasmo-truncate">
+            PERSONA | {activePersona?.name || "Default"}
+          </span>
+        )}
 
         {/* Dropdown Arrow */}
         <svg
-          className={`plasmo-w-3.5 plasmo-h-3.5 plasmo-transition-transform plasmo-duration-200 ${
+          className={`plasmo-w-3 plasmo-h-3 plasmo-transition-transform plasmo-duration-200 plasmo-text-slate-400 ${
             isOpen ? "plasmo-rotate-180" : ""
-          } ${
-            activePersona
-              ? "plasmo-text-purple-600"
-              : "plasmo-text-slate-500 group-hover:plasmo-text-slate-700"
           }`}
           fill="none"
           stroke="currentColor"
-          viewBox="0 0 24 24">
+          viewBox="0 0 24 24"
+          strokeWidth={2.5}>
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            strokeWidth={2.5}
             d="M19 9l-7 7-7-7"
           />
         </svg>
@@ -150,40 +217,34 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
             onClick={() => setIsOpen(false)}
           />
 
-          {/* Menu Panel - Opens UPWARD */}
-          <div className="plasmo-absolute plasmo-bottom-full plasmo-mb-2 plasmo-left-0 plasmo-w-80 plasmo-bg-white plasmo-border plasmo-border-slate-200 plasmo-rounded-xl plasmo-shadow-xl plasmo-z-[101] plasmo-max-h-[32rem] plasmo-overflow-hidden plasmo-flex plasmo-flex-col">
+          {/* Menu Panel - Opens UPWARD - Compact Style */}
+          <div className="plasmo-absolute plasmo-bottom-full plasmo-mb-2 plasmo-left-0 plasmo-w-[260px] plasmo-bg-white plasmo-border plasmo-border-slate-200 plasmo-rounded-lg plasmo-shadow-xl plasmo-z-[101] plasmo-max-h-[360px] plasmo-overflow-hidden plasmo-flex plasmo-flex-col">
             {/* Header */}
-            <div className="plasmo-px-4 plasmo-py-3 plasmo-border-b plasmo-border-slate-100 plasmo-bg-gradient-to-r plasmo-from-slate-50 plasmo-to-white">
-              <h3 className="plasmo-text-sm plasmo-font-semibold plasmo-text-slate-800 plasmo-flex plasmo-items-center plasmo-gap-2">
-                <span>🎭</span>
-                <span>Select AI Persona</span>
+            <div className="plasmo-px-3 plasmo-py-2.5 plasmo-border-b plasmo-border-slate-100 plasmo-bg-slate-50">
+              <h3 className="plasmo-text-xs plasmo-font-semibold plasmo-text-slate-700">
+                Select Persona
               </h3>
-              <p className="plasmo-text-xs plasmo-text-slate-500 plasmo-mt-0.5">
-                Choose how the AI should respond
-              </p>
             </div>
 
             {/* Scrollable Content */}
-            <div className="plasmo-overflow-y-auto plasmo-max-h-96">
+            <div className="plasmo-overflow-y-auto plasmo-flex-1 plasmo-no-visible-scrollbar">
               {/* Default Mode Option */}
               <button
                 onClick={() => handleSelect(null)}
-                className={`plasmo-w-full plasmo-flex plasmo-items-start plasmo-gap-3 plasmo-px-4 plasmo-py-3 plasmo-transition-all plasmo-border-b plasmo-border-slate-100 ${
+                type="button"
+                className={`plasmo-w-full plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-px-3 plasmo-py-2 plasmo-transition-all plasmo-text-left ${
                   !activePersona
-                    ? "plasmo-bg-gradient-to-r plasmo-from-blue-50 plasmo-to-indigo-50 plasmo-border-l-4 plasmo-border-l-blue-500"
-                    : "hover:plasmo-bg-slate-50 plasmo-border-l-4 plasmo-border-l-transparent hover:plasmo-border-l-slate-300"
+                    ? "plasmo-bg-slate-100"
+                    : "hover:plasmo-bg-slate-50"
                 }`}>
-                <div className="plasmo-flex-shrink-0 plasmo-w-10 plasmo-h-10 plasmo-bg-gradient-to-br plasmo-from-blue-500 plasmo-to-indigo-600 plasmo-rounded-lg plasmo-flex plasmo-items-center plasmo-justify-center plasmo-text-xl plasmo-shadow-md">
-                  ⚡
-                </div>
-                <div className="plasmo-flex-1 plasmo-text-left plasmo-min-w-0">
-                  <div className="plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-mb-1">
-                    <span className="plasmo-font-semibold plasmo-text-sm plasmo-text-slate-800">
-                      Default Mode
+                <div className="plasmo-flex-1 plasmo-min-w-0">
+                  <div className="plasmo-flex plasmo-items-center plasmo-gap-1.5">
+                    <span className="plasmo-text-[13px] plasmo-font-medium plasmo-text-slate-800">
+                      Default
                     </span>
                     {!activePersona && (
                       <svg
-                        className="plasmo-w-4 plasmo-h-4 plasmo-text-blue-600 plasmo-flex-shrink-0"
+                        className="plasmo-w-3 plasmo-h-3 plasmo-text-blue-600 plasmo-flex-shrink-0"
                         fill="currentColor"
                         viewBox="0 0 20 20">
                         <path
@@ -194,59 +255,43 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
                       </svg>
                     )}
                   </div>
-                  <p className="plasmo-text-xs plasmo-text-slate-600 plasmo-leading-relaxed">
-                    Full access to create, update, and delete notes
+                  <p className="plasmo-text-[11px] plasmo-text-slate-500 plasmo-truncate">
+                    Full tool access
                   </p>
                 </div>
               </button>
 
-              {/* Personas Section */}
+              {/* Divider */}
               {personas.length > 0 && (
-                <div className="plasmo-px-4 plasmo-py-2 plasmo-bg-slate-50 plasmo-border-b plasmo-border-slate-100">
-                  <span className="plasmo-text-xs plasmo-font-medium plasmo-text-slate-500 plasmo-uppercase plasmo-tracking-wider">
-                    Available Personas ({personas.length})
-                  </span>
-                </div>
+                <div className="plasmo-h-px plasmo-bg-slate-100 plasmo-my-1" />
               )}
 
               {/* Persona Options */}
               {personas.length === 0 ? (
-                <div className="plasmo-px-4 plasmo-py-8 plasmo-text-center">
-                  <div className="plasmo-w-16 plasmo-h-16 plasmo-mx-auto plasmo-bg-slate-100 plasmo-rounded-full plasmo-flex plasmo-items-center plasmo-justify-center plasmo-text-3xl plasmo-mb-3">
-                    🎭
-                  </div>
-                  <p className="plasmo-text-sm plasmo-text-slate-600 plasmo-font-medium plasmo-mb-1">
-                    No personas yet
-                  </p>
-                  <p className="plasmo-text-xs plasmo-text-slate-500">
-                    Create personas in the Personas tab to customize AI behavior
+                <div className="plasmo-px-3 plasmo-py-4 plasmo-text-center">
+                  <p className="plasmo-text-[11px] plasmo-text-slate-500">
+                    No personas available
                   </p>
                 </div>
               ) : (
-                personas.map((persona, idx) => (
+                personas.map((persona) => (
                   <button
                     key={persona.id}
                     onClick={() => handleSelect(persona)}
-                    className={`plasmo-w-full plasmo-flex plasmo-items-start plasmo-gap-3 plasmo-px-4 plasmo-py-3 plasmo-transition-all ${
-                      idx < personas.length - 1
-                        ? "plasmo-border-b plasmo-border-slate-100"
-                        : ""
-                    } ${
+                    type="button"
+                    className={`plasmo-w-full plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-px-3 plasmo-py-2 plasmo-transition-all plasmo-text-left ${
                       activePersona?.id === persona.id
-                        ? "plasmo-bg-gradient-to-r plasmo-from-purple-50 plasmo-to-pink-50 plasmo-border-l-4 plasmo-border-l-purple-500"
-                        : "hover:plasmo-bg-slate-50 plasmo-border-l-4 plasmo-border-l-transparent hover:plasmo-border-l-slate-300"
+                        ? "plasmo-bg-slate-100"
+                        : "hover:plasmo-bg-slate-50"
                     }`}>
-                    <div className="plasmo-flex-shrink-0 plasmo-w-10 plasmo-h-10 plasmo-bg-gradient-to-br plasmo-from-purple-500 plasmo-to-pink-600 plasmo-rounded-lg plasmo-flex plasmo-items-center plasmo-justify-center plasmo-text-xl plasmo-shadow-md">
-                      {persona.emoji || "🤖"}
-                    </div>
-                    <div className="plasmo-flex-1 plasmo-text-left plasmo-min-w-0">
-                      <div className="plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-mb-1">
-                        <span className="plasmo-font-semibold plasmo-text-sm plasmo-text-slate-800 plasmo-truncate">
+                    <div className="plasmo-flex-1 plasmo-min-w-0">
+                      <div className="plasmo-flex plasmo-items-center plasmo-gap-1.5">
+                        <span className="plasmo-text-[13px] plasmo-font-medium plasmo-text-slate-800 plasmo-truncate">
                           {persona.name}
                         </span>
                         {activePersona?.id === persona.id && (
                           <svg
-                            className="plasmo-w-4 plasmo-h-4 plasmo-text-purple-600 plasmo-flex-shrink-0"
+                            className="plasmo-w-3 plasmo-h-3 plasmo-text-blue-600 plasmo-flex-shrink-0"
                             fill="currentColor"
                             viewBox="0 0 20 20">
                             <path
@@ -257,26 +302,10 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
                           </svg>
                         )}
                       </div>
-                      <p className="plasmo-text-xs plasmo-text-slate-600 plasmo-line-clamp-2 plasmo-leading-relaxed">
-                        {persona.description}
+                      <p className="plasmo-text-[11px] plasmo-text-slate-500 plasmo-truncate">
+                        {persona.description.substring(0, 40)}
+                        {persona.description.length > 40 ? "..." : ""}
                       </p>
-                      <div className="plasmo-flex plasmo-items-center plasmo-gap-1 plasmo-mt-1.5">
-                        <svg
-                          className="plasmo-w-3 plasmo-h-3 plasmo-text-slate-400"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24">
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                          />
-                        </svg>
-                        <span className="plasmo-text-[10px] plasmo-text-slate-500 plasmo-uppercase plasmo-tracking-wide">
-                          Search-only access
-                        </span>
-                      </div>
                     </div>
                   </button>
                 ))

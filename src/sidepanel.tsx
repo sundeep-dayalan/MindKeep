@@ -4,12 +4,10 @@ import "~style.css"
 
 import { AISearchBar } from "~components/AISearchBar"
 import { AIStatusBanner } from "~components/AIStatusBanner"
-import { CategoryFilter } from "~components/CategoryFilter"
+import { AnimatedCategoryTabs } from "~components/AnimatedCategoryTabs"
 import { Header } from "~components/Header"
 import { NoteEditor, type RichTextEditorRef } from "~components/NoteEditor"
-import { NotesList } from "~components/NotesList"
 import { PersonaManager } from "~components/PersonaManager"
-import { SearchBar } from "~components/SearchBar"
 import { generateEmbedding, generateTitle } from "~services/ai-service"
 import {
   deleteNote,
@@ -156,20 +154,20 @@ function SidePanel() {
       let finalTitle = noteTitle.trim()
       if (!finalTitle) {
         console.log(
-          "🎯 [Auto Title] No title provided, generating automatically..."
+          " [Auto Title] No title provided, generating automatically..."
         )
         const titleGenerationStart = performance.now()
 
         try {
           finalTitle = await generateTitle("", contentPlaintext)
           console.log(
-            `✅ [Auto Title] Generated: "${finalTitle}" in ${(performance.now() - titleGenerationStart).toFixed(2)}ms`
+            ` [Auto Title] Generated: "${finalTitle}" in ${(performance.now() - titleGenerationStart).toFixed(2)}ms`
           )
 
           // Update the UI to show the generated title
           setNoteTitle(finalTitle)
         } catch (error) {
-          console.error("❌ [Auto Title] Generation failed:", error)
+          console.error(" [Auto Title] Generation failed:", error)
           // Fallback to a default title
           finalTitle = "Untitled Note"
           setNoteTitle(finalTitle)
@@ -182,14 +180,14 @@ function SidePanel() {
       if (editingNote) {
         // For updates, generate embedding here (in DOM context with full Web APIs)
         const updateStartTime = performance.now()
-        console.log("✏️ [UI Update] Updating existing note:", editingNote.id)
+        console.log(" [UI Update] Updating existing note:", editingNote.id)
 
         // Generate new embedding for updated content (from plaintext)
         const embeddingStartTime = performance.now()
         const embedding = await generateEmbedding(contentPlaintext)
         const embeddingTime = performance.now() - embeddingStartTime
         console.log(
-          `⏱️ [UI Update] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embedding.length} dimensions)`
+          `⏱ [UI Update] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embedding.length} dimensions)`
         )
 
         // Send update request to background script with pre-generated embedding
@@ -207,7 +205,7 @@ function SidePanel() {
         })
         const messageTime = performance.now() - messageStartTime
         console.log(
-          `⏱️ [UI Update] Background processing (encrypt + DB): ${messageTime.toFixed(2)}ms`
+          `⏱ [UI Update] Background processing (encrypt + DB): ${messageTime.toFixed(2)}ms`
         )
 
         if (!response.success) {
@@ -216,22 +214,22 @@ function SidePanel() {
 
         const totalTime = performance.now() - updateStartTime
         console.log(
-          `⏱️ [UI Update] TOTAL update time: ${totalTime.toFixed(2)}ms`
+          `⏱ [UI Update] TOTAL update time: ${totalTime.toFixed(2)}ms`
         )
         console.log(
-          `📊 [UI Update] Breakdown: Embedding=${embeddingTime.toFixed(2)}ms, Background=${messageTime.toFixed(2)}ms`
+          ` [UI Update] Breakdown: Embedding=${embeddingTime.toFixed(2)}ms, Background=${messageTime.toFixed(2)}ms`
         )
       } else {
         // For new notes, generate embedding here (in DOM context with full Web APIs)
         const saveStartTime = performance.now()
-        console.log("📝 [UI Save] Creating new note...")
+        console.log(" [UI Save] Creating new note...")
 
         // Step 1: Generate embedding from plaintext content
         const embeddingStartTime = performance.now()
         const embedding = await generateEmbedding(contentPlaintext)
         const embeddingTime = performance.now() - embeddingStartTime
         console.log(
-          `⏱️ [UI Save] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embedding.length} dimensions)`
+          `⏱ [UI Save] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embedding.length} dimensions)`
         )
 
         // Get current tab URL for sourceUrl
@@ -250,7 +248,7 @@ function SidePanel() {
         const messageStartTime = performance.now()
         const saveId = `save_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
         console.log(
-          `🚀 [UI Save ${saveId}] Sending SAVE_NOTE message to background`
+          ` [UI Save ${saveId}] Sending SAVE_NOTE message to background`
         )
         const response = await chrome.runtime.sendMessage({
           type: "SAVE_NOTE",
@@ -266,7 +264,7 @@ function SidePanel() {
         })
         const messageTime = performance.now() - messageStartTime
         console.log(
-          `⏱️ [UI Save] Background processing (encrypt + DB): ${messageTime.toFixed(2)}ms`
+          `⏱ [UI Save] Background processing (encrypt + DB): ${messageTime.toFixed(2)}ms`
         )
 
         if (!response.success) {
@@ -274,9 +272,9 @@ function SidePanel() {
         }
 
         const totalTime = performance.now() - saveStartTime
-        console.log(`⏱️ [UI Save] TOTAL save time: ${totalTime.toFixed(2)}ms`)
+        console.log(` [UI Save] TOTAL save time: ${totalTime.toFixed(2)}ms`)
         console.log(
-          `📊 [UI Save] Breakdown: Embedding=${embeddingTime.toFixed(2)}ms, Background=${messageTime.toFixed(2)}ms`
+          ` [UI Save] Breakdown: Embedding=${embeddingTime.toFixed(2)}ms, Background=${messageTime.toFixed(2)}ms`
         )
       }
 
@@ -286,7 +284,7 @@ function SidePanel() {
       console.log("Switching to list view")
       setView("list")
     } catch (error) {
-      console.error("❌ Error saving note:", error)
+      console.error(" Error saving note:", error)
       alert(`Failed to save note: ${error.message || error}`)
     }
     setLoading(false)
@@ -313,26 +311,26 @@ function SidePanel() {
   }
 
   const handlePersonasClick = () => {
-    console.log("🎭 [SidePanel] Switching to personas view")
+    console.log(" [SidePanel] Switching to personas view")
     setView("personas")
   }
 
   const handlePersonaActivated = async (persona: Persona | null) => {
-    console.log("🎭 [SidePanel] Persona activated:", persona?.name || "None")
+    console.log(" [SidePanel] Persona activated:", persona?.name || "None")
 
     try {
       // Update the global agent with the new persona
       const agent = await getGlobalAgent()
       await agent.setPersona(persona) // Now async - recreates session
 
-      console.log("🎭 [SidePanel] Global agent updated with persona")
+      console.log(" [SidePanel] Global agent updated with persona")
     } catch (error) {
-      console.error("🎭 [SidePanel] Error updating agent persona:", error)
+      console.error(" [SidePanel] Error updating agent persona:", error)
     }
   }
 
   const handleBackToList = () => {
-    console.log("📝 [SidePanel] Switching back to list view")
+    console.log(" [SidePanel] Switching back to list view")
     setView("list")
   }
 
@@ -353,15 +351,10 @@ function SidePanel() {
 
   // Handle search input change with auto-search
   const handleSearchInput = (value: string) => {
+    console.log(" [Search] Query changed to:", value)
     setSearchQuery(value)
-    // Auto-search as user types
-    if (value.trim()) {
-      setTimeout(() => {
-        searchNotesByTitle(value).then(setNotes).catch(console.error)
-      }, 300)
-    } else {
-      loadData()
-    }
+    // Note: Filtering is done via filteredNotes, no need for async search here
+    // Just update the query and let React handle the filtering
   }
 
   const handleAISearch = async (
@@ -371,7 +364,7 @@ function SidePanel() {
     const startTime = performance.now()
 
     try {
-      console.log("🤖 [LangChain Agent] Processing query:", query)
+      console.log(" [LangChain Agent] Processing query:", query)
 
       // Use the LangChain agent for agentic search (already imported at top)
       const agent = await getGlobalAgent()
@@ -379,8 +372,8 @@ function SidePanel() {
       const response = await agent.run(query, conversationHistory)
 
       const totalTime = performance.now() - startTime
-      console.log(`⏱️ [LangChain Agent] TOTAL time: ${totalTime.toFixed(2)}ms`)
-      console.log(`📊 [LangChain Agent] Structured response:`, response)
+      console.log(` [LangChain Agent] TOTAL time: ${totalTime.toFixed(2)}ms`)
+      console.log(` [LangChain Agent] Structured response:`, response)
 
       // Return the full response object for clarification support
       // AISearchBar will handle it appropriately
@@ -388,23 +381,29 @@ function SidePanel() {
     } catch (error) {
       const totalTime = performance.now() - startTime
       console.error(
-        `❌ [LangChain Agent] Failed after ${totalTime.toFixed(2)}ms:`,
+        ` [LangChain Agent] Failed after ${totalTime.toFixed(2)}ms:`,
         error
       )
       return "I encountered an error while searching. Please try again."
     }
   }
 
-  // Filter notes
+  // Filter notes by search query only
+  // Category filtering is handled by AnimatedCategoryTabs component
   const filteredNotes = notes.filter((note) => {
-    const matchesCategory =
-      selectedCategory === "all" || note.category === selectedCategory
     const matchesSearch =
       searchQuery === "" ||
       note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      note.content.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesCategory && matchesSearch
+      note.contentPlaintext.toLowerCase().includes(searchQuery.toLowerCase())
+    return matchesSearch
   })
+
+  // Debug logging for search
+  if (searchQuery) {
+    console.log(
+      ` [Search] Query: "${searchQuery}", Total notes: ${notes.length}, Filtered: ${filteredNotes.length}`
+    )
+  }
 
   return (
     <div className="plasmo-w-full plasmo-h-screen plasmo-bg-slate-50 plasmo-overflow-hidden">
@@ -413,17 +412,17 @@ function SidePanel() {
         <Header
           onClose={handleClose}
           onPersonasClick={handlePersonasClick}
+          onCreateNote={handleCreateNew}
           view={view}
+          searchValue={searchQuery}
+          onSearchChange={handleSearchInput}
+          onSearchClear={clearSearchQuery}
         />
 
         {/* Content */}
-        <div
-          className={`plasmo-flex-1 plasmo-overflow-y-auto plasmo-p-4 ${view === "personas" ? "plasmo-pb-4" : "plasmo-pb-20"}`}>
-          {/* AI Status Banner - only show in list view */}
-          {view === "list" && <AIStatusBanner />}
-
+        <div className="plasmo-flex-1 plasmo-flex plasmo-flex-col plasmo-overflow-hidden">
           {view === "personas" ? (
-            <div className="plasmo-h-full">
+            <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-no-visible-scrollbar plasmo-p-4">
               <div className="plasmo-mb-4">
                 <button
                   onClick={handleBackToList}
@@ -446,71 +445,61 @@ function SidePanel() {
               <PersonaManager onPersonaActivated={handlePersonaActivated} />
             </div>
           ) : view === "list" ? (
-            <>
-              {/* Search and Filters */}
-              <div className="plasmo-mb-4 plasmo-space-y-3">
-                <SearchBar
-                  value={searchQuery}
-                  onChange={handleSearchInput}
-                  onClear={clearSearchQuery}
-                  onSearch={handleSearch}
-                />
+            <div className="plasmo-flex-1 plasmo-flex plasmo-flex-col plasmo-overflow-hidden">
+              {/* Sticky Top Section - AI Banner only */}
+              <div className="plasmo-flex-shrink-0">
+                {/* AI Status Banner */}
+                <AIStatusBanner />
+              </div>
 
-                <CategoryFilter
+              {/* Category Tabs and Scrollable Notes Section */}
+              <div className="plasmo-flex-1 plasmo-min-h-0 plasmo-mt-4">
+                <AnimatedCategoryTabs
                   categories={categories}
+                  notes={filteredNotes}
                   selectedCategory={selectedCategory}
                   onCategoryChange={(category) => {
                     setSelectedCategory(category)
                     clearSearchQuery()
                   }}
+                  onEdit={handleEditNote}
+                  onDelete={handleDeleteNote}
+                  loading={loading}
                 />
-
-                <button
-                  onClick={handleCreateNew}
-                  disabled={loading}
-                  className="plasmo-w-full plasmo-px-4 plasmo-py-2 plasmo-bg-green-500 plasmo-text-white plasmo-rounded-lg plasmo-text-sm plasmo-font-medium hover:plasmo-bg-green-600 plasmo-transition-colors disabled:plasmo-opacity-50">
-                  + Create New Note
-                </button>
               </div>
-
-              {/* Notes List */}
-              <NotesList
-                notes={filteredNotes}
-                loading={loading}
-                onEdit={handleEditNote}
-                onDelete={handleDeleteNote}
-                onCreateNew={handleCreateNew}
-              />
-            </>
+            </div>
           ) : (
             /* Editor View */
-            <NoteEditor
-              title={noteTitle}
-              content={noteContent}
-              category={noteCategory}
-              categories={categories}
-              isEditing={!!editingNote}
-              loading={loading}
-              onTitleChange={setNoteTitle}
-              onCategoryChange={setNoteCategory}
-              onSave={handleSaveNote}
-              onCancel={() => setView("list")}
-              externalEditorRef={editorRef}
-            />
+            <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-no-visible-scrollbar plasmo-p-4 plasmo-pb-8">
+              <NoteEditor
+                title={noteTitle}
+                content={noteContent}
+                category={noteCategory}
+                categories={categories}
+                isEditing={!!editingNote}
+                loading={loading}
+                onTitleChange={setNoteTitle}
+                onCategoryChange={setNoteCategory}
+                onSave={handleSaveNote}
+                onCancel={() => setView("list")}
+                externalEditorRef={editorRef}
+              />
+            </div>
+          )}
+
+          {/* Fixed Bottom Search Bar - hide in personas view and editor view */}
+          {view !== "personas" && view !== "editor" && (
+            <div className="plasmo-fixed plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-bg-transparent plasmo-backdrop-blur-xl plasmo-border-t plasmo-border-white/20 plasmo-shadow-lg plasmo-p-3 plasmo-z-50">
+              <AISearchBar
+                placeholder="Ask me anything..."
+                onSearch={handleAISearch}
+                onNoteCreated={loadData}
+                onNotesChange={loadData}
+                onNoteClick={handleEditNote}
+              />
+            </div>
           )}
         </div>
-
-        {/* Fixed Bottom Search Bar - hide in personas view */}
-        {view !== "personas" && (
-          <div className="plasmo-fixed plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-bg-white plasmo-border-t plasmo-border-slate-200 plasmo-shadow-lg plasmo-p-4">
-            <AISearchBar
-              placeholder="Ask me anything..."
-              onSearch={handleAISearch}
-              onNoteCreated={loadData}
-              onNotesChange={loadData}
-            />
-          </div>
-        )}
       </div>
     </div>
   )
