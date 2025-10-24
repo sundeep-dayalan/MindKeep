@@ -223,10 +223,11 @@ export function AISearchBar({
   }, [messages])
 
   // Handle persona changes
-  const handlePersonaChange = async (persona: Persona | null) => {
+  const handlePersonaChange = async (persona: Persona | null, isManualChange: boolean = true) => {
     console.log(
       " [AISearchBar] Persona changed to:",
-      persona?.name || "Default Mode"
+      persona?.name || "Default Mode",
+      isManualChange ? "(manual)" : "(auto-restored)"
     )
 
     try {
@@ -240,16 +241,18 @@ export function AISearchBar({
       // Clear handled clarifications
       setHandledClarifications(new Set())
 
-      // Add a system message to indicate persona change
-      const systemMessage: Message = {
-        id: `system-${Date.now()}`,
-        type: "ai",
-        content: persona
-          ? ` Switched to ${persona.name} persona. Conversation history cleared.\n\n${persona.description}`
-          : " Switched to Default Mode. Full tool access restored.",
-        timestamp: Date.now()
+      // Only show system message if this is a manual change (not auto-restoration)
+      if (isManualChange) {
+        const systemMessage: Message = {
+          id: `system-${Date.now()}`,
+          type: "ai",
+          content: persona
+            ? ` Switched to ${persona.name} persona. Conversation history cleared.\n\n${persona.description}`
+            : " Switched to Default Mode. Full tool access restored.",
+          timestamp: Date.now()
+        }
+        setMessages([systemMessage])
       }
-      setMessages([systemMessage])
 
       console.log(" [AISearchBar] Agent persona updated successfully")
     } catch (error) {

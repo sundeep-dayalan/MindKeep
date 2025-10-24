@@ -11,10 +11,11 @@ import {
   getAllPersonas,
   setActivePersona
 } from "~services/db-service"
+import { getSelectedPersonaId } from "~services/persona-settings"
 import type { Persona } from "~types/persona"
 
 interface PersonaSelectorProps {
-  onPersonaChange?: (persona: Persona | null) => void
+  onPersonaChange?: (persona: Persona | null, isManualChange?: boolean) => void
 }
 
 export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
@@ -22,6 +23,7 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
   const [activePersona, setActivePersonaState] = useState<Persona | null>(null)
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [isInitialized, setIsInitialized] = useState(false)
 
   useEffect(() => {
     console.log(" [PersonaSelector] Component mounted, loading personas")
@@ -41,8 +43,50 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
 
       setPersonas(allPersonas)
       setActivePersonaState(active)
+
+      // On first load, restore saved persona from chrome.storage
+      if (!isInitialized) {
+        console.log(" [PersonaSelector] First load - restoring saved persona")
+        await restoreSavedPersona(allPersonas)
+        setIsInitialized(true)
+      }
     } catch (error) {
       console.error(" [PersonaSelector] Error loading personas:", error)
+    }
+  }
+
+  const restoreSavedPersona = async (allPersonas: Persona[]) => {
+    try {
+      const savedPersonaId = await getSelectedPersonaId()
+      
+      if (!savedPersonaId) {
+        console.log(" [PersonaSelector] No saved persona, staying in default mode")
+        return
+      }
+
+      console.log(" [PersonaSelector] Restoring saved persona ID:", savedPersonaId)
+      
+      const savedPersona = allPersonas.find(p => p.id === savedPersonaId)
+      
+      if (savedPersona) {
+        console.log(" [PersonaSelector] Found saved persona:", savedPersona.name)
+        
+        // Just update local state - don't call setActivePersona() to avoid triggering storage listener
+        setActivePersonaState(savedPersona)
+        
+        // Notify parent to update agent (isManualChange = false for restoration)
+        if (onPersonaChange) {
+          console.log(" [PersonaSelector] Notifying parent of restored persona (silent)")
+          onPersonaChange(savedPersona, false) // false = don't show "Switched to..." message
+        }
+      } else {
+        console.log(" [PersonaSelector] Saved persona not found in database, clearing selection")
+        // Clear invalid saved persona from storage only
+        const { setSelectedPersona } = await import("~services/persona-settings")
+        await setSelectedPersona(null)
+      }
+    } catch (error) {
+      console.error(" [PersonaSelector] Error restoring saved persona:", error)
     }
   }
 
@@ -60,7 +104,7 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
       setActivePersonaState(persona)
 
       if (onPersonaChange) {
-        onPersonaChange(persona)
+        onPersonaChange(persona, true) // true = manual change, show "Switched to..." message
       }
 
       console.log(" [PersonaSelector] Persona changed successfully")
@@ -72,29 +116,11 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
     }
   }
 
-  // Trigger reload when personas change in storage
-  useEffect(() => {
-    console.log(" [PersonaSelector] Setting up storage listener")
-
-    const handleStorageChange = (changes: {
-      [key: string]: chrome.storage.StorageChange
-    }) => {
-      // Reload if persona-related data changes
-      if (changes["mindkeep_persona_settings"]) {
-        console.log(
-          " [PersonaSelector] Persona settings changed in storage, reloading"
-        )
-        loadPersonas()
-      }
-    }
-
-    chrome.storage.onChanged.addListener(handleStorageChange)
-
-    return () => {
-      console.log(" [PersonaSelector] Removing storage listener")
-      chrome.storage.onChanged.removeListener(handleStorageChange)
-    }
-  }, [])
+  // Note: We don't need a storage listener for persona selection changes
+  // because handleSelect() already updates the UI immediately.
+  // We could add a listener here if we want to detect when personas are
+  // created/updated/deleted from PersonaManager, but that's not critical
+  // since the user would manually refresh or reopen the dropdown.
 
   return (
     <div className="plasmo-relative">

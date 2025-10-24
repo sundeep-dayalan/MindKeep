@@ -1037,6 +1037,11 @@ export async function setActivePersona(id: string | null): Promise<boolean> {
  console.log(" [DB] All personas deactivated (default mode)")
  }
 
+ // Persist selection to chrome.storage for restoration on next load
+ const { setSelectedPersona } = await import("./persona-settings")
+ await setSelectedPersona(id)
+ console.log(" [DB] Saved persona selection to chrome.storage")
+
  return true
  } catch (error) {
  console.error(" [DB] Error setting active persona:", error)
