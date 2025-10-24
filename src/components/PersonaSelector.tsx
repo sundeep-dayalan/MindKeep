@@ -52,7 +52,12 @@ export function PersonaSelector({
       console.log(` [PersonaSelector] Loaded ${allPersonas.length} personas`)
       console.log(" [PersonaSelector] Active persona:", active?.name || "None")
 
-      setPersonas(allPersonas)
+      // Sort personas by createdAt: newest first (descending order)
+      const sortedPersonas = allPersonas.sort(
+        (a, b) => b.createdAt - a.createdAt
+      )
+
+      setPersonas(sortedPersonas)
       setActivePersonaState(active)
 
       // On first load, restore saved persona from chrome.storage

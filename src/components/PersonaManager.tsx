@@ -35,6 +35,14 @@ export function PersonaManager({
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false)
   const [isGeneratingContext, setIsGeneratingContext] = useState(false)
 
+  // Character/Token limits
+  const LIMITS = {
+    name: 25, // characters
+    description: 200, // characters
+    context: 8000, // characters (~2000 tokens, 1 token ≈ 4 chars)
+    outputTemplate: 2000 // characters (~500 tokens)
+  }
+
   // Form state
   const [formData, setFormData] = useState<PersonaInput>({
     name: "",
@@ -54,7 +62,13 @@ export function PersonaManager({
     try {
       const allPersonas = await getAllPersonas()
       console.log(` [PersonaManager] Loaded ${allPersonas.length} personas`)
-      setPersonas(allPersonas)
+
+      // Sort personas by createdAt: newest first (descending order)
+      const sortedPersonas = allPersonas.sort(
+        (a, b) => b.createdAt - a.createdAt
+      )
+
+      setPersonas(sortedPersonas)
     } catch (error) {
       console.error(" [PersonaManager] Error loading personas:", error)
     } finally {
@@ -89,6 +103,7 @@ export function PersonaManager({
   const handleSave = async () => {
     console.log(" [PersonaManager] handleSave called with data:", formData)
 
+    // Validate required fields
     if (!formData.name.trim()) {
       alert("Please enter a persona name")
       return
@@ -99,6 +114,33 @@ export function PersonaManager({
     }
     if (!formData.context.trim()) {
       alert("Please enter persona context/instructions")
+      return
+    }
+
+    // Validate character limits
+    if (formData.name.length > LIMITS.name) {
+      alert(`Name is too long. Maximum ${LIMITS.name} characters allowed.`)
+      return
+    }
+    if (formData.description.length > LIMITS.description) {
+      alert(
+        `Description is too long. Maximum ${LIMITS.description} characters allowed.`
+      )
+      return
+    }
+    if (formData.context.length > LIMITS.context) {
+      alert(
+        `Context is too long. Maximum ${LIMITS.context} characters (~2000 tokens) allowed.`
+      )
+      return
+    }
+    if (
+      formData.outputTemplate &&
+      formData.outputTemplate.length > LIMITS.outputTemplate
+    ) {
+      alert(
+        `Output template is too long. Maximum ${LIMITS.outputTemplate} characters (~500 tokens) allowed.`
+      )
       return
     }
 
@@ -423,9 +465,19 @@ Keep it focused and actionable. No markdown headers, just clear paragraphs.`
 
         <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-p-6 plasmo-space-y-5 plasmo-bg-white">
           <div>
-            <label className="plasmo-block plasmo-text-sm plasmo-font-medium plasmo-text-gray-700 plasmo-mb-2">
-              Name *
-            </label>
+            <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-mb-2">
+              <label className="plasmo-block plasmo-text-sm plasmo-font-medium plasmo-text-gray-700">
+                Name *
+              </label>
+              <span
+                className={`plasmo-text-xs ${
+                  formData.name.length > LIMITS.name
+                    ? "plasmo-text-red-600 plasmo-font-semibold"
+                    : "plasmo-text-gray-500"
+                }`}>
+                {formData.name.length}/{LIMITS.name}
+              </span>
+            </div>
             <div className="plasmo-relative">
               <input
                 type="text"
@@ -433,6 +485,7 @@ Keep it focused and actionable. No markdown headers, just clear paragraphs.`
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
+                maxLength={LIMITS.name}
                 placeholder="e.g., Email Writer"
                 className="plasmo-w-full plasmo-px-4 plasmo-py-2.5 plasmo-pr-12 plasmo-bg-gray-50 plasmo-border plasmo-border-gray-200 plasmo-rounded-lg focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-purple-500 focus:plasmo-border-transparent plasmo-text-sm plasmo-text-gray-900"
               />
@@ -487,9 +540,19 @@ Keep it focused and actionable. No markdown headers, just clear paragraphs.`
           </div>
 
           <div>
-            <label className="plasmo-block plasmo-text-sm plasmo-font-medium plasmo-text-gray-700 plasmo-mb-2">
-              Description *
-            </label>
+            <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-mb-2">
+              <label className="plasmo-block plasmo-text-sm plasmo-font-medium plasmo-text-gray-700">
+                Description *
+              </label>
+              <span
+                className={`plasmo-text-xs ${
+                  formData.description.length > LIMITS.description
+                    ? "plasmo-text-red-600 plasmo-font-semibold"
+                    : "plasmo-text-gray-500"
+                }`}>
+                {formData.description.length}/{LIMITS.description}
+              </span>
+            </div>
             <div className="plasmo-relative">
               <input
                 type="text"
@@ -497,6 +560,7 @@ Keep it focused and actionable. No markdown headers, just clear paragraphs.`
                 onChange={(e) =>
                   setFormData({ ...formData, description: e.target.value })
                 }
+                maxLength={LIMITS.description}
                 placeholder="Brief description of what this persona does"
                 className="plasmo-w-full plasmo-px-4 plasmo-py-2.5 plasmo-pr-12 plasmo-bg-gray-50 plasmo-border plasmo-border-gray-200 plasmo-rounded-lg focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-purple-500 focus:plasmo-border-transparent plasmo-text-sm plasmo-text-gray-900"
               />
@@ -552,9 +616,19 @@ Keep it focused and actionable. No markdown headers, just clear paragraphs.`
 
           <div>
             <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-mb-2">
-              <label className="plasmo-block plasmo-text-sm plasmo-font-medium plasmo-text-gray-700">
-                Context / Instructions *
-              </label>
+              <div className="plasmo-flex plasmo-items-center plasmo-gap-2">
+                <label className="plasmo-block plasmo-text-sm plasmo-font-medium plasmo-text-gray-700">
+                  Context / Instructions *
+                </label>
+                <span
+                  className={`plasmo-text-xs ${
+                    formData.context.length > LIMITS.context
+                      ? "plasmo-text-red-600 plasmo-font-semibold"
+                      : "plasmo-text-gray-500"
+                  }`}>
+                  {formData.context.length}/{LIMITS.context}
+                </span>
+              </div>
               <button
                 onClick={handleGenerateContext}
                 disabled={
@@ -621,9 +695,19 @@ Keep it focused and actionable. No markdown headers, just clear paragraphs.`
           </div>
 
           <div>
-            <label className="plasmo-block plasmo-text-sm plasmo-font-medium plasmo-text-gray-700 plasmo-mb-2">
-              Output Template (Optional)
-            </label>
+            <div className="plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-mb-2">
+              <label className="plasmo-block plasmo-text-sm plasmo-font-medium plasmo-text-gray-700">
+                Output Template (Optional)
+              </label>
+              <span
+                className={`plasmo-text-xs ${
+                  formData.outputTemplate.length > LIMITS.outputTemplate
+                    ? "plasmo-text-red-600 plasmo-font-semibold"
+                    : "plasmo-text-gray-500"
+                }`}>
+                {formData.outputTemplate.length}/{LIMITS.outputTemplate}
+              </span>
+            </div>
             <textarea
               value={formData.outputTemplate}
               onChange={(e) =>
