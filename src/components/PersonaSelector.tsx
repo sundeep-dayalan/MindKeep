@@ -16,14 +16,15 @@ import type { Persona } from "~types/persona"
 
 interface PersonaSelectorProps {
   onPersonaChange?: (persona: Persona | null, isManualChange?: boolean) => void
+  onInitializationChange?: (isInitializing: boolean) => void // Notify parent of initialization state
 }
 
-export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
+export function PersonaSelector({ onPersonaChange, onInitializationChange }: PersonaSelectorProps) {
   const [personas, setPersonas] = useState<Persona[]>([])
   const [activePersona, setActivePersonaState] = useState<Persona | null>(null)
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [isInitialized, setIsInitialized] = useState(false)
+  const [isInitializing, setIsInitializing] = useState(true) // Start as true - we're loading
 
   useEffect(() => {
     console.log(" [PersonaSelector] Component mounted, loading personas")
@@ -33,6 +34,11 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
   const loadPersonas = async () => {
     console.log(" [PersonaSelector] loadPersonas called")
     try {
+      setIsInitializing(true) // Start initialization
+      if (onInitializationChange) {
+        onInitializationChange(true)
+      }
+
       const [allPersonas, active] = await Promise.all([
         getAllPersonas(),
         getActivePersona()
@@ -45,13 +51,19 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
       setActivePersonaState(active)
 
       // On first load, restore saved persona from chrome.storage
-      if (!isInitialized) {
+      if (isInitializing) {
         console.log(" [PersonaSelector] First load - restoring saved persona")
         await restoreSavedPersona(allPersonas)
-        setIsInitialized(true)
       }
     } catch (error) {
       console.error(" [PersonaSelector] Error loading personas:", error)
+    } finally {
+      // Mark initialization complete
+      setIsInitializing(false)
+      if (onInitializationChange) {
+        onInitializationChange(false)
+      }
+      console.log(" [PersonaSelector] Initialization complete")
     }
   }
 
@@ -141,13 +153,40 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
       {/* Model Selector Style Dropdown Button - Exact Reference Match */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        disabled={loading}
+        disabled={loading || isInitializing}
         type="button"
-        className="plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-px-2.5 plasmo-py-1.5 plasmo-rounded-lg plasmo-border plasmo-border-slate-100 plasmo-bg-slate-50 hover:plasmo-bg-slate-200 plasmo-transition-colors plasmo-min-w-[120px]">
-        {/* Name */}
-        <span className="plasmo-text-[13px] plasmo-font-medium plasmo-text-slate-700 plasmo-flex-1 plasmo-text-left plasmo-truncate">
-          Persona • {activePersona?.name || "Default"}
-        </span>
+        className="plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-px-2.5 plasmo-py-1.5 plasmo-rounded-lg plasmo-border plasmo-border-slate-100 plasmo-bg-slate-50 hover:plasmo-bg-slate-200 plasmo-transition-colors plasmo-min-w-[120px] disabled:plasmo-opacity-60 disabled:plasmo-cursor-not-allowed">
+        {/* Loading Spinner or Name */}
+        {isInitializing ? (
+          <>
+            <svg
+              className="plasmo-animate-spin plasmo-h-3 plasmo-w-3 plasmo-text-slate-500"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24">
+              <circle
+                className="plasmo-opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="plasmo-opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
+            <span className="plasmo-text-[13px] plasmo-font-medium plasmo-text-slate-500 plasmo-flex-1 plasmo-text-left">
+              Loading...
+            </span>
+          </>
+        ) : (
+          <span className="plasmo-text-[13px] plasmo-font-medium plasmo-text-slate-700 plasmo-flex-1 plasmo-text-left plasmo-truncate">
+            PERSONA | {activePersona?.name || "Default"}
+          </span>
+        )}
 
         {/* Dropdown Arrow */}
         <svg

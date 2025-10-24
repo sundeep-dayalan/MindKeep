@@ -45,11 +45,18 @@ interface AISearchBarProps {
   onNoteCreated?: () => void // Callback when a note is successfully created
   onNotesChange?: () => Promise<void> // Callback when notes are modified (e.g., category changed)
   onMessagesChange?: (hasMessages: boolean) => void // Callback when messages are added/cleared
+  onNoteClick?: (note: Note) => void // Callback when a reference note is clicked
   className?: string
 }
 
 // Reference Notes Component - Collapsible chip design
-function ReferenceNotesSection({ notes }: { notes: Note[] }) {
+function ReferenceNotesSection({
+  notes,
+  onNoteClick
+}: {
+  notes: Note[]
+  onNoteClick?: (note: Note) => void
+}) {
   const [isExpanded, setIsExpanded] = React.useState(false)
 
   return (
@@ -90,13 +97,14 @@ function ReferenceNotesSection({ notes }: { notes: Note[] }) {
           </svg>
         </button>
 
-        {/* Expanded View - Note Chips */}
+        {/* Expanded View - Note Chips (Clickable) */}
         {isExpanded && (
           <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-2 plasmo-mt-2">
             {notes.map((note) => (
-              <div
+              <button
                 key={note.id}
-                className="plasmo-group plasmo-relative plasmo-px-3 plasmo-py-1.5 plasmo-bg-white/20 plasmo-backdrop-blur-sm plasmo-border plasmo-border-white/40 hover:plasmo-border-blue-300 plasmo-rounded-full plasmo-shadow-sm hover:plasmo-shadow-md plasmo-transition-all plasmo-cursor-pointer">
+                onClick={() => onNoteClick?.(note)}
+                className="plasmo-px-3 plasmo-py-1.5 plasmo-bg-white/20 plasmo-backdrop-blur-sm plasmo-border plasmo-border-white/40 hover:plasmo-border-blue-400 hover:plasmo-bg-blue-50/50 plasmo-rounded-full plasmo-shadow-sm hover:plasmo-shadow-md plasmo-transition-all plasmo-cursor-pointer">
                 <div className="plasmo-flex plasmo-items-center plasmo-gap-2">
                   <span className="plasmo-text-xs plasmo-font-medium plasmo-text-slate-800 plasmo-max-w-[200px] plasmo-truncate">
                     {note.title}
@@ -105,49 +113,7 @@ function ReferenceNotesSection({ notes }: { notes: Note[] }) {
                     {note.category}
                   </span>
                 </div>
-
-                {/* Tooltip on hover */}
-                <div className="plasmo-hidden group-hover:plasmo-block plasmo-absolute plasmo-left-0 plasmo-top-full plasmo-mt-2 plasmo-z-10 plasmo-w-72 plasmo-p-3 plasmo-bg-white plasmo-border plasmo-border-slate-200 plasmo-rounded-lg plasmo-shadow-lg">
-                  <div className="plasmo-flex plasmo-items-start plasmo-justify-between plasmo-gap-2 plasmo-mb-2">
-                    <h4 className="plasmo-text-sm plasmo-font-semibold plasmo-text-slate-800">
-                      {note.title}
-                    </h4>
-                    <span className="plasmo-px-2 plasmo-py-0.5 plasmo-bg-blue-50 plasmo-text-blue-700 plasmo-text-xs plasmo-rounded-full plasmo-flex-shrink-0">
-                      {note.category}
-                    </span>
-                  </div>
-                  <p className="plasmo-text-xs plasmo-text-slate-600 plasmo-line-clamp-3 plasmo-mb-2">
-                    {note.contentPlaintext}
-                  </p>
-                  <div className="plasmo-flex plasmo-items-center plasmo-gap-3 plasmo-pt-2 plasmo-border-t plasmo-border-slate-100">
-                    <span className="plasmo-text-xs plasmo-text-slate-400">
-                      {new Date(note.updatedAt).toLocaleDateString()}
-                    </span>
-                    {note.sourceUrl && (
-                      <a
-                        href={note.sourceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="plasmo-text-xs plasmo-text-blue-500 hover:plasmo-text-blue-700 plasmo-flex plasmo-items-center plasmo-gap-1">
-                        <svg
-                          className="plasmo-w-3 plasmo-h-3"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24">
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                          />
-                        </svg>
-                        Source
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </div>
+              </button>
             ))}
           </div>
         )}
@@ -162,12 +128,14 @@ export function AISearchBar({
   onNoteCreated,
   onNotesChange,
   onMessagesChange,
+  onNoteClick,
   className = ""
 }: AISearchBarProps) {
   const [messages, setMessages] = React.useState<Message[]>([])
   const [isSearching, setIsSearching] = React.useState(false)
   const [isChatExpanded, setIsChatExpanded] = React.useState(true)
   const [isInputDisabled, setIsInputDisabled] = React.useState(false)
+  const [isPersonaInitializing, setIsPersonaInitializing] = React.useState(true) // Track persona loading
   const [greeting, setGreeting] = React.useState(getTimeBasedGreeting())
 
   // Track which messages have had their clarifications handled (to hide buttons after click)
@@ -1382,22 +1350,6 @@ export function AISearchBar({
               ? "plasmo-border-red-300 plasmo-text-red-800"
               : "plasmo-border-amber-300 plasmo-text-amber-800"
           }`}>
-          <svg
-            className={`plasmo-w-5 plasmo-h-5 plasmo-flex-shrink-0 plasmo-mt-0.5 ${
-              tokenUsage.percentage >= 95
-                ? "plasmo-text-red-600"
-                : "plasmo-text-amber-600"
-            }`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-            />
-          </svg>
           <div className="plasmo-flex-1">
             <div className="plasmo-text-xs plasmo-mb-2">
               {"Summarizing conversation history"}
@@ -1479,7 +1431,10 @@ export function AISearchBar({
 
               {/* Reference Notes */}
               {message.referenceNotes && message.referenceNotes.length > 0 && (
-                <ReferenceNotesSection notes={message.referenceNotes} />
+                <ReferenceNotesSection
+                  notes={message.referenceNotes}
+                  onNoteClick={onNoteClick}
+                />
               )}
             </div>
           ))}
@@ -1546,7 +1501,10 @@ export function AISearchBar({
           <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-gap-3 plasmo-pt-2 plasmo-border-t plasmo-border-slate-100">
             {/* Persona Selector - Left Side */}
             <div className="plasmo-flex-shrink-0">
-              <PersonaSelector onPersonaChange={handlePersonaChange} />
+              <PersonaSelector
+                onPersonaChange={handlePersonaChange}
+                onInitializationChange={setIsPersonaInitializing}
+              />
             </div>
 
             {/* Submit Button - Right Side */}
@@ -1554,13 +1512,16 @@ export function AISearchBar({
               type="submit"
               className="plasmo-flex-shrink-0 plasmo-w-9 plasmo-h-9 plasmo-bg-slate-900 plasmo-text-white plasmo-rounded-lg plasmo-flex plasmo-items-center plasmo-justify-center hover:plasmo-bg-slate-700 plasmo-transition-colors disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed"
               title={
-                currentInputLength > 8000
-                  ? "Input too large (max 8000 chars)"
-                  : tokenUsage && tokenUsage.usage >= 7000
-                    ? "Session limit reached - start new chat"
-                    : "Send (Enter)"
+                isPersonaInitializing
+                  ? "Loading persona..."
+                  : currentInputLength > 8000
+                    ? "Input too large (max 8000 chars)"
+                    : tokenUsage && tokenUsage.usage >= 7000
+                      ? "Session limit reached - start new chat"
+                      : "Send (Enter)"
               }
               disabled={
+                isPersonaInitializing ||
                 isSearching ||
                 isInputDisabled ||
                 currentInputLength > 8000 ||

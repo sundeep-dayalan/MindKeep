@@ -495,6 +495,7 @@ function SidePanel() {
  onSearch={handleAISearch}
  onNoteCreated={loadData}
  onNotesChange={loadData}
+ onNoteClick={handleEditNote}
  />
  </div>
  )}
