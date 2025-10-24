@@ -19,7 +19,10 @@ interface PersonaSelectorProps {
   onInitializationChange?: (isInitializing: boolean) => void // Notify parent of initialization state
 }
 
-export function PersonaSelector({ onPersonaChange, onInitializationChange }: PersonaSelectorProps) {
+export function PersonaSelector({
+  onPersonaChange,
+  onInitializationChange
+}: PersonaSelectorProps) {
   const [personas, setPersonas] = useState<Persona[]>([])
   const [activePersona, setActivePersonaState] = useState<Persona | null>(null)
   const [isOpen, setIsOpen] = useState(false)
