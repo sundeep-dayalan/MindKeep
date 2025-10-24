@@ -489,7 +489,7 @@ function SidePanel() {
 
           {/* Fixed Bottom Search Bar - hide in personas view and editor view */}
           {view !== "personas" && view !== "editor" && (
-            <div className="plasmo-fixed plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-bg-transparent plasmo-backdrop-blur-xl plasmo-border-t plasmo-border-white/20 plasmo-shadow-lg plasmo-p-4 plasmo-z-50">
+            <div className="plasmo-fixed plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-bg-transparent plasmo-backdrop-blur-xl plasmo-border-t plasmo-border-white/20 plasmo-shadow-lg plasmo-p-3 plasmo-z-50">
               <AISearchBar
                 placeholder="Ask me anything..."
                 onSearch={handleAISearch}

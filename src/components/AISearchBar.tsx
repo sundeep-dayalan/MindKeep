@@ -11,6 +11,21 @@ import type { AgentResponse } from "~services/langchain-agent"
 import { getGlobalAgent } from "~services/langchain-agent"
 import type { Persona } from "~types/persona"
 
+// Helper function to get dynamic greeting based on time of day
+function getTimeBasedGreeting(): string {
+  const hour = new Date().getHours()
+
+  if (hour >= 5 && hour < 12) {
+    return "Good morning"
+  } else if (hour >= 12 && hour < 17) {
+    return "Good afternoon"
+  } else if (hour >= 17 && hour < 21) {
+    return "Good evening"
+  } else {
+    return "Good night"
+  }
+}
+
 interface Message {
   id: string
   type: "user" | "ai"
@@ -153,6 +168,12 @@ export function AISearchBar({
   const [isSearching, setIsSearching] = React.useState(false)
   const [isChatExpanded, setIsChatExpanded] = React.useState(true)
   const [isInputDisabled, setIsInputDisabled] = React.useState(false)
+  const [greeting, setGreeting] = React.useState(getTimeBasedGreeting())
+
+  // Track which messages have had their clarifications handled (to hide buttons after click)
+  const [handledClarifications, setHandledClarifications] = React.useState<
+    Set<string>
+  >(new Set())
 
   // Track token usage for warning banner
   const [tokenUsage, setTokenUsage] = React.useState<{
@@ -184,6 +205,15 @@ export function AISearchBar({
     }
   }, [messages.length, onMessagesChange])
 
+  // Update greeting every minute to keep it current
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      setGreeting(getTimeBasedGreeting())
+    }, 60000) // Update every minute
+
+    return () => clearInterval(interval)
+  }, [])
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
@@ -206,6 +236,9 @@ export function AISearchBar({
 
       // Clear chat history when switching personas
       setMessages([])
+
+      // Clear handled clarifications
+      setHandledClarifications(new Set())
 
       // Add a system message to indicate persona change
       const systemMessage: Message = {
@@ -230,6 +263,9 @@ export function AISearchBar({
 
     // Clear local messages
     setMessages([])
+
+    // Clear handled clarifications
+    setHandledClarifications(new Set())
 
     // Clear the agent's session
     const agent = await getGlobalAgent()
@@ -472,14 +508,21 @@ export function AISearchBar({
   const handleClarificationOption = async (
     action: string,
     value: any,
-    pendingNoteData?: AgentResponse["pendingNoteData"]
+    pendingNoteData?: AgentResponse["pendingNoteData"],
+    messageId?: string
   ) => {
     const callId = `${action}-${Date.now()}`
     console.log(`[${callId}] Clarification option selected:`, {
       action,
       value,
-      pendingNoteData
+      pendingNoteData,
+      messageId
     })
+
+    // Mark this message's clarification as handled (hide buttons)
+    if (messageId) {
+      setHandledClarifications((prev) => new Set(prev).add(messageId))
+    }
 
     if (!pendingNoteData) {
       console.error(`[${callId}] No pending note data found`)
@@ -529,6 +572,9 @@ export function AISearchBar({
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, cancelMessage])
+
+          // Clear pending manual input state
+          setPendingManualInput({ type: null })
 
           // Re-enable input
           setIsSearching(false)
@@ -1247,34 +1293,31 @@ export function AISearchBar({
   }
 
   return (
-    <div
-      className={`plasmo-flex plasmo-flex-col plasmo-space-y-2 ${className}`}>
-      {/* Persona Selector & Ask AI Label with Toggle */}
-      <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-px-1 plasmo-gap-2">
-        {/* Left side: Persona Selector and Label */}
-        <div className="plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-flex-1 plasmo-min-w-0">
-          <PersonaSelector onPersonaChange={handlePersonaChange} />
-
-          <div className="plasmo-flex plasmo-items-center plasmo-gap-1.5">
-            <svg
-              className="plasmo-w-4 plasmo-h-4 plasmo-text-slate-600"
-              fill="currentColor"
-              viewBox="0 0 20 20">
-              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-            </svg>
-            <span className="plasmo-text-xs plasmo-font-medium plasmo-text-slate-600">
-              Ask AI
+    <div className={`plasmo-flex plasmo-flex-col plasmo-h-full ${className}`}>
+      {/* Header Section - Dynamic Greeting and Controls */}
+      <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-py-2 plasmo-px-3 plasmo-border-b plasmo-border-slate-200">
+        {/* Left: MIND KEEP label and greeting */}
+        <div className="plasmo-flex plasmo-flex-col plasmo-gap-1">
+          <span className="plasmo-text-[8px] plasmo-font-medium plasmo-text-slate-500 plasmo-uppercase plasmo-tracking-wider">
+            Mind Keep
+          </span>
+          <div className="plasmo-flex plasmo-flex-col plasmo-gap-0.5">
+            <span className="plasmo-text-base plasmo-font-light plasmo-text-slate-700">
+              {greeting}!
+            </span>
+            <span className="plasmo-text-base plasmo-font-normal plasmo-text-slate-800">
+              May I help you with anything?
             </span>
           </div>
         </div>
 
-        {/* Right side: Clear & Toggle buttons */}
+        {/* Right: Clear & Toggle buttons */}
         {messages.length > 0 && (
-          <div className="plasmo-flex-shrink-0 plasmo-flex plasmo-items-center plasmo-gap-1">
+          <div className="plasmo-flex-shrink-0 plasmo-flex plasmo-items-center plasmo-gap-2">
             {/* Clear chat button */}
             <button
               onClick={handleClearChat}
-              className="plasmo-p-1 plasmo-rounded plasmo-text-slate-500 hover:plasmo-text-red-600 hover:plasmo-bg-red-50 plasmo-transition-colors"
+              className="plasmo-p-1.5 plasmo-rounded-lg plasmo-text-slate-500 hover:plasmo-text-red-600 hover:plasmo-bg-red-50 plasmo-transition-colors"
               title="Clear conversation">
               <svg
                 className="plasmo-w-4 plasmo-h-4"
@@ -1293,7 +1336,7 @@ export function AISearchBar({
             {/* Toggle chat history button */}
             <button
               onClick={() => setIsChatExpanded(!isChatExpanded)}
-              className="plasmo-p-1 plasmo-rounded plasmo-text-slate-500 hover:plasmo-text-slate-700 hover:plasmo-bg-slate-100 plasmo-transition-colors"
+              className="plasmo-p-1.5 plasmo-rounded-lg plasmo-text-slate-500 hover:plasmo-text-slate-700 hover:plasmo-bg-slate-100 plasmo-transition-colors"
               title={
                 isChatExpanded ? "Hide chat history" : "Show chat history"
               }>
@@ -1372,7 +1415,7 @@ export function AISearchBar({
 
       {/* Chat Messages */}
       {messages.length > 0 && isChatExpanded && (
-        <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-space-y-3 plasmo-px-2 plasmo-py-3 plasmo-max-h-96 plasmo-bg-white/10 plasmo-backdrop-blur-lg plasmo-rounded-lg plasmo-border plasmo-border-white/20">
+        <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-space-y-4 plasmo-px-4 plasmo-py-4 plasmo-max-h-[500px] plasmo-bg-white/10 plasmo-backdrop-blur-lg plasmo-rounded-2xl plasmo-border plasmo-border-white/30 plasmo-mb-4">
           {messages.map((message) => (
             <div key={message.id} className="plasmo-space-y-2">
               <div
@@ -1382,13 +1425,13 @@ export function AISearchBar({
                     : "plasmo-justify-start"
                 }`}>
                 <div
-                  className={`plasmo-px-4 plasmo-py-2 plasmo-rounded-lg plasmo-shadow-sm plasmo-max-w-[80%] ${
+                  className={`plasmo-px-4 plasmo-py-3 plasmo-rounded-2xl plasmo-shadow-sm plasmo-max-w-[85%] ${
                     message.type === "user"
-                      ? "plasmo-bg-blue-500 plasmo-text-white"
-                      : "plasmo-bg-white/20 plasmo-backdrop-blur-md plasmo-text-slate-900 plasmo-border plasmo-border-white/40"
+                      ? "plasmo-bg-gradient-to-br plasmo-from-gray-50 plasmo-via-gray-100/80 plasmo-to-gray-100 plasmo-text-slate-900 plasmo-border plasmo-border-gray-200/50"
+                      : "plasmo-bg-gradient-to-br plasmo-from-white plasmo-via-blue-50/30 plasmo-to-purple-50/20 plasmo-backdrop-blur-md plasmo-text-slate-900 plasmo-border plasmo-border-slate-200/50"
                   }`}>
                   {message.type === "user" ? (
-                    <div className="plasmo-text-sm plasmo-whitespace-pre-wrap plasmo-text-white">
+                    <div className="plasmo-text-sm plasmo-whitespace-pre-wrap plasmo-text-slate-900">
                       {message.content}
                     </div>
                   ) : (
@@ -1397,9 +1440,10 @@ export function AISearchBar({
                 </div>
               </div>
 
-              {/* Clarification Options */}
+              {/* Clarification Options - Only show if not handled */}
               {message.clarificationOptions &&
-                message.clarificationOptions.length > 0 && (
+                message.clarificationOptions.length > 0 &&
+                !handledClarifications.has(message.id) && (
                   <div className="plasmo-flex plasmo-justify-start plasmo-pl-4">
                     <div className="plasmo-max-w-[80%] plasmo-space-y-2">
                       <div className="plasmo-text-xs plasmo-font-medium plasmo-text-slate-600 plasmo-pl-2">
@@ -1414,7 +1458,8 @@ export function AISearchBar({
                               handleClarificationOption(
                                 option.action,
                                 option.value,
-                                message.pendingNoteData
+                                message.pendingNoteData,
+                                message.id
                               )
                             }
                             className={`${
@@ -1458,11 +1503,11 @@ export function AISearchBar({
       )}
 
       {/* Search Input */}
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="plasmo-mt-auto">
         {/* Input length indicator - show if getting close to limit */}
         {currentInputLength > 4000 && (
           <div
-            className={`plasmo-px-3 plasmo-py-1 plasmo-text-xs plasmo-mb-2 plasmo-rounded ${
+            className={`plasmo-px-3 plasmo-py-1 plasmo-text-xs plasmo-mb-2 plasmo-rounded-lg ${
               currentInputLength > 7000
                 ? "plasmo-bg-red-50 plasmo-text-red-700"
                 : currentInputLength > 6000
@@ -1474,9 +1519,9 @@ export function AISearchBar({
           </div>
         )}
 
-        <div className="plasmo-flex plasmo-items-end plasmo-gap-2 plasmo-bg-white plasmo-rounded-2xl plasmo-px-4 plasmo-py-3 plasmo-border plasmo-border-slate-200 hover:plasmo-border-slate-300 plasmo-transition-all focus-within:plasmo-border-blue-400 focus-within:plasmo-ring-2 focus-within:plasmo-ring-blue-100 plasmo-shadow-sm">
-          {/* Rich Text Editor - takes full width */}
-          <div className="plasmo-flex-1 plasmo-min-h-[40px] plasmo-max-h-[200px] plasmo-overflow-y-auto">
+        <div className="plasmo-bg-white/90 plasmo-backdrop-blur-sm plasmo-rounded-[10px] plasmo-px-4 plasmo-py-3 plasmo-border plasmo-border-slate-200/80 hover:plasmo-border-slate-300 plasmo-transition-all focus-within:plasmo-border-slate-400 plasmo-shadow-sm plasmo-space-y-3">
+          {/* Rich Text Editor - Full Width on Top */}
+          <div className="plasmo-w-full plasmo-min-h-[44px] plasmo-max-h-[200px] plasmo-overflow-y-auto">
             <RichTextEditor
               ref={editorRef}
               placeholder={
@@ -1495,36 +1540,44 @@ export function AISearchBar({
             />
           </div>
 
-          {/* Submit Button - aligned to bottom right */}
-          <button
-            type="submit"
-            className="plasmo-flex-shrink-0 plasmo-w-8 plasmo-h-8 plasmo-bg-slate-900 plasmo-text-white plasmo-rounded-full plasmo-flex plasmo-items-center plasmo-justify-center hover:plasmo-bg-slate-800 plasmo-transition-colors disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed plasmo-mb-0.5"
-            title={
-              currentInputLength > 8000
-                ? "Input too large (max 8000 chars)"
-                : tokenUsage && tokenUsage.usage >= 7000
-                  ? "Session limit reached - start new chat"
-                  : "Send (Enter)"
-            }
-            disabled={
-              isSearching ||
-              isInputDisabled ||
-              currentInputLength > 8000 ||
-              (tokenUsage !== null && tokenUsage.usage >= 7000)
-            }>
-            <svg
-              className="plasmo-w-4 plasmo-h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M14 5l7 7m0 0l-7 7m7-7H3"
-              />
-            </svg>
-          </button>
+          {/* Bottom Row: Persona Selector + Submit Button */}
+          <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-gap-3 plasmo-pt-2 plasmo-border-t plasmo-border-slate-100">
+            {/* Persona Selector - Left Side */}
+            <div className="plasmo-flex-shrink-0">
+              <PersonaSelector onPersonaChange={handlePersonaChange} />
+            </div>
+
+            {/* Submit Button - Right Side */}
+            <button
+              type="submit"
+              className="plasmo-flex-shrink-0 plasmo-w-9 plasmo-h-9 plasmo-bg-slate-900 plasmo-text-white plasmo-rounded-lg plasmo-flex plasmo-items-center plasmo-justify-center hover:plasmo-bg-slate-700 plasmo-transition-colors disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed"
+              title={
+                currentInputLength > 8000
+                  ? "Input too large (max 8000 chars)"
+                  : tokenUsage && tokenUsage.usage >= 7000
+                    ? "Session limit reached - start new chat"
+                    : "Send (Enter)"
+              }
+              disabled={
+                isSearching ||
+                isInputDisabled ||
+                currentInputLength > 8000 ||
+                (tokenUsage !== null && tokenUsage.usage >= 7000)
+              }>
+              <svg
+                className="plasmo-w-4 plasmo-h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M14 5l7 7m0 0l-7 7m7-7H3"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
       </form>
     </div>
