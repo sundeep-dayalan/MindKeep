@@ -13,6 +13,7 @@ import {
   setActivePersona,
   updatePersona
 } from "~services/db-service"
+import { executePrompt } from "~services/gemini-nano-service"
 import type { Persona, PersonaInput } from "~types/persona"
 
 interface PersonaManagerProps {
@@ -28,6 +29,11 @@ export function PersonaManager({
   const [isCreating, setIsCreating] = useState(false)
   const [editingPersona, setEditingPersona] = useState<Persona | null>(null)
   const [loading, setLoading] = useState(false)
+
+  // AI generation loading states
+  const [isGeneratingTitle, setIsGeneratingTitle] = useState(false)
+  const [isGeneratingDescription, setIsGeneratingDescription] = useState(false)
+  const [isGeneratingContext, setIsGeneratingContext] = useState(false)
 
   // Form state
   const [formData, setFormData] = useState<PersonaInput>({
@@ -181,9 +187,224 @@ export function PersonaManager({
   }
 
   const handleCancel = () => {
-    console.log(" [PersonaManager] handleCancel - closing form")
+    console.log("🎭 [PersonaManager] handleCancel - closing form")
     setIsCreating(false)
     setEditingPersona(null)
+  }
+
+  /**
+   * AI Generation Handlers
+   */
+
+  const handleGenerateTitle = async () => {
+    console.log("🤖 [PersonaManager] handleGenerateTitle called")
+
+    // Check if we have any input to work with
+    if (!formData.context.trim() && !formData.description.trim()) {
+      alert(
+        "Please enter either Context/Instructions or Description first to generate a title"
+      )
+      return
+    }
+
+    const startTime = performance.now()
+    setIsGeneratingTitle(true)
+
+    try {
+      // Build prompt based on available input
+      const inputSource = formData.context.trim() || formData.description.trim()
+
+      // Limit input length to avoid token overflow
+      const truncatedInput =
+        inputSource.length > 500
+          ? inputSource.substring(0, 500) + "..."
+          : inputSource
+
+      const prompt = `Generate a short persona name (2-4 words) for this AI assistant:
+
+${truncatedInput}
+
+Return only the name. Examples: "Email Writer", "Movie Critic", "Code Helper"`
+
+      console.log("🤖 [PersonaManager] Generating title with prompt:", prompt)
+      const generatedTitle = await executePrompt(prompt)
+
+      // Clean up the response (remove quotes, extra whitespace)
+      const cleanTitle = generatedTitle.trim().replace(/^["']|["']$/g, "")
+      // Use functional update to avoid overwriting other concurrent generations
+      setFormData((prev) => ({ ...prev, name: cleanTitle }))
+
+      const totalTime = performance.now() - startTime
+      console.log(
+        `⏱️ [PersonaManager] Title generation completed: ${totalTime.toFixed(2)}ms`
+      )
+    } catch (error) {
+      const totalTime = performance.now() - startTime
+      console.error(
+        `❌ [PersonaManager] Title generation failed after ${totalTime.toFixed(2)}ms:`,
+        error
+      )
+      const errorMessage = error.message || "Failed to generate title"
+      if (
+        confirm(
+          errorMessage +
+            "\n\nWould you like to open Chrome flags to enable AI features?"
+        )
+      ) {
+        chrome.tabs.create({
+          url: "chrome://flags/#optimization-guide-on-device-model"
+        })
+      }
+    } finally {
+      setIsGeneratingTitle(false)
+    }
+  }
+
+  const handleGenerateDescription = async () => {
+    console.log("🤖 [PersonaManager] handleGenerateDescription called")
+
+    // Check if we have any input to work with
+    if (!formData.context.trim() && !formData.name.trim()) {
+      alert(
+        "Please enter either Context/Instructions or Name first to generate a description"
+      )
+      return
+    }
+
+    const startTime = performance.now()
+    setIsGeneratingDescription(true)
+
+    try {
+      // Build prompt based on available input
+      const inputSource = formData.context.trim() || formData.name.trim()
+
+      // Limit input length to avoid token overflow
+      const truncatedInput =
+        inputSource.length > 500
+          ? inputSource.substring(0, 500) + "..."
+          : inputSource
+
+      const prompt = `Generate a one-sentence description (15-25 words) for this AI persona:
+
+${truncatedInput}
+
+Return only the description sentence.`
+
+      console.log(
+        "🤖 [PersonaManager] Generating description with prompt:",
+        prompt
+      )
+      const generatedDescription = await executePrompt(prompt)
+
+      // Clean up the response
+      const cleanDescription = generatedDescription.trim()
+      // Use functional update to avoid overwriting other concurrent generations
+      setFormData((prev) => ({ ...prev, description: cleanDescription }))
+
+      const totalTime = performance.now() - startTime
+      console.log(
+        `⏱️ [PersonaManager] Description generation completed: ${totalTime.toFixed(2)}ms`
+      )
+    } catch (error) {
+      const totalTime = performance.now() - startTime
+      console.error(
+        `❌ [PersonaManager] Description generation failed after ${totalTime.toFixed(2)}ms:`,
+        error
+      )
+      const errorMessage = error.message || "Failed to generate description"
+      if (
+        confirm(
+          errorMessage +
+            "\n\nWould you like to open Chrome flags to enable AI features?"
+        )
+      ) {
+        chrome.tabs.create({
+          url: "chrome://flags/#optimization-guide-on-device-model"
+        })
+      }
+    } finally {
+      setIsGeneratingDescription(false)
+    }
+  }
+
+  const handleGenerateContext = async () => {
+    console.log("🤖 [PersonaManager] handleGenerateContext called")
+
+    // Check if we have any input to work with
+    if (
+      !formData.context.trim() &&
+      !formData.name.trim() &&
+      !formData.description.trim()
+    ) {
+      alert(
+        "Please enter at least one field (Name, Description, or basic Context) to generate detailed instructions"
+      )
+      return
+    }
+
+    const startTime = performance.now()
+    setIsGeneratingContext(true)
+
+    try {
+      // Build prompt based on available input
+      let inputSource = ""
+      if (formData.context.trim()) {
+        // User has basic context - expand it
+        inputSource = `Basic Context: ${formData.context.trim()}`
+      } else {
+        // Use title and/or description
+        if (formData.name.trim()) inputSource += `Name: ${formData.name.trim()}\n`
+        if (formData.description.trim())
+          inputSource += `Description: ${formData.description.trim()}`
+      }
+
+      const prompt = `Create detailed AI persona instructions based on this:
+
+${inputSource}
+
+Write 3-5 concise paragraphs covering:
+1. Role and purpose
+2. Key behaviors (tone, style, response format)
+3. Guidelines (do's and don'ts)
+
+Keep it focused and actionable. No markdown headers, just clear paragraphs.`
+
+      console.log(
+        "🤖 [PersonaManager] Generating context with prompt:",
+        prompt
+      )
+      const generatedContext = await executePrompt(prompt)
+
+      // Clean up the response
+      const cleanContext = generatedContext.trim()
+      // Use functional update to avoid overwriting other concurrent generations
+      setFormData((prev) => ({ ...prev, context: cleanContext }))
+
+      const totalTime = performance.now() - startTime
+      console.log(
+        `⏱️ [PersonaManager] Context generation completed: ${totalTime.toFixed(2)}ms`
+      )
+    } catch (error) {
+      const totalTime = performance.now() - startTime
+      console.error(
+        `❌ [PersonaManager] Context generation failed after ${totalTime.toFixed(2)}ms:`,
+        error
+      )
+      const errorMessage =
+        error.message || "Failed to generate context instructions"
+      if (
+        confirm(
+          errorMessage +
+            "\n\nWould you like to open Chrome flags to enable AI features?"
+        )
+      ) {
+        chrome.tabs.create({
+          url: "chrome://flags/#optimization-guide-on-device-model"
+        })
+      }
+    } finally {
+      setIsGeneratingContext(false)
+    }
   }
 
   const activePersona = personas.find((p) => p.isActive)
@@ -207,36 +428,189 @@ export function PersonaManager({
             <label className="plasmo-block plasmo-text-sm plasmo-font-medium plasmo-text-gray-700 plasmo-mb-2">
               Name *
             </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-              placeholder="e.g., Email Writer"
-              className="plasmo-w-full plasmo-px-4 plasmo-py-2.5 plasmo-bg-gray-50 plasmo-border plasmo-border-gray-200 plasmo-rounded-lg focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-purple-500 focus:plasmo-border-transparent plasmo-text-sm plasmo-text-gray-900"
-            />
+            <div className="plasmo-relative">
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+                placeholder="e.g., Email Writer"
+                className="plasmo-w-full plasmo-px-4 plasmo-py-2.5 plasmo-pr-12 plasmo-bg-gray-50 plasmo-border plasmo-border-gray-200 plasmo-rounded-lg focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-purple-500 focus:plasmo-border-transparent plasmo-text-sm plasmo-text-gray-900"
+              />
+              <button
+                onClick={handleGenerateTitle}
+                disabled={
+                  isGeneratingTitle ||
+                  isGeneratingDescription ||
+                  isGeneratingContext
+                }
+                className="plasmo-absolute plasmo-right-3 plasmo-top-1/2 plasmo--translate-y-1/2 plasmo-p-2 plasmo-text-purple-600 hover:plasmo-bg-purple-50 plasmo-rounded-lg disabled:plasmo-opacity-40 disabled:plasmo-cursor-not-allowed plasmo-transition-all"
+                title={
+                  isGeneratingTitle
+                    ? "Generating title..."
+                    : "Generate title using AI (1-2 seconds)"
+                }>
+                {isGeneratingTitle ? (
+                  <svg
+                    className="plasmo-w-5 plasmo-h-5 plasmo-animate-spin"
+                    fill="none"
+                    viewBox="0 0 24 24">
+                    <circle
+                      className="plasmo-opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="plasmo-opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    className="plasmo-w-5 plasmo-h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 10V3L4 14h7v7l9-11h-7z"
+                    />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
 
           <div>
             <label className="plasmo-block plasmo-text-sm plasmo-font-medium plasmo-text-gray-700 plasmo-mb-2">
               Description *
             </label>
-            <input
-              type="text"
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              placeholder="Brief description of what this persona does"
-              className="plasmo-w-full plasmo-px-4 plasmo-py-2.5 plasmo-bg-gray-50 plasmo-border plasmo-border-gray-200 plasmo-rounded-lg focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-purple-500 focus:plasmo-border-transparent plasmo-text-sm plasmo-text-gray-900"
-            />
+            <div className="plasmo-relative">
+              <input
+                type="text"
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
+                placeholder="Brief description of what this persona does"
+                className="plasmo-w-full plasmo-px-4 plasmo-py-2.5 plasmo-pr-12 plasmo-bg-gray-50 plasmo-border plasmo-border-gray-200 plasmo-rounded-lg focus:plasmo-outline-none focus:plasmo-ring-2 focus:plasmo-ring-purple-500 focus:plasmo-border-transparent plasmo-text-sm plasmo-text-gray-900"
+              />
+              <button
+                onClick={handleGenerateDescription}
+                disabled={
+                  isGeneratingDescription ||
+                  isGeneratingTitle ||
+                  isGeneratingContext
+                }
+                className="plasmo-absolute plasmo-right-3 plasmo-top-1/2 plasmo--translate-y-1/2 plasmo-p-2 plasmo-text-purple-600 hover:plasmo-bg-purple-50 plasmo-rounded-lg disabled:plasmo-opacity-40 disabled:plasmo-cursor-not-allowed plasmo-transition-all"
+                title={
+                  isGeneratingDescription
+                    ? "Generating description..."
+                    : "Generate description using AI (1-2 seconds)"
+                }>
+                {isGeneratingDescription ? (
+                  <svg
+                    className="plasmo-w-5 plasmo-h-5 plasmo-animate-spin"
+                    fill="none"
+                    viewBox="0 0 24 24">
+                    <circle
+                      className="plasmo-opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="plasmo-opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    className="plasmo-w-5 plasmo-h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 10V3L4 14h7v7l9-11h-7z"
+                    />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
 
           <div>
-            <label className="plasmo-block plasmo-text-sm plasmo-font-medium plasmo-text-gray-700 plasmo-mb-2">
-              Context / Instructions *
-            </label>
+            <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-mb-2">
+              <label className="plasmo-block plasmo-text-sm plasmo-font-medium plasmo-text-gray-700">
+                Context / Instructions *
+              </label>
+              <button
+                onClick={handleGenerateContext}
+                disabled={
+                  isGeneratingContext ||
+                  isGeneratingTitle ||
+                  isGeneratingDescription
+                }
+                className="plasmo-flex plasmo-items-center plasmo-gap-1.5 plasmo-px-3 plasmo-py-1.5 plasmo-text-xs plasmo-font-medium plasmo-text-purple-600 hover:plasmo-bg-purple-50 plasmo-rounded-md disabled:plasmo-opacity-40 disabled:plasmo-cursor-not-allowed plasmo-transition-all"
+                title={
+                  isGeneratingContext
+                    ? "Generating detailed instructions... This may take 5-10 seconds"
+                    : "Generate detailed instructions using AI"
+                }>
+                {isGeneratingContext ? (
+                  <>
+                    <svg
+                      className="plasmo-w-4 plasmo-h-4 plasmo-animate-spin"
+                      fill="none"
+                      viewBox="0 0 24 24">
+                      <circle
+                        className="plasmo-opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="plasmo-opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    <span className="plasmo-animate-pulse">Generating...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      className="plasmo-w-4 plasmo-h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 10V3L4 14h7v7l9-11h-7z"
+                      />
+                    </svg>
+                    Generate with AI
+                  </>
+                )}
+              </button>
+            </div>
             <textarea
               value={formData.context}
               onChange={(e) =>
