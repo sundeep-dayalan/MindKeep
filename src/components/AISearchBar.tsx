@@ -46,6 +46,7 @@ interface AISearchBarProps {
   onNotesChange?: () => Promise<void> // Callback when notes are modified (e.g., category changed)
   onMessagesChange?: (hasMessages: boolean) => void // Callback when messages are added/cleared
   onNoteClick?: (note: Note) => void // Callback when a reference note is clicked
+  onManagePersonas?: () => void // Callback to open Personas management page
   className?: string
 }
 
@@ -129,6 +130,7 @@ export function AISearchBar({
   onNotesChange,
   onMessagesChange,
   onNoteClick,
+  onManagePersonas,
   className = ""
 }: AISearchBarProps) {
   const [messages, setMessages] = React.useState<Message[]>([])
@@ -1504,6 +1506,7 @@ export function AISearchBar({
               <PersonaSelector
                 onPersonaChange={handlePersonaChange}
                 onInitializationChange={setIsPersonaInitializing}
+                onManageClick={onManagePersonas}
               />
             </div>
 

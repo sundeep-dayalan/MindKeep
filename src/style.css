@@ -43,6 +43,16 @@ img {
   display: none;
 }
 
+/* Hide scrollbar utility class */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* React Bento Grid - Remove extra padding/background from grid items */
 [class*="bento"] > div,
 [style*="grid"] > div {

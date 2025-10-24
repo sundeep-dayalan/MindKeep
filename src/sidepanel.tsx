@@ -422,27 +422,11 @@ function SidePanel() {
         {/* Content */}
         <div className="plasmo-flex-1 plasmo-flex plasmo-flex-col plasmo-overflow-hidden">
           {view === "personas" ? (
-            <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-no-visible-scrollbar plasmo-p-4">
-              <div className="plasmo-mb-4">
-                <button
-                  onClick={handleBackToList}
-                  className="plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-px-3 plasmo-py-2 plasmo-text-sm plasmo-text-slate-600 hover:plasmo-text-slate-900 plasmo-transition-colors">
-                  <svg
-                    className="plasmo-w-4 plasmo-h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                    />
-                  </svg>
-                  Back to Notes
-                </button>
-              </div>
-              <PersonaManager onPersonaActivated={handlePersonaActivated} />
+            <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-no-visible-scrollbar">
+              <PersonaManager
+                onPersonaActivated={handlePersonaActivated}
+                onBack={handleBackToList}
+              />
             </div>
           ) : view === "list" ? (
             <div className="plasmo-flex-1 plasmo-flex plasmo-flex-col plasmo-overflow-hidden">
@@ -496,6 +480,7 @@ function SidePanel() {
                 onNoteCreated={loadData}
                 onNotesChange={loadData}
                 onNoteClick={handleEditNote}
+                onManagePersonas={handlePersonasClick}
               />
             </div>
           )}
