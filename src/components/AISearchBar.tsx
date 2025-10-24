@@ -225,7 +225,7 @@ export function AISearchBar({
   // Handle persona changes
   const handlePersonaChange = async (persona: Persona | null) => {
     console.log(
-      "🎭 [AISearchBar] Persona changed to:",
+      " [AISearchBar] Persona changed to:",
       persona?.name || "Default Mode"
     )
 
@@ -245,21 +245,21 @@ export function AISearchBar({
         id: `system-${Date.now()}`,
         type: "ai",
         content: persona
-          ? `🎭 Switched to ${persona.name} persona. Conversation history cleared.\n\n${persona.description}`
-          : "🤖 Switched to Default Mode. Full tool access restored.",
+          ? ` Switched to ${persona.name} persona. Conversation history cleared.\n\n${persona.description}`
+          : " Switched to Default Mode. Full tool access restored.",
         timestamp: Date.now()
       }
       setMessages([systemMessage])
 
-      console.log("🎭 [AISearchBar] Agent persona updated successfully")
+      console.log(" [AISearchBar] Agent persona updated successfully")
     } catch (error) {
-      console.error("🎭 [AISearchBar] Error updating agent persona:", error)
+      console.error(" [AISearchBar] Error updating agent persona:", error)
     }
   }
 
   // Handle clearing the conversation
   const handleClearChat = async () => {
-    console.log("🧹 [AISearchBar] Clearing chat...")
+    console.log(" [AISearchBar] Clearing chat...")
 
     // Clear local messages
     setMessages([])
@@ -286,7 +286,7 @@ export function AISearchBar({
     // Clear input length tracker
     setCurrentInputLength(0)
 
-    console.log("✅ [AISearchBar] Chat cleared")
+    console.log(" [AISearchBar] Chat cleared")
   }
 
   // Check and update token usage
@@ -305,13 +305,13 @@ export function AISearchBar({
 
           // Log token usage for debugging
           console.log(
-            `📊 [Token Usage] ${usage.usage}/${usage.quota} tokens (${usage.percentage.toFixed(1)}% used) - ${(usage.quota - usage.usage).toFixed(0)} remaining`
+            ` [Token Usage] ${usage.usage}/${usage.quota} tokens (${usage.percentage.toFixed(1)}% used) - ${(usage.quota - usage.usage).toFixed(0)} remaining`
           )
 
           // Warn if approaching limit
           if (usage.percentage >= 80) {
             console.warn(
-              `⚠️ [Token Warning] Approaching token limit! ${usage.percentage.toFixed(1)}% used`
+              ` [Token Warning] Approaching token limit! ${usage.percentage.toFixed(1)}% used`
             )
           }
         }
@@ -559,7 +559,7 @@ export function AISearchBar({
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
-            content: "❌ Cancel",
+            content: " Cancel",
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, userMessage])
@@ -587,7 +587,7 @@ export function AISearchBar({
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
-            content: "✨ Auto-generate both title and category",
+            content: " Auto-generate both title and category",
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, userMessage])
@@ -615,7 +615,7 @@ export function AISearchBar({
           const confirmMessage: Message = {
             id: `ai-${Date.now()}`,
             type: "ai",
-            content: `Great! I've generated:\n📝 Title: "${finalTitle}"\n📁 Category: "${finalCategory}"\n\nCreating your note now...`,
+            content: `Great! I've generated:\n Title: "${finalTitle}"\n Category: "${finalCategory}"\n\nCreating your note now...`,
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, confirmMessage])
@@ -629,7 +629,7 @@ export function AISearchBar({
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
-            content: "✍️ I'll choose manually",
+            content: " I'll choose manually",
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, userMessage])
@@ -683,7 +683,7 @@ export function AISearchBar({
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
-            content: "🤖 Auto-generate title",
+            content: " Auto-generate title",
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, userMessage])
@@ -742,7 +742,7 @@ export function AISearchBar({
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
-            content: "✍️ I'll provide a title",
+            content: " I'll provide a title",
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, userMessage])
@@ -775,7 +775,7 @@ export function AISearchBar({
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
-            content: "🤖 Auto-generate category",
+            content: " Auto-generate category",
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, userMessage])
@@ -835,7 +835,7 @@ export function AISearchBar({
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
-            content: `📁 ${value}`,
+            content: ` ${value}`,
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, userMessage])
@@ -879,7 +879,7 @@ export function AISearchBar({
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
-            content: "✍️ I'll provide a category",
+            content: " I'll provide a category",
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, userMessage])
@@ -913,7 +913,7 @@ export function AISearchBar({
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
-            content: `📝 "${value}"`,
+            content: ` "${value}"`,
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, userMessage])
@@ -960,9 +960,7 @@ export function AISearchBar({
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
-            content: value.confirmed
-              ? "✅ Yes, move it"
-              : "❌ No, keep it here",
+            content: value.confirmed ? " Yes, move it" : " No, keep it here",
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, userMessage])
@@ -1022,7 +1020,7 @@ export function AISearchBar({
         // Generate embedding (same as in sidepanel.tsx handleSaveNote)
         const saveStartTime = performance.now()
         console.log(
-          `[${noteCreationId}] 📝 [AI Chat] Creating new note via agent...`
+          `[${noteCreationId}] [AI Chat] Creating new note via agent...`
         )
 
         // Step 1: Generate embedding from plaintext content
@@ -1031,7 +1029,7 @@ export function AISearchBar({
         const embedding = await generateEmbedding(noteContent)
         const embeddingTime = performance.now() - embeddingStartTime
         console.log(
-          `⏱️ [AI Chat] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embedding.length} dimensions)`
+          `⏱ [AI Chat] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embedding.length} dimensions)`
         )
 
         // Get current tab URL for sourceUrl
@@ -1050,9 +1048,7 @@ export function AISearchBar({
         let contentJSONString: string
         if (lastSubmittedContentJSON && noteContent) {
           // Extract only the portion of TipTap JSON that matches the agent's extracted content
-          console.log(
-            "✨ Extracting relevant portion from rich content JSON..."
-          )
+          console.log(" Extracting relevant portion from rich content JSON...")
 
           // Get the full plaintext from the stored JSON to compare
           const extractPlainTextFromJSON = (json: any): string => {
@@ -1078,7 +1074,7 @@ export function AISearchBar({
             fullText.length > noteContent.length
           ) {
             console.log(
-              "⚠️ Agent extracted partial content, filtering TipTap nodes..."
+              " Agent extracted partial content, filtering TipTap nodes..."
             )
 
             // Filter TipTap nodes to only include those that are part of noteContent
@@ -1106,21 +1102,21 @@ export function AISearchBar({
                 content: filteredNodes
               })
               console.log(
-                `✅ Filtered to ${filteredNodes.length} nodes (removed prompt)`
+                ` Filtered to ${filteredNodes.length} nodes (removed prompt)`
               )
             } else {
               // Fallback: use the full content if filtering failed
               contentJSONString = JSON.stringify(lastSubmittedContentJSON)
-              console.log("⚠️ Filtering failed, using full content")
+              console.log(" Filtering failed, using full content")
             }
           } else {
             // Content matches exactly, use full JSON
-            console.log("✅ Content matches exactly, using full rich JSON")
+            console.log(" Content matches exactly, using full rich JSON")
             contentJSONString = JSON.stringify(lastSubmittedContentJSON)
           }
         } else {
           // Fallback: Convert plain text to TipTap JSON format (for backward compatibility)
-          console.log("⚠️ No rich content found, converting plain text to JSON")
+          console.log(" No rich content found, converting plain text to JSON")
           const contentJSON = {
             type: "doc",
             content: noteContent
@@ -1155,7 +1151,7 @@ export function AISearchBar({
         })
         const messageTime = performance.now() - messageStartTime
         console.log(
-          `⏱️ [AI Chat] Background processing (encrypt + DB): ${messageTime.toFixed(2)}ms`
+          `⏱ [AI Chat] Background processing (encrypt + DB): ${messageTime.toFixed(2)}ms`
         )
 
         if (!response.success) {
@@ -1163,15 +1159,15 @@ export function AISearchBar({
         }
 
         const totalTime = performance.now() - saveStartTime
-        console.log(`⏱️ [AI Chat] TOTAL save time: ${totalTime.toFixed(2)}ms`)
+        console.log(` [AI Chat] TOTAL save time: ${totalTime.toFixed(2)}ms`)
         console.log(
-          `📊 [AI Chat] Breakdown: Embedding=${embeddingTime.toFixed(2)}ms, Background=${messageTime.toFixed(2)}ms`
+          ` [AI Chat] Breakdown: Embedding=${embeddingTime.toFixed(2)}ms, Background=${messageTime.toFixed(2)}ms`
         )
 
         const successMessage: Message = {
           id: `ai-${Date.now()}`,
           type: "ai",
-          content: `✅ Note created successfully!\n\n📝 Title: "${finalTitle}"\n📁 Category: ${finalCategory}`,
+          content: ` Note created successfully!\n\n Title: "${finalTitle}"\n Category: ${finalCategory}`,
           timestamp: Date.now()
         }
         setMessages((prev) => [...prev, successMessage])
@@ -1401,14 +1397,14 @@ export function AISearchBar({
               {"Summarizing conversation history"}
             </div>
             {/* <button
-              onClick={handleClearChat}
-              className={`plasmo-px-3 plasmo-py-1.5 plasmo-rounded plasmo-text-xs plasmo-font-medium plasmo-transition-colors ${
-                tokenUsage.percentage >= 95
-                  ? "plasmo-bg-red-600 hover:plasmo-bg-red-700 plasmo-text-white"
-                  : "plasmo-bg-amber-600 hover:plasmo-bg-amber-700 plasmo-text-white"
-              }`}>
-              Start New Chat
-            </button> */}
+ onClick={handleClearChat}
+ className={`plasmo-px-3 plasmo-py-1.5 plasmo-rounded plasmo-text-xs plasmo-font-medium plasmo-transition-colors ${
+ tokenUsage.percentage >= 95
+ ? "plasmo-bg-red-600 hover:plasmo-bg-red-700 plasmo-text-white"
+ : "plasmo-bg-amber-600 hover:plasmo-bg-amber-700 plasmo-text-white"
+ }`}>
+ Start New Chat
+ </button> */}
           </div>
         </div>
       )}
@@ -1444,9 +1440,9 @@ export function AISearchBar({
               {message.clarificationOptions &&
                 message.clarificationOptions.length > 0 &&
                 !handledClarifications.has(message.id) && (
-                  <div className="plasmo-flex plasmo-justify-start plasmo-pl-4">
+                  <div className="plasmo-flex plasmo-justify-start">
                     <div className="plasmo-max-w-[80%] plasmo-space-y-2">
-                      <div className="plasmo-text-xs plasmo-font-medium plasmo-text-slate-600 plasmo-pl-2">
+                      <div className="plasmo-text-xs plasmo-font-light plasmo-text-slate-600 plasmo-pl-2">
                         Choose an option:
                       </div>
                       <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-2">
@@ -1466,7 +1462,7 @@ export function AISearchBar({
                               option.type === "category_pill"
                                 ? "plasmo-px-3 plasmo-py-1.5 plasmo-bg-blue-50 hover:plasmo-bg-blue-100 plasmo-text-blue-700 plasmo-border plasmo-border-blue-200 hover:plasmo-border-blue-300"
                                 : "plasmo-px-4 plasmo-py-2 plasmo-bg-white/20 plasmo-backdrop-blur-sm hover:plasmo-bg-white/30 plasmo-text-slate-900 plasmo-border plasmo-border-white/40 hover:plasmo-border-white/50"
-                            } plasmo-rounded-full plasmo-text-sm plasmo-font-medium plasmo-transition-all plasmo-cursor-pointer plasmo-shadow-sm hover:plasmo-shadow disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed`}>
+                            } plasmo-rounded-full plasmo-text-[12px] plasmo-font-normal plasmo-transition-all plasmo-cursor-pointer plasmo-shadow-sm hover:plasmo-shadow disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed`}>
                             {option.label}
                           </button>
                         ))}

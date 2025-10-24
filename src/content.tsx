@@ -2,7 +2,7 @@ import cssText from "data-text:~style.css"
 import type { PlasmoCSConfig } from "plasmo"
 
 export const config: PlasmoCSConfig = {
-  matches: ["<all_urls>"]
+ matches: ["<all_urls>"]
 }
 
 /**
@@ -15,29 +15,29 @@ export const config: PlasmoCSConfig = {
  * To address this, we:
  * 1. Replace the `:root` selector with `:host(plasmo-csui)` to properly scope the styles within the Shadow DOM.
  * 2. Convert all `rem` units to pixel values using a fixed base font size, ensuring consistent styling
- *    regardless of the host page's font size.
+ * regardless of the host page's font size.
  */
 export const getStyle = (): HTMLStyleElement => {
-  const baseFontSize = 16
+ const baseFontSize = 16
 
-  let updatedCssText = cssText.replaceAll(":root", ":host(plasmo-csui)")
-  const remRegex = /([\d.]+)rem/g
-  updatedCssText = updatedCssText.replace(remRegex, (match, remValue) => {
-    const pixelsValue = parseFloat(remValue) * baseFontSize
+ let updatedCssText = cssText.replaceAll(":root", ":host(plasmo-csui)")
+ const remRegex = /([\d.]+)rem/g
+ updatedCssText = updatedCssText.replace(remRegex, (match, remValue) => {
+ const pixelsValue = parseFloat(remValue) * baseFontSize
 
-    return `${pixelsValue}px`
-  })
+ return `${pixelsValue}px`
+ })
 
-  const styleElement = document.createElement("style")
+ const styleElement = document.createElement("style")
 
-  styleElement.textContent = updatedCssText
+ styleElement.textContent = updatedCssText
 
-  return styleElement
+ return styleElement
 }
 
 // Content script placeholder - will be used for command palette later
 const PlasmoOverlay = () => {
-  return null
+ return null
 }
 
 export default PlasmoOverlay
@@ -48,22 +48,22 @@ export default PlasmoOverlay
  * Listen for messages from background script to capture selected HTML
  */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === "GET_SELECTED_HTML") {
-    const selection = window.getSelection()
+ if (message.type === "GET_SELECTED_HTML") {
+ const selection = window.getSelection()
 
-    if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0)
-      const container = document.createElement("div")
-      container.appendChild(range.cloneContents())
+ if (selection && selection.rangeCount > 0) {
+ const range = selection.getRangeAt(0)
+ const container = document.createElement("div")
+ container.appendChild(range.cloneContents())
 
-      sendResponse({
-        html: container.innerHTML,
-        text: selection.toString()
-      })
-    } else {
-      sendResponse({ html: "", text: "" })
-    }
+ sendResponse({
+ html: container.innerHTML,
+ text: selection.toString()
+ })
+ } else {
+ sendResponse({ html: "", text: "" })
+ }
 
-    return true // Keep the message channel open for async response
-  }
+ return true // Keep the message channel open for async response
+ }
 })

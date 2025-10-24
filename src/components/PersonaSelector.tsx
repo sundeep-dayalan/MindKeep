@@ -24,34 +24,31 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    console.log("🎭 [PersonaSelector] Component mounted, loading personas")
+    console.log(" [PersonaSelector] Component mounted, loading personas")
     loadPersonas()
   }, [])
 
   const loadPersonas = async () => {
-    console.log("🎭 [PersonaSelector] loadPersonas called")
+    console.log(" [PersonaSelector] loadPersonas called")
     try {
       const [allPersonas, active] = await Promise.all([
         getAllPersonas(),
         getActivePersona()
       ])
 
-      console.log(`🎭 [PersonaSelector] Loaded ${allPersonas.length} personas`)
-      console.log(
-        "🎭 [PersonaSelector] Active persona:",
-        active?.name || "None"
-      )
+      console.log(` [PersonaSelector] Loaded ${allPersonas.length} personas`)
+      console.log(" [PersonaSelector] Active persona:", active?.name || "None")
 
       setPersonas(allPersonas)
       setActivePersonaState(active)
     } catch (error) {
-      console.error("🎭 [PersonaSelector] Error loading personas:", error)
+      console.error(" [PersonaSelector] Error loading personas:", error)
     }
   }
 
   const handleSelect = async (persona: Persona | null) => {
     console.log(
-      "🎭 [PersonaSelector] handleSelect for persona:",
+      " [PersonaSelector] handleSelect for persona:",
       persona?.name || "None (default mode)"
     )
 
@@ -66,9 +63,9 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
         onPersonaChange(persona)
       }
 
-      console.log("🎭 [PersonaSelector] Persona changed successfully")
+      console.log(" [PersonaSelector] Persona changed successfully")
     } catch (error) {
-      console.error("🎭 [PersonaSelector] Error changing persona:", error)
+      console.error(" [PersonaSelector] Error changing persona:", error)
       alert("Failed to change persona. Please try again.")
     } finally {
       setLoading(false)
@@ -77,7 +74,7 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
 
   // Trigger reload when personas change in storage
   useEffect(() => {
-    console.log("🎭 [PersonaSelector] Setting up storage listener")
+    console.log(" [PersonaSelector] Setting up storage listener")
 
     const handleStorageChange = (changes: {
       [key: string]: chrome.storage.StorageChange
@@ -85,7 +82,7 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
       // Reload if persona-related data changes
       if (changes["mindkeep_persona_settings"]) {
         console.log(
-          "🎭 [PersonaSelector] Persona settings changed in storage, reloading"
+          " [PersonaSelector] Persona settings changed in storage, reloading"
         )
         loadPersonas()
       }
@@ -94,7 +91,7 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
     chrome.storage.onChanged.addListener(handleStorageChange)
 
     return () => {
-      console.log("🎭 [PersonaSelector] Removing storage listener")
+      console.log(" [PersonaSelector] Removing storage listener")
       chrome.storage.onChanged.removeListener(handleStorageChange)
     }
   }, [])
@@ -109,7 +106,7 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
         className="plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-px-2.5 plasmo-py-1.5 plasmo-rounded-lg plasmo-border plasmo-border-slate-100 plasmo-bg-slate-50 hover:plasmo-bg-slate-200 plasmo-transition-colors plasmo-min-w-[120px]">
         {/* Name */}
         <span className="plasmo-text-[13px] plasmo-font-medium plasmo-text-slate-700 plasmo-flex-1 plasmo-text-left plasmo-truncate">
-          {activePersona?.name || "Default"}
+          Persona • {activePersona?.name || "Default"}
         </span>
 
         {/* Dropdown Arrow */}

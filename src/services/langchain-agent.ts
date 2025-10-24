@@ -24,59 +24,59 @@ import { allTools } from "./langchain-tools"
  * Provides both extracted data and conversational AI response
  */
 export interface AgentResponse {
-  /** The extracted/requested data (email, password, URL, etc.) */
-  extractedData: string | null
+ /** The extracted/requested data (email, password, URL, etc.) */
+ extractedData: string | null
 
-  /** IDs of notes that were referenced to answer the query */
-  referenceNotes: string[]
+ /** IDs of notes that were referenced to answer the query */
+ referenceNotes: string[]
 
-  /** Natural language response from the AI */
-  aiResponse: string
+ /** Natural language response from the AI */
+ aiResponse: string
 
-  /** Type of data extracted (helps UI determine how to display it) */
-  dataType?: "email" | "password" | "url" | "text" | "code" | "date" | "other"
+ /** Type of data extracted (helps UI determine how to display it) */
+ dataType?: "email" | "password" | "url" | "text" | "code" | "date" | "other"
 
-  /** Confidence score (0-1) - how confident is the AI about the extracted data */
-  confidence?: number
+ /** Confidence score (0-1) - how confident is the AI about the extracted data */
+ confidence?: number
 
-  /** Suggested actions the user can take */
-  suggestedActions?: Array<{
-    type: "copy" | "fill" | "view_note" | "open_link"
-    label: string
-    data: any
-  }>
+ /** Suggested actions the user can take */
+ suggestedActions?: Array<{
+ type: "copy" | "fill" | "view_note" | "open_link"
+ label: string
+ data: any
+ }>
 
-  /** Indicates if agent needs clarification from user */
-  needsClarification?: boolean
+ /** Indicates if agent needs clarification from user */
+ needsClarification?: boolean
 
-  /** Type of clarification needed */
-  clarificationType?:
-    | "title"
-    | "category"
-    | "both"
-    | "content"
-    | "organize_confirmation"
+ /** Type of clarification needed */
+ clarificationType?:
+ | "title"
+ | "category"
+ | "both"
+ | "content"
+ | "organize_confirmation"
 
-  /** Options for user to select (for clarification) */
-  clarificationOptions?: Array<{
-    type: "button" | "category_pill"
-    label: string
-    value: any
-    action: string // e.g., "select_category", "auto_generate_title", "manual_title"
-  }>
+ /** Options for user to select (for clarification) */
+ clarificationOptions?: Array<{
+ type: "button" | "category_pill"
+ label: string
+ value: any
+ action: string // e.g., "select_category", "auto_generate_title", "manual_title"
+ }>
 
-  /** Pending note data waiting for clarification */
-  pendingNoteData?: {
-    content?: string
-    title?: string
-    category?: string
-    noteId?: string
-    currentCategory?: string
-    suggestedCategory?: string
-  }
+ /** Pending note data waiting for clarification */
+ pendingNoteData?: {
+ content?: string
+ title?: string
+ category?: string
+ noteId?: string
+ currentCategory?: string
+ suggestedCategory?: string
+ }
 
-  /** Indicates if a note was successfully created */
-  noteCreated?: boolean
+ /** Indicates if a note was successfully created */
+ noteCreated?: boolean
 }
 
 // ============================================================================
@@ -128,9 +128,9 @@ Important:
  * @returns Estimated token count
  */
 function estimateTokens(text: string): number {
-  // Rough estimation: 1 token ≈ 3.5 characters for English
-  // For JSON, account for formatting overhead
-  return Math.ceil(text.length / 3.5)
+ // Rough estimation: 1 token ≈ 3.5 characters for English
+ // For JSON, account for formatting overhead
+ return Math.ceil(text.length / 3.5)
 }
 
 /**
@@ -141,72 +141,72 @@ function estimateTokens(text: string): number {
  * @returns Optimized content that prioritizes query-relevant sections
  */
 function extractRelevantContent(
-  noteContent: string,
-  query: string,
-  maxLength: number = 500
+ noteContent: string,
+ query: string,
+ maxLength: number = 500
 ): string {
-  if (noteContent.length <= maxLength) {
-    return noteContent
-  }
+ if (noteContent.length <= maxLength) {
+ return noteContent
+ }
 
-  // Strategy A: Keyword matching
-  const queryKeywords = query
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((word) => word.length > 3) // "netflix", "password", etc.
+ // Strategy A: Keyword matching
+ const queryKeywords = query
+ .toLowerCase()
+ .split(/\s+/)
+ .filter((word) => word.length > 3) // "netflix", "password", etc.
 
-  if (queryKeywords.length > 0) {
-    // Split into sentences
-    const sentences = noteContent.split(/[.!?]+/).filter((s) => s.trim())
+ if (queryKeywords.length > 0) {
+ // Split into sentences
+ const sentences = noteContent.split(/[.!?]+/).filter((s) => s.trim())
 
-    // Find sentences containing query keywords
-    const relevantSentences: Array<{ sentence: string; score: number }> = []
+ // Find sentences containing query keywords
+ const relevantSentences: Array<{ sentence: string; score: number }> = []
 
-    sentences.forEach((sentence) => {
-      const lowerSentence = sentence.toLowerCase()
-      let score = 0
+ sentences.forEach((sentence) => {
+ const lowerSentence = sentence.toLowerCase()
+ let score = 0
 
-      // Calculate relevance score based on keyword matches
-      queryKeywords.forEach((keyword) => {
-        if (lowerSentence.includes(keyword)) {
-          score += 1
-        }
-      })
+ // Calculate relevance score based on keyword matches
+ queryKeywords.forEach((keyword) => {
+ if (lowerSentence.includes(keyword)) {
+ score += 1
+ }
+ })
 
-      if (score > 0) {
-        relevantSentences.push({ sentence: sentence.trim(), score })
-      }
-    })
+ if (score > 0) {
+ relevantSentences.push({ sentence: sentence.trim(), score })
+ }
+ })
 
-    // Sort by relevance score (highest first)
-    relevantSentences.sort((a, b) => b.score - a.score)
+ // Sort by relevance score (highest first)
+ relevantSentences.sort((a, b) => b.score - a.score)
 
-    // Build result from most relevant sentences until maxLength
-    if (relevantSentences.length > 0) {
-      let result = ""
-      for (const { sentence } of relevantSentences) {
-        if (result.length + sentence.length + 2 <= maxLength) {
-          result += sentence + ". "
-        } else {
-          break
-        }
-      }
+ // Build result from most relevant sentences until maxLength
+ if (relevantSentences.length > 0) {
+ let result = ""
+ for (const { sentence } of relevantSentences) {
+ if (result.length + sentence.length + 2 <= maxLength) {
+ result += sentence + ". "
+ } else {
+ break
+ }
+ }
 
-      if (result.length > 0) {
-        return result.trim()
-      }
-    }
-  }
+ if (result.length > 0) {
+ return result.trim()
+ }
+ }
+ }
 
-  // Strategy B: Fallback to sandwich approach (beginning + end)
-  // Keep first 40% and last 40%, skip middle 20%
-  const firstPartLength = Math.floor(maxLength * 0.4)
-  const lastPartLength = Math.floor(maxLength * 0.4)
+ // Strategy B: Fallback to sandwich approach (beginning + end)
+ // Keep first 40% and last 40%, skip middle 20%
+ const firstPartLength = Math.floor(maxLength * 0.4)
+ const lastPartLength = Math.floor(maxLength * 0.4)
 
-  const firstPart = noteContent.substring(0, firstPartLength)
-  const lastPart = noteContent.substring(noteContent.length - lastPartLength)
+ const firstPart = noteContent.substring(0, firstPartLength)
+ const lastPart = noteContent.substring(noteContent.length - lastPartLength)
 
-  return `${firstPart} [...] ${lastPart}`
+ return `${firstPart} [...] ${lastPart}`
 }
 
 // ============================================================================
@@ -214,179 +214,179 @@ function extractRelevantContent(
 // ============================================================================
 
 export interface AgentConfig {
-  tools?: typeof allTools
-  maxIterations?: number
-  verbose?: boolean
-  temperature?: number
-  topK?: number
+ tools?: typeof allTools
+ maxIterations?: number
+ verbose?: boolean
+ temperature?: number
+ topK?: number
 }
 
 export class MindKeepAgent {
-  private sessionId: string | null = null // Native Prompt API session
-  private tools: typeof allTools
-  private maxIterations: number
-  private verbose: boolean
-  private temperature: number
-  private topK: number
-  private lastUserMessage: string = "" // Track the last user message content
-  private conversationHistory: Array<{ role: string; content: string }> = [] // Full conversation history for tools
-  private activePersona: Persona | null = null // Active persona for search-only mode
-  private mode: AgentMode = AgentMode.DEFAULT // Current operating mode
+ private sessionId: string | null = null // Native Prompt API session
+ private tools: typeof allTools
+ private maxIterations: number
+ private verbose: boolean
+ private temperature: number
+ private topK: number
+ private lastUserMessage: string = "" // Track the last user message content
+ private conversationHistory: Array<{ role: string; content: string }> = [] // Full conversation history for tools
+ private activePersona: Persona | null = null // Active persona for search-only mode
+ private mode: AgentMode = AgentMode.DEFAULT // Current operating mode
 
-  constructor(config: AgentConfig = {}) {
-    this.tools = config.tools || allTools
-    this.maxIterations = config.maxIterations || 5
-    this.verbose = config.verbose || false
-    this.temperature = config.temperature || 0.8
-    this.topK = config.topK || 3
-  }
+ constructor(config: AgentConfig = {}) {
+ this.tools = config.tools || allTools
+ this.maxIterations = config.maxIterations || 5
+ this.verbose = config.verbose || false
+ this.temperature = config.temperature || 0.8
+ this.topK = config.topK || 3
+ }
 
-  /**
-   * Initialize the agent by creating a session
-   * Must be called before using the agent
-   */
-  async initialize(): Promise<void> {
-    console.log("🤖 [Agent] Initializing agent with native session...")
+ /**
+ * Initialize the agent by creating a session
+ * Must be called before using the agent
+ */
+ async initialize(): Promise<void> {
+ console.log(" [Agent] Initializing agent with native session...")
 
-    try {
-      this.sessionId = await GeminiNanoService.createSession({
-        systemPrompt: this.buildSystemPrompt(),
-        temperature: this.temperature,
-        topK: this.topK
-      })
+ try {
+ this.sessionId = await GeminiNanoService.createSession({
+ systemPrompt: this.buildSystemPrompt(),
+ temperature: this.temperature,
+ topK: this.topK
+ })
 
-      console.log(
-        `✅ [Agent] Agent initialized with session: ${this.sessionId}`
-      )
-    } catch (error) {
-      console.error("❌ [Agent] Failed to initialize agent:", error)
-      throw new Error(`Failed to initialize agent: ${error.message}`)
-    }
-  }
+ console.log(
+ ` [Agent] Agent initialized with session: ${this.sessionId}`
+ )
+ } catch (error) {
+ console.error(" [Agent] Failed to initialize agent:", error)
+ throw new Error(`Failed to initialize agent: ${error.message}`)
+ }
+ }
 
-  /**
-   * Check if agent is initialized
-   */
-  isInitialized(): boolean {
-    return this.sessionId !== null
-  }
+ /**
+ * Check if agent is initialized
+ */
+ isInitialized(): boolean {
+ return this.sessionId !== null
+ }
 
-  /**
-   * Set active persona (enters PERSONA mode with search-only tools)
-   * Destroys current session and creates a new one with updated system prompt
-   * @param persona - The persona to activate, or null to return to DEFAULT mode
-   */
-  async setPersona(persona: Persona | null): Promise<void> {
-    console.log(
-      "🎭 [Agent] setPersona called with:",
-      persona?.name || "null (default mode)"
-    )
+ /**
+ * Set active persona (enters PERSONA mode with search-only tools)
+ * Destroys current session and creates a new one with updated system prompt
+ * @param persona - The persona to activate, or null to return to DEFAULT mode
+ */
+ async setPersona(persona: Persona | null): Promise<void> {
+ console.log(
+ " [Agent] setPersona called with:",
+ persona?.name || "null (default mode)"
+ )
 
-    this.activePersona = persona
-    this.mode = persona ? AgentMode.PERSONA : AgentMode.DEFAULT
+ this.activePersona = persona
+ this.mode = persona ? AgentMode.PERSONA : AgentMode.DEFAULT
 
-    // Destroy old session and create new one with updated system prompt
-    console.log("🎭 [Agent] Recreating session due to persona change")
+ // Destroy old session and create new one with updated system prompt
+ console.log(" [Agent] Recreating session due to persona change")
 
-    if (this.sessionId) {
-      await GeminiNanoService.destroySession(this.sessionId)
-    }
+ if (this.sessionId) {
+ await GeminiNanoService.destroySession(this.sessionId)
+ }
 
-    // Create new session with updated system prompt
-    this.sessionId = await GeminiNanoService.createSession({
-      systemPrompt: this.buildSystemPrompt(),
-      temperature: this.temperature,
-      topK: this.topK
-    })
+ // Create new session with updated system prompt
+ this.sessionId = await GeminiNanoService.createSession({
+ systemPrompt: this.buildSystemPrompt(),
+ temperature: this.temperature,
+ topK: this.topK
+ })
 
-    console.log(`🎭 [Agent] Mode set to: ${this.mode}`)
-    console.log(`🎭 [Agent] Active persona: ${persona?.name || "None"}`)
-    console.log(`🎭 [Agent] New session: ${this.sessionId}`)
-  }
+ console.log(` [Agent] Mode set to: ${this.mode}`)
+ console.log(` [Agent] Active persona: ${persona?.name || "None"}`)
+ console.log(` [Agent] New session: ${this.sessionId}`)
+ }
 
-  /**
-   * Get the current active persona
-   */
-  getPersona(): Persona | null {
-    return this.activePersona
-  }
+ /**
+ * Get the current active persona
+ */
+ getPersona(): Persona | null {
+ return this.activePersona
+ }
 
-  /**
-   * Get the current operating mode
-   */
-  getMode(): AgentMode {
-    return this.mode
-  }
+ /**
+ * Get the current operating mode
+ */
+ getMode(): AgentMode {
+ return this.mode
+ }
 
-  /**
-   * Get the current session ID
-   */
-  getSessionId(): string | null {
-    return this.sessionId
-  }
+ /**
+ * Get the current session ID
+ */
+ getSessionId(): string | null {
+ return this.sessionId
+ }
 
-  /**
-   * Clear the conversation session and start fresh
-   * Destroys the current session and creates a new one
-   */
-  async clearSession(): Promise<void> {
-    console.log("🧹 [Agent] Clearing conversation session...")
+ /**
+ * Clear the conversation session and start fresh
+ * Destroys the current session and creates a new one
+ */
+ async clearSession(): Promise<void> {
+ console.log(" [Agent] Clearing conversation session...")
 
-    // Destroy the current session
-    await GeminiNanoService.destroySession(this.sessionId)
+ // Destroy the current session
+ await GeminiNanoService.destroySession(this.sessionId)
 
-    // Create a new session with the same configuration
-    this.sessionId = await GeminiNanoService.createSession({
-      systemPrompt: this.buildSystemPrompt(),
-      temperature: this.temperature,
-      topK: this.topK
-    })
+ // Create a new session with the same configuration
+ this.sessionId = await GeminiNanoService.createSession({
+ systemPrompt: this.buildSystemPrompt(),
+ temperature: this.temperature,
+ topK: this.topK
+ })
 
-    // Clear last user message
-    this.lastUserMessage = null
+ // Clear last user message
+ this.lastUserMessage = null
 
-    console.log(`✅ [Agent] Session cleared. New session: ${this.sessionId}`)
-  }
+ console.log(` [Agent] Session cleared. New session: ${this.sessionId}`)
+ }
 
-  /**
-   * Get available tools based on current mode
-   * DEFAULT mode: All tools
-   * PERSONA mode: Search-only tools (search_notes, get_note)
-   */
-  private getAvailableTools(): typeof allTools {
-    if (this.mode === AgentMode.PERSONA) {
-      console.log("🎭 [Agent] PERSONA mode - filtering to search-only tools")
+ /**
+ * Get available tools based on current mode
+ * DEFAULT mode: All tools
+ * PERSONA mode: Search-only tools (search_notes, get_note)
+ */
+ private getAvailableTools(): typeof allTools {
+ if (this.mode === AgentMode.PERSONA) {
+ console.log(" [Agent] PERSONA mode - filtering to search-only tools")
 
-      // Only allow read-only tools in persona mode
-      const searchOnlyTools = allTools.filter(
-        (tool) => tool.name === "search_notes" || tool.name === "get_note"
-      )
+ // Only allow read-only tools in persona mode
+ const searchOnlyTools = allTools.filter(
+ (tool) => tool.name === "search_notes" || tool.name === "get_note"
+ )
 
-      console.log(
-        `🎭 [Agent] Available tools in PERSONA mode: ${searchOnlyTools.map((t) => t.name).join(", ")}`
-      )
+ console.log(
+ ` [Agent] Available tools in PERSONA mode: ${searchOnlyTools.map((t) => t.name).join(", ")}`
+ )
 
-      return searchOnlyTools as typeof allTools
-    }
+ return searchOnlyTools as typeof allTools
+ }
 
-    console.log(
-      `🤖 [Agent] DEFAULT mode - all ${allTools.length} tools available`
-    )
-    return this.tools
-  }
+ console.log(
+ ` [Agent] DEFAULT mode - all ${allTools.length} tools available`
+ )
+ return this.tools
+ }
 
-  /**
-   * Build system prompt based on current mode and persona
-   */
-  private buildSystemPrompt(): string {
-    let systemPrompt = AGENT_SYSTEM_PROMPT
+ /**
+ * Build system prompt based on current mode and persona
+ */
+ private buildSystemPrompt(): string {
+ let systemPrompt = AGENT_SYSTEM_PROMPT
 
-    if (this.mode === AgentMode.PERSONA && this.activePersona) {
-      console.log(
-        `🎭 [Agent] Building PERSONA mode system prompt for: ${this.activePersona.name}`
-      )
+ if (this.mode === AgentMode.PERSONA && this.activePersona) {
+ console.log(
+ ` [Agent] Building PERSONA mode system prompt for: ${this.activePersona.name}`
+ )
 
-      systemPrompt = `You are MindKeep AI, operating in PERSONA mode as "${this.activePersona.name}".
+ systemPrompt = `You are MindKeep AI, operating in PERSONA mode as "${this.activePersona.name}".
 
 === PERSONA CONTEXT ===
 ${this.activePersona.context}
@@ -412,201 +412,201 @@ When helping users:
 4. Be helpful and stay in character
 5. If no notes are found, suggest creating a note about the topic`
 
-      console.log(
-        "🎭 [Agent] Persona system prompt built (length:",
-        systemPrompt.length,
-        "chars)"
-      )
-    } else {
-      console.log("🤖 [Agent] Using DEFAULT system prompt")
-    }
+ console.log(
+ " [Agent] Persona system prompt built (length:",
+ systemPrompt.length,
+ "chars)"
+ )
+ } else {
+ console.log(" [Agent] Using DEFAULT system prompt")
+ }
 
-    return systemPrompt
-  }
+ return systemPrompt
+ }
 
-  /**
-   * Optimize tool results to fit within token budget for LLM
-   * Applies smart truncation and content extraction to prevent context overflow
-   * @param toolResults The raw tool results
-   * @param query The user's query for context-aware optimization
-   * @param maxTotalTokens Maximum total tokens allowed (default: 4000 for Gemini Nano)
-   * @returns Optimized tool results
-   */
-  private async optimizeToolResultsForLLM(
-    toolResults: any[],
-    query: string,
-    maxTotalTokens: number = 4000
-  ): Promise<any[]> {
-    const optimized = []
-    let currentTokenCount = 0
+ /**
+ * Optimize tool results to fit within token budget for LLM
+ * Applies smart truncation and content extraction to prevent context overflow
+ * @param toolResults The raw tool results
+ * @param query The user's query for context-aware optimization
+ * @param maxTotalTokens Maximum total tokens allowed (default: 4000 for Gemini Nano)
+ * @returns Optimized tool results
+ */
+ private async optimizeToolResultsForLLM(
+ toolResults: any[],
+ query: string,
+ maxTotalTokens: number = 4000
+ ): Promise<any[]> {
+ const optimized = []
+ let currentTokenCount = 0
 
-    for (const result of toolResults) {
-      // Only optimize search_notes results (other tools return small data)
-      if (result.tool === "search_notes" && result.result?.notes) {
-        const notes = result.result.notes
-        const optimizedNotes = []
+ for (const result of toolResults) {
+ // Only optimize search_notes results (other tools return small data)
+ if (result.tool === "search_notes" && result.result?.notes) {
+ const notes = result.result.notes
+ const optimizedNotes = []
 
-        console.log(
-          `[Optimizer] Processing ${notes.length} notes from search results`
-        )
+ console.log(
+ `[Optimizer] Processing ${notes.length} notes from search results`
+ )
 
-        for (const note of notes) {
-          // Remove embedding arrays (they're huge and not needed for extraction)
-          if (note.embedding) {
-            delete note.embedding
-          }
+ for (const note of notes) {
+ // Remove embedding arrays (they're huge and not needed for extraction)
+ if (note.embedding) {
+ delete note.embedding
+ }
 
-          // Preserve original content length for logging
-          const originalLength = note.content?.length || 0
+ // Preserve original content length for logging
+ const originalLength = note.content?.length || 0
 
-          // Apply query-aware content extraction to fit within token budget
-          note.content = extractRelevantContent(note.content || "", query, 400)
+ // Apply query-aware content extraction to fit within token budget
+ note.content = extractRelevantContent(note.content || "", query, 400)
 
-          console.log(
-            `[Optimizer] Optimized note ${note.id}: ${originalLength} → ${note.content.length} chars`
-          )
+ console.log(
+ `[Optimizer] Optimized note ${note.id}: ${originalLength} → ${note.content.length} chars`
+ )
 
-          // Step 3: Token budget check
-          const noteTokens = estimateTokens(JSON.stringify(note))
+ // Step 3: Token budget check
+ const noteTokens = estimateTokens(JSON.stringify(note))
 
-          if (currentTokenCount + noteTokens > maxTotalTokens) {
-            console.warn(
-              `[Optimizer] Token budget exceeded (${currentTokenCount + noteTokens}/${maxTotalTokens}). Attempting harder truncation...`
-            )
+ if (currentTokenCount + noteTokens > maxTotalTokens) {
+ console.warn(
+ `[Optimizer] Token budget exceeded (${currentTokenCount + noteTokens}/${maxTotalTokens}). Attempting harder truncation...`
+ )
 
-            // If we're at limit, try harder truncation
-            note.content = note.content.substring(0, 150)
-            const newTokens = estimateTokens(JSON.stringify(note))
+ // If we're at limit, try harder truncation
+ note.content = note.content.substring(0, 150)
+ const newTokens = estimateTokens(JSON.stringify(note))
 
-            if (currentTokenCount + newTokens > maxTotalTokens) {
-              console.warn(
-                `[Optimizer] Even with truncation, budget exceeded. Skipping note ${note.id}`
-              )
-              break // Skip this note entirely
-            }
+ if (currentTokenCount + newTokens > maxTotalTokens) {
+ console.warn(
+ `[Optimizer] Even with truncation, budget exceeded. Skipping note ${note.id}`
+ )
+ break // Skip this note entirely
+ }
 
-            console.log(
-              `[Optimizer] Hard truncation applied to note ${note.id}: ${noteTokens} → ${newTokens} tokens`
-            )
-            currentTokenCount += newTokens
-          } else {
-            currentTokenCount += noteTokens
-          }
+ console.log(
+ `[Optimizer] Hard truncation applied to note ${note.id}: ${noteTokens} → ${newTokens} tokens`
+ )
+ currentTokenCount += newTokens
+ } else {
+ currentTokenCount += noteTokens
+ }
 
-          optimizedNotes.push(note)
-        }
+ optimizedNotes.push(note)
+ }
 
-        console.log(
-          `[Optimizer] Final result: ${optimizedNotes.length}/${notes.length} notes included, ~${currentTokenCount} tokens used`
-        )
+ console.log(
+ `[Optimizer] Final result: ${optimizedNotes.length}/${notes.length} notes included, ~${currentTokenCount} tokens used`
+ )
 
-        result.result.notes = optimizedNotes
-      }
+ result.result.notes = optimizedNotes
+ }
 
-      optimized.push(result)
-    }
+ optimized.push(result)
+ }
 
-    return optimized
-  }
+ return optimized
+ }
 
-  /**
-   * Process a user query through the agent
-   * Returns structured response with extracted data + AI message
-   */
-  async run(
-    input: string,
-    conversationHistory?: Array<{ role: string; content: string }>
-  ): Promise<AgentResponse> {
-    if (!this.sessionId) {
-      throw new Error("Agent not initialized. Call initialize() first.")
-    }
+ /**
+ * Process a user query through the agent
+ * Returns structured response with extracted data + AI message
+ */
+ async run(
+ input: string,
+ conversationHistory?: Array<{ role: string; content: string }>
+ ): Promise<AgentResponse> {
+ if (!this.sessionId) {
+ throw new Error("Agent not initialized. Call initialize() first.")
+ }
 
-    if (this.verbose) {
-      console.log(`\n🤖 [Agent] Processing query: "${input}"`)
-      const metadata = GeminiNanoService.getSessionMetadata(this.sessionId)
-      console.log(
-        `� [Agent] Session usage: ${metadata?.inputUsage}/${metadata?.inputQuota} tokens`
-      )
-    }
+ if (this.verbose) {
+ console.log(`\n [Agent] Processing query: "${input}"`)
+ const metadata = GeminiNanoService.getSessionMetadata(this.sessionId)
+ console.log(
+ ` [Agent] Session usage: ${metadata?.inputUsage}/${metadata?.inputQuota} tokens`
+ )
+ }
 
-    // Store conversation history for tools to access
-    this.conversationHistory = conversationHistory || []
+ // Store conversation history for tools to access
+ this.conversationHistory = conversationHistory || []
 
-    // Track the last user message for note creation from chat
-    this.lastUserMessage = input
+ // Track the last user message for note creation from chat
+ this.lastUserMessage = input
 
-    try {
-      // Step 1: Determine which tools to use (if any)
-      const toolsNeeded = await this.selectTools(input, this.sessionId)
+ try {
+ // Step 1: Determine which tools to use (if any)
+ const toolsNeeded = await this.selectTools(input, this.sessionId)
 
-      if (this.verbose) {
-        console.log(`[Agent] Tools selected:`, toolsNeeded)
-      }
+ if (this.verbose) {
+ console.log(`[Agent] Tools selected:`, toolsNeeded)
+ }
 
-      // Step 2: Execute tools if needed
-      let toolResults: any[] = []
-      let referenceNotes: string[] = []
+ // Step 2: Execute tools if needed
+ let toolResults: any[] = []
+ let referenceNotes: string[] = []
 
-      if (toolsNeeded.length > 0) {
-        toolResults = await this.executeTools(toolsNeeded, input)
-        console.log("Tool Results:", toolResults)
+ if (toolsNeeded.length > 0) {
+ toolResults = await this.executeTools(toolsNeeded, input)
+ console.log("Tool Results:", toolResults)
 
-        // Extract note IDs from tool results
-        try {
-          if (toolResults.length > 0) {
-            // Extract notes from search results
-            const searchResult = toolResults.find(
-              (t) => t.tool === "search_notes"
-            )
-            if (
-              searchResult?.result?.notes &&
-              Array.isArray(searchResult.result.notes)
-            ) {
-              referenceNotes = searchResult.result.notes.map(
-                (note: any) => note.id
-              )
-            }
-          }
-        } catch (e) {
-          console.warn("Could not extract note IDs from tool results:", e)
-        }
+ // Extract note IDs from tool results
+ try {
+ if (toolResults.length > 0) {
+ // Extract notes from search results
+ const searchResult = toolResults.find(
+ (t) => t.tool === "search_notes"
+ )
+ if (
+ searchResult?.result?.notes &&
+ Array.isArray(searchResult.result.notes)
+ ) {
+ referenceNotes = searchResult.result.notes.map(
+ (note: any) => note.id
+ )
+ }
+ }
+ } catch (e) {
+ console.warn("Could not extract note IDs from tool results:", e)
+ }
 
-        if (this.verbose) {
-          console.log(`[Agent] Tool results:`, toolResults)
-          console.log(`[Agent] Reference notes:`, referenceNotes)
-        }
-      }
+ if (this.verbose) {
+ console.log(`[Agent] Tool results:`, toolResults)
+ console.log(`[Agent] Reference notes:`, referenceNotes)
+ }
+ }
 
-      console.log("Tool Results:", toolResults)
+ console.log("Tool Results:", toolResults)
 
-      // Handle conversational queries (no tools needed)
-      if (toolResults.length === 0) {
-        console.log(
-          "[Agent] No tools needed - handling as conversational query"
-        )
+ // Handle conversational queries (no tools needed)
+ if (toolResults.length === 0) {
+ console.log(
+ "[Agent] No tools needed - handling as conversational query"
+ )
 
-        // Generate a conversational response using a FRESH gemini nano session
-        // (not the LangChain model that's configured for tool selection)
-        const baseIntro =
-          this.mode === AgentMode.PERSONA && this.activePersona
-            ? `You are MindKeep AI, operating as "${this.activePersona.name}". ${this.activePersona.description}`
-            : `You are MindKeep AI, a helpful assistant for managing personal notes.`
+ // Generate a conversational response using a FRESH gemini nano session
+ // (not the LangChain model that's configured for tool selection)
+ const baseIntro =
+ this.mode === AgentMode.PERSONA && this.activePersona
+ ? `You are MindKeep AI, operating as "${this.activePersona.name}". ${this.activePersona.description}`
+ : `You are MindKeep AI, a helpful assistant for managing personal notes.`
 
-        // Build conversation context from history (last 5 messages)
-        let conversationContext = ""
-        if (conversationHistory && conversationHistory.length > 0) {
-          const recentHistory = conversationHistory.slice(-5)
-          conversationContext =
-            "\n\nRecent conversation:\n" +
-            recentHistory
-              .map(
-                (msg) =>
-                  `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`
-              )
-              .join("\n")
-        }
+ // Build conversation context from history (last 5 messages)
+ let conversationContext = ""
+ if (conversationHistory && conversationHistory.length > 0) {
+ const recentHistory = conversationHistory.slice(-5)
+ conversationContext =
+ "\n\nRecent conversation:\n" +
+ recentHistory
+ .map(
+ (msg) =>
+ `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`
+ )
+ .join("\n")
+ }
 
-        const conversationPrompt = `${baseIntro}
+ const conversationPrompt = `${baseIntro}
 ${conversationContext}
 
 Current user message: "${input}"
@@ -627,280 +627,280 @@ Examples:
 
 Respond with ONLY the natural conversational text, no JSON or formatting.`
 
-        console.log(
-          `💬 [Agent] Generating conversational response in ${this.mode} mode with context`
-        )
+ console.log(
+ ` [Agent] Generating conversational response in ${this.mode} mode with context`
+ )
 
-        const responseText = await GeminiNanoService.promptWithSession(
-          this.sessionId!,
-          conversationPrompt
-        )
+ const responseText = await GeminiNanoService.promptWithSession(
+ this.sessionId!,
+ conversationPrompt
+ )
 
-        console.log("[Agent] Conversational response:", responseText)
+ console.log("[Agent] Conversational response:", responseText)
 
-        return {
-          extractedData: null,
-          referenceNotes: [],
-          aiResponse: responseText?.trim(),
-          dataType: "text",
-          confidence: 1.0
-        }
-      }
+ return {
+ extractedData: null,
+ referenceNotes: [],
+ aiResponse: responseText?.trim(),
+ dataType: "text",
+ confidence: 1.0
+ }
+ }
 
-      // Check if any tool requested clarification
-      const clarificationNeeded = toolResults.find(
-        (result) => result.result?.needsClarification
-      )
+ // Check if any tool requested clarification
+ const clarificationNeeded = toolResults.find(
+ (result) => result.result?.needsClarification
+ )
 
-      if (clarificationNeeded) {
-        const clarificationData = clarificationNeeded.result
-        console.log("[Agent] Clarification needed:", clarificationData)
+ if (clarificationNeeded) {
+ const clarificationData = clarificationNeeded.result
+ console.log("[Agent] Clarification needed:", clarificationData)
 
-        // Generate clarification options based on type
-        const clarificationOptions =
-          await this.generateClarificationOptions(clarificationData)
+ // Generate clarification options based on type
+ const clarificationOptions =
+ await this.generateClarificationOptions(clarificationData)
 
-        return {
-          extractedData: null,
-          referenceNotes: [],
-          aiResponse: clarificationData.message,
-          needsClarification: true,
-          clarificationType: clarificationData.clarificationType,
-          clarificationOptions: clarificationOptions,
-          pendingNoteData: {
-            content: clarificationData.noteContent,
-            title: clarificationData.noteTitle,
-            category: clarificationData.noteCategory
-          }
-        }
-      }
+ return {
+ extractedData: null,
+ referenceNotes: [],
+ aiResponse: clarificationData.message,
+ needsClarification: true,
+ clarificationType: clarificationData.clarificationType,
+ clarificationOptions: clarificationOptions,
+ pendingNoteData: {
+ content: clarificationData.noteContent,
+ title: clarificationData.noteTitle,
+ category: clarificationData.noteCategory
+ }
+ }
+ }
 
-      // Check if a note was successfully created (skip extraction for creation confirmations)
-      const noteCreated = toolResults.find(
-        (result) => result.result?.noteCreated === true
-      )
+ // Check if a note was successfully created (skip extraction for creation confirmations)
+ const noteCreated = toolResults.find(
+ (result) => result.result?.noteCreated === true
+ )
 
-      if (noteCreated) {
-        const creationData = noteCreated.result
-        console.log("[Agent] Note created successfully:", creationData)
+ if (noteCreated) {
+ const creationData = noteCreated.result
+ console.log("[Agent] Note created successfully:", creationData)
 
-        // Automatically run the organize_note tool to suggest better category placement
-        if (creationData.noteData?.id) {
-          console.log(
-            "[Agent] Running organize_note tool for newly created note:",
-            creationData.noteData.id
-          )
+ // Automatically run the organize_note tool to suggest better category placement
+ if (creationData.noteData?.id) {
+ console.log(
+ "[Agent] Running organize_note tool for newly created note:",
+ creationData.noteData.id
+ )
 
-          try {
-            const organizeResult = await this.executeTools(
-              [
-                {
-                  name: "organize_note",
-                  params: {
-                    noteId: creationData.noteData.id
-                  }
-                }
-              ],
-              input
-            )
+ try {
+ const organizeResult = await this.executeTools(
+ [
+ {
+ name: "organize_note",
+ params: {
+ noteId: creationData.noteData.id
+ }
+ }
+ ],
+ input
+ )
 
-            console.log("[Agent] Organize result:", organizeResult)
+ console.log("[Agent] Organize result:", organizeResult)
 
-            // Check if reorganization is needed
-            const organizeData = organizeResult[0]?.result
-            if (
-              organizeData?.needsReorganization &&
-              organizeData?.suggestedCategory
-            ) {
-              console.log(
-                "[Agent] Reorganization suggested:",
-                organizeData.suggestedCategory
-              )
+ // Check if reorganization is needed
+ const organizeData = organizeResult[0]?.result
+ if (
+ organizeData?.needsReorganization &&
+ organizeData?.suggestedCategory
+ ) {
+ console.log(
+ "[Agent] Reorganization suggested:",
+ organizeData.suggestedCategory
+ )
 
-              // Return a response asking for user confirmation
-              return {
-                extractedData: null,
-                referenceNotes: [],
-                aiResponse: `${creationData.message}\n\n${organizeData.message}`,
-                dataType: "text",
-                confidence: 1.0,
-                noteCreated: true,
-                needsClarification: true,
-                clarificationType: "organize_confirmation",
-                clarificationOptions: [
-                  {
-                    type: "button",
-                    label: "✅ Yes, move it",
-                    value: {
-                      action: "confirm_organize",
-                      noteId: organizeData.noteId,
-                      targetCategory: organizeData.suggestedCategory,
-                      confirmed: true
-                    },
-                    action: "confirm_organize"
-                  },
-                  {
-                    type: "button",
-                    label: "❌ No, keep it here",
-                    value: {
-                      action: "confirm_organize",
-                      noteId: organizeData.noteId,
-                      targetCategory: organizeData.suggestedCategory,
-                      confirmed: false
-                    },
-                    action: "confirm_organize"
-                  }
-                ],
-                pendingNoteData: {
-                  noteId: organizeData.noteId,
-                  currentCategory: organizeData.currentCategory,
-                  suggestedCategory: organizeData.suggestedCategory
-                }
-              }
-            } else {
-              console.log(
-                "[Agent] No reorganization needed or no similar notes found"
-              )
-            }
-          } catch (error) {
-            console.error("[Agent] Error running organize_note:", error)
-            // Don't fail the entire operation, just log and continue
-          }
-        }
+ // Return a response asking for user confirmation
+ return {
+ extractedData: null,
+ referenceNotes: [],
+ aiResponse: `${creationData.message}\n\n${organizeData.message}`,
+ dataType: "text",
+ confidence: 1.0,
+ noteCreated: true,
+ needsClarification: true,
+ clarificationType: "organize_confirmation",
+ clarificationOptions: [
+ {
+ type: "button",
+ label: " Yes, move it",
+ value: {
+ action: "confirm_organize",
+ noteId: organizeData.noteId,
+ targetCategory: organizeData.suggestedCategory,
+ confirmed: true
+ },
+ action: "confirm_organize"
+ },
+ {
+ type: "button",
+ label: " No, keep it here",
+ value: {
+ action: "confirm_organize",
+ noteId: organizeData.noteId,
+ targetCategory: organizeData.suggestedCategory,
+ confirmed: false
+ },
+ action: "confirm_organize"
+ }
+ ],
+ pendingNoteData: {
+ noteId: organizeData.noteId,
+ currentCategory: organizeData.currentCategory,
+ suggestedCategory: organizeData.suggestedCategory
+ }
+ }
+ } else {
+ console.log(
+ "[Agent] No reorganization needed or no similar notes found"
+ )
+ }
+ } catch (error) {
+ console.error("[Agent] Error running organize_note:", error)
+ // Don't fail the entire operation, just log and continue
+ }
+ }
 
-        return {
-          extractedData: null,
-          referenceNotes: [],
-          aiResponse: creationData.message, // Use the message directly from the tool
-          dataType: "text",
-          confidence: 1.0,
-          noteCreated: true // Flag to indicate note was created
-        }
-      }
+ return {
+ extractedData: null,
+ referenceNotes: [],
+ aiResponse: creationData.message, // Use the message directly from the tool
+ dataType: "text",
+ confidence: 1.0,
+ noteCreated: true // Flag to indicate note was created
+ }
+ }
 
-      // Step 3: Generate structured response
-      // History is automatically managed by the session
-      const response = await this.generateResponse(
-        input,
-        toolResults,
-        referenceNotes,
-        this.sessionId
-      )
+ // Step 3: Generate structured response
+ // History is automatically managed by the session
+ const response = await this.generateResponse(
+ input,
+ toolResults,
+ referenceNotes,
+ this.sessionId
+ )
 
-      console.log("Structured response:", response)
+ console.log("Structured response:", response)
 
-      return response
-    } catch (error) {
-      console.error("[Agent] Error:", error)
-      return {
-        extractedData: null,
-        referenceNotes: [],
-        aiResponse: `I encountered an error: ${error.message}. Please try again.`
-      }
-    }
-  }
+ return response
+ } catch (error) {
+ console.error("[Agent] Error:", error)
+ return {
+ extractedData: null,
+ referenceNotes: [],
+ aiResponse: `I encountered an error: ${error.message}. Please try again.`
+ }
+ }
+ }
 
-  /**
-   * Determine which tools should be used for this query
-   * History is automatically managed by the session
-   */
-  private async selectTools(
-    query: string,
-    sessionId: string
-  ): Promise<Array<{ name: string; params: any }>> {
-    console.log(`🔧 [Agent] selectTools called in ${this.mode} mode`)
+ /**
+ * Determine which tools should be used for this query
+ * History is automatically managed by the session
+ */
+ private async selectTools(
+ query: string,
+ sessionId: string
+ ): Promise<Array<{ name: string; params: any }>> {
+ console.log(` [Agent] selectTools called in ${this.mode} mode`)
 
-    // Use Zod for reliable JSON parsing, which you're already using in your tools!
-    const { z } = await import("zod")
+ // Use Zod for reliable JSON parsing, which you're already using in your tools!
+ const { z } = await import("zod")
 
-    // Get available tools based on current mode
-    const availableTools = this.getAvailableTools()
-    const availableToolNames = availableTools.map((t) => t.name)
+ // Get available tools based on current mode
+ const availableTools = this.getAvailableTools()
+ const availableToolNames = availableTools.map((t) => t.name)
 
-    console.log("🔧 [Agent] Available tool names:", availableToolNames)
+ console.log(" [Agent] Available tool names:", availableToolNames)
 
-    // Step 1: Define the structured output we want from the LLM
-    // In PERSONA mode, only allow search_notes and get_note
-    // const toolEnum =
-    //   this.mode === AgentMode.PERSONA
-    //     ? z.enum(["search_notes", "get_note", "none"])
-    //     : z.enum([
-    //         "search_notes",
-    //         "get_note",
-    //         "list_categories",
-    //         "get_statistics",
-    //         "create_note_from_chat",
-    //         "none"
-    //       ])
+ // Step 1: Define the structured output we want from the LLM
+ // In PERSONA mode, only allow search_notes and get_note
+ // const toolEnum =
+ // this.mode === AgentMode.PERSONA
+ // ? z.enum(["search_notes", "get_note", "none"])
+ // : z.enum([
+ // "search_notes",
+ // "get_note",
+ // "list_categories",
+ // "get_statistics",
+ // "create_note_from_chat",
+ // "none"
+ // ])
 
-    const toolEnum =
-      this.mode === AgentMode.PERSONA
-        ? ["search_notes", "get_note", "none"]
-        : [
-            "search_notes",
-            "get_note",
-            "list_categories",
-            "get_statistics",
-            "create_note_from_chat",
-            "none"
-          ]
+ const toolEnum =
+ this.mode === AgentMode.PERSONA
+ ? ["search_notes", "get_note", "none"]
+ : [
+ "search_notes",
+ "get_note",
+ "list_categories",
+ "get_statistics",
+ "create_note_from_chat",
+ "none"
+ ]
 
-    const ToolSelectionSchema = {
-      tool: toolEnum,
-      search_query: "string | null",
-      note_id: "string | null",
-      note_content: "string | null",
-      note_title: "string | null",
-      note_category: "string | null"
-    }
+ const ToolSelectionSchema = {
+ tool: toolEnum,
+ search_query: "string | null",
+ note_id: "string | null",
+ note_content: "string | null",
+ note_title: "string | null",
+ note_category: "string | null"
+ }
 
-    // const ToolSelectionSchema = z.object({
-    //   tool: toolEnum,
-    //   search_query: z
-    //     .string()
-    //     .nullable()
-    //     .optional()
-    //     .describe(
-    //       "A concise, keyword-focused search query if tool is 'search_notes'. Should not contain conversational filler."
-    //     ),
-    //   note_id: z
-    //     .string()
-    //     .nullable()
-    //     .optional()
-    //     .describe("The ID of the note if the tool is 'get_note'."),
-    //   note_content: z
-    //     .string()
-    //     .nullable()
-    //     .optional()
-    //     .describe(
-    //       "The content to save if tool is 'create_note_from_chat'. Extract from user message or use previous message context."
-    //     ),
-    //   note_title: z
-    //     .string()
-    //     .nullable()
-    //     .optional()
-    //     .describe(
-    //       "The title for the note if explicitly mentioned by user (e.g., 'add as note with title AWS')."
-    //     ),
-    //   note_category: z
-    //     .string()
-    //     .nullable()
-    //     .optional()
-    //     .describe(
-    //       "The category for the note if explicitly mentioned by user (e.g., 'add as note under aws category')."
-    //     )
-    // })
+ // const ToolSelectionSchema = z.object({
+ // tool: toolEnum,
+ // search_query: z
+ // .string()
+ // .nullable()
+ // .optional()
+ // .describe(
+ // "A concise, keyword-focused search query if tool is 'search_notes'. Should not contain conversational filler."
+ // ),
+ // note_id: z
+ // .string()
+ // .nullable()
+ // .optional()
+ // .describe("The ID of the note if the tool is 'get_note'."),
+ // note_content: z
+ // .string()
+ // .nullable()
+ // .optional()
+ // .describe(
+ // "The content to save if tool is 'create_note_from_chat'. Extract from user message or use previous message context."
+ // ),
+ // note_title: z
+ // .string()
+ // .nullable()
+ // .optional()
+ // .describe(
+ // "The title for the note if explicitly mentioned by user (e.g., 'add as note with title AWS')."
+ // ),
+ // note_category: z
+ // .string()
+ // .nullable()
+ // .optional()
+ // .describe(
+ // "The category for the note if explicitly mentioned by user (e.g., 'add as note under aws category')."
+ // )
+ // })
 
-    // Step 2: Create a more robust prompt (persona-aware)
-    const toolDescriptions =
-      this.mode === AgentMode.PERSONA
-        ? `Available tools (PERSONA MODE - Search Only):
+ // Step 2: Create a more robust prompt (persona-aware)
+ const toolDescriptions =
+ this.mode === AgentMode.PERSONA
+ ? `Available tools (PERSONA MODE - Search Only):
 - search_notes: Find notes on a specific topic. Use this when user asks to FIND, RETRIEVE, SEARCH, or GET any information from their notes (passwords, emails, codes, etc.).
 - get_note: Get a specific note by its ID. Use this ONLY when user explicitly mentions a note ID.
 - none: For greetings (hi, hello, thanks) or if the request cannot be fulfilled with search.
 
 NOTE: You are in PERSONA mode. You can ONLY search and read notes. You CANNOT create, update, delete, or organize notes.`
-        : `Available tools:
+ : `Available tools:
 - search_notes: Find notes on a specific topic. Use this when user asks to FIND, RETRIEVE, SEARCH, or GET any information from their notes (passwords, emails, codes, etc.).
 - get_note: Get a specific note by its ID. Use this ONLY when user explicitly mentions a note ID.
 - list_categories: List all available note categories. Use this when user asks about categories.
@@ -908,21 +908,21 @@ NOTE: You are in PERSONA mode. You can ONLY search and read notes. You CANNOT cr
 - create_note_from_chat: Create a NEW note from the conversation. Use when user wants to ADD, SAVE, CREATE, or MAKE a note. Keywords: "add note", "save note", "create note", "make note", "add this", "save this", "new note".
 - none: ONLY for greetings (hi, hello, thanks) or meta questions about the conversation itself (what did we talk about?).`
 
-    // Build conversation context for note creation detection
-    let conversationContext = ""
-    if (this.conversationHistory && this.conversationHistory.length > 0) {
-      const recentHistory = this.conversationHistory.slice(-4) // Last 4 messages
-      conversationContext =
-        "\n\nRecent conversation context:\n" +
-        recentHistory
-          .map(
-            (msg) =>
-              `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`
-          )
-          .join("\n")
-    }
+ // Build conversation context for note creation detection
+ let conversationContext = ""
+ if (this.conversationHistory && this.conversationHistory.length > 0) {
+ const recentHistory = this.conversationHistory.slice(-4) // Last 4 messages
+ conversationContext =
+ "\n\nRecent conversation context:\n" +
+ recentHistory
+ .map(
+ (msg) =>
+ `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`
+ )
+ .join("\n")
+ }
 
-    const toolSelectionPrompt = `You are an expert at understanding user requests and routing them to the correct tool.
+ const toolSelectionPrompt = `You are an expert at understanding user requests and routing them to the correct tool.
 Analyze the user's query and determine which tool is most appropriate.
 
 ${toolDescriptions}
@@ -933,21 +933,21 @@ CRITICAL RULES:
 - "Can you find X?", "What is my X?", "Show me X" → use "search_notes"
 - "How many notes", "how many in each category", "statistics", "note counts" → use "get_statistics"
 - CREATE NOTE keywords: "add", "save", "create", "make" + "note" → use "create_note_from_chat"
-  Examples: "add this as note", "save as note", "can you add this", "create a note", "make this a note", "add a new note"
+ Examples: "add this as note", "save as note", "can you add this", "create a note", "make this a note", "add a new note"
 - REFERENTIAL NOTE CREATION: "add that as note", "save that", "can u add that" → extract content from PREVIOUS USER MESSAGE in conversation context
 - CONFIRMATION phrases for note creation: "yes", "yea", "yeah", "go for it", "do it", "sure", "ok", "okay" → IF the assistant JUST offered to create a note in the conversation context, use "create_note_from_chat" and extract content from the previous user message
 
 CRITICAL for create_note_from_chat - READ CAREFULLY:
 - note_content: 
-  * **PRESERVE FULL CONTENT** - Do NOT summarize, shorten, or extract only the first paragraph
-  * If user pastes/shares LONG text (articles, lists, multiple paragraphs), include **EVERYTHING** they shared - the ENTIRE text from start to finish
-  * If query contains "that" (e.g., "add that as note"), extract **FULL CONTENT** from the MOST RECENT PREVIOUS USER MESSAGE in conversation context
-  * If query contains "this" without inline content (e.g., "add this as note"), extract **FULL CONTENT** from the MOST RECENT PREVIOUS USER MESSAGE in conversation context
-  * If query is a confirmation phrase ("yes", "go for it", etc.), extract **FULL CONTENT** from the PREVIOUS USER MESSAGE in conversation context  
-  * If query contains the actual content (e.g., "Money Heist is... - add as note"), extract the **COMPLETE CONTENT** from the current query
-  * NEVER use placeholder values like "..." - ALWAYS extract the ACTUAL text content from the conversation context
-  * NEVER truncate or summarize - users want to save the FULL text they shared, not a summary
-  * LOOK AT THE CONVERSATION CONTEXT ABOVE to find the REAL content to save
+ * **PRESERVE FULL CONTENT** - Do NOT summarize, shorten, or extract only the first paragraph
+ * If user pastes/shares LONG text (articles, lists, multiple paragraphs), include **EVERYTHING** they shared - the ENTIRE text from start to finish
+ * If query contains "that" (e.g., "add that as note"), extract **FULL CONTENT** from the MOST RECENT PREVIOUS USER MESSAGE in conversation context
+ * If query contains "this" without inline content (e.g., "add this as note"), extract **FULL CONTENT** from the MOST RECENT PREVIOUS USER MESSAGE in conversation context
+ * If query is a confirmation phrase ("yes", "go for it", etc.), extract **FULL CONTENT** from the PREVIOUS USER MESSAGE in conversation context 
+ * If query contains the actual content (e.g., "Money Heist is... - add as note"), extract the **COMPLETE CONTENT** from the current query
+ * NEVER use placeholder values like "..." - ALWAYS extract the ACTUAL text content from the conversation context
+ * NEVER truncate or summarize - users want to save the FULL text they shared, not a summary
+ * LOOK AT THE CONVERSATION CONTEXT ABOVE to find the REAL content to save
 - note_title: MUST be null UNLESS user says "with title X" or "titled X" 
 - note_category: MUST be null UNLESS user says "under X category" or "in X category"
 - DEFAULT VALUES: note_title=null, note_category=null
@@ -958,12 +958,12 @@ Current User Query: "${query}"
 
 Your task is to respond with a JSON object that strictly follows this schema:
 {
-  "tool": "tool_name",
-  "search_query": "text", // ONLY if tool is "search_notes"
-  "note_id": "id", // ONLY if tool is "get_note"
-  "note_content": "COMPLETE FULL TEXT - NO TRUNCATION OR SUMMARY", // ONLY if tool is "create_note_from_chat" - Include EVERYTHING the user shared, from start to finish, word-for-word
-  "note_title": null, // ONLY if tool is "create_note_from_chat" - USE null unless user explicitly provides title
-  "note_category": null // ONLY if tool is "create_note_from_chat" - USE null unless user explicitly provides category
+ "tool": "tool_name",
+ "search_query": "text", // ONLY if tool is "search_notes"
+ "note_id": "id", // ONLY if tool is "get_note"
+ "note_content": "COMPLETE FULL TEXT - NO TRUNCATION OR SUMMARY", // ONLY if tool is "create_note_from_chat" - Include EVERYTHING the user shared, from start to finish, word-for-word
+ "note_title": null, // ONLY if tool is "create_note_from_chat" - USE null unless user explicitly provides title
+ "note_category": null // ONLY if tool is "create_note_from_chat" - USE null unless user explicitly provides category
 }
 
 CRITICAL: For note_content, you MUST extract the **COMPLETE FULL TEXT** from the conversation context above. 
@@ -996,13 +996,13 @@ CREATE NOTE EXAMPLES (note_title and note_category are null by default):
 
 REFERENTIAL NOTE CREATION (extract FULL COMPLETE content from previous user message in conversation context):
 - Context: [User: "Money Heist is a Spanish heist series created by Álex Pina. The story follows a group of robbers who plan and execute heists on the Royal Mint of Spain and the Bank of Spain.", Assistant: "The query is about the TV series Money Heist..."]
-  Query: "can u add that as note?" -> {"tool": "create_note_from_chat", "note_content": "Money Heist is a Spanish heist series created by Álex Pina. The story follows a group of robbers who plan and execute heists on the Royal Mint of Spain and the Bank of Spain.", "note_title": null, "note_category": null}
+ Query: "can u add that as note?" -> {"tool": "create_note_from_chat", "note_content": "Money Heist is a Spanish heist series created by Álex Pina. The story follows a group of robbers who plan and execute heists on the Royal Mint of Spain and the Bank of Spain.", "note_title": null, "note_category": null}
 - Context: [User: "The Eiffel Tower is 330m tall and was built in 1889", Assistant: "Interesting fact!"]
-  Query: "save that as a note" -> {"tool": "create_note_from_chat", "note_content": "The Eiffel Tower is 330m tall and was built in 1889", "note_title": null, "note_category": null}
+ Query: "save that as a note" -> {"tool": "create_note_from_chat", "note_content": "The Eiffel Tower is 330m tall and was built in 1889", "note_title": null, "note_category": null}
 - Context: [User: "My Netflix password is abc123 and email is user@example.com", Assistant: "I can help you save that"]
-  Query: "can u add that" -> {"tool": "create_note_from_chat", "note_content": "My Netflix password is abc123 and email is user@example.com", "note_title": null, "note_category": null}
+ Query: "can u add that" -> {"tool": "create_note_from_chat", "note_content": "My Netflix password is abc123 and email is user@example.com", "note_title": null, "note_category": null}
 - Context: [User: "Tirupati Travel Guide:\n\n1. Sri Venkateswara Temple - Main attraction\n2. Sri Kapileswara Swamy Temple - Ancient Shiva temple\n3. Silathoranam - Natural rock arch\n4. TTD Gardens - 460 acres of gardens\n\nBest time to visit: November to February", Assistant: "Great travel information about Tirupati!"]
-  Query: "Add this as note" -> {"tool": "create_note_from_chat", "note_content": "Tirupati Travel Guide:\n\n1. Sri Venkateswara Temple - Main attraction\n2. Sri Kapileswara Swamy Temple - Ancient Shiva temple\n3. Silathoranam - Natural rock arch\n4. TTD Gardens - 460 acres of gardens\n\nBest time to visit: November to February", "note_title": null, "note_category": null}
+ Query: "Add this as note" -> {"tool": "create_note_from_chat", "note_content": "Tirupati Travel Guide:\n\n1. Sri Venkateswara Temple - Main attraction\n2. Sri Kapileswara Swamy Temple - Ancient Shiva temple\n3. Silathoranam - Natural rock arch\n4. TTD Gardens - 460 acres of gardens\n\nBest time to visit: November to February", "note_title": null, "note_category": null}
 
 INLINE CONTENT (content in current query, extract from query itself):
 - Query: "The sky is blue - add this as a note" -> {"tool": "create_note_from_chat", "note_content": "The sky is blue", "note_title": null, "note_category": null}
@@ -1013,292 +1013,292 @@ INLINE CONTENT (content in current query, extract from query itself):
 
 CONFIRMATION EXAMPLES (extract content from previous user message in context):
 - Context: [User: "I got hurt so i am sad", Assistant: "Would you like to write about how you're feeling? I can create a new note for that."]
-  Query: "yea. go for it" -> {"tool": "create_note_from_chat", "note_content": "I got hurt so i am sad", "note_title": null, "note_category": null}
+ Query: "yea. go for it" -> {"tool": "create_note_from_chat", "note_content": "I got hurt so i am sad", "note_title": null, "note_category": null}
 - Context: [User: "Meeting notes from today...", Assistant: "I can save that as a note if you'd like?"]
-  Query: "yes please" -> {"tool": "create_note_from_chat", "note_content": "Meeting notes from today...", "note_title": null, "note_category": null}
+ Query: "yes please" -> {"tool": "create_note_from_chat", "note_content": "Meeting notes from today...", "note_title": null, "note_category": null}
 - Context: [User: "Here's my password: abc123", Assistant: "Would you like me to create a note for that?"]
-  Query: "sure" -> {"tool": "create_note_from_chat", "note_content": "Here's my password: abc123", "note_title": null, "note_category": null}
+ Query: "sure" -> {"tool": "create_note_from_chat", "note_content": "Here's my password: abc123", "note_title": null, "note_category": null}
 
 Respond with ONLY the JSON object and nothing else.`
 
-    let responseText = "" // Declare outside try block for error handling
+ let responseText = "" // Declare outside try block for error handling
 
-    try {
-      // CRITICAL: Use one-off prompt (NO session history) for tool selection
-      // Tool selection should be based ONLY on the current query, not conversation context
-      // This prevents "Hi" from triggering searches due to previous conversation
+ try {
+ // CRITICAL: Use one-off prompt (NO session history) for tool selection
+ // Tool selection should be based ONLY on the current query, not conversation context
+ // This prevents "Hi" from triggering searches due to previous conversation
 
-      console.log(`🔍 [Agent] Tool selection for query: "${query}"`)
-      console.log("🔍 [Agent] Using executePrompt (no session history)")
+ console.log(` [Agent] Tool selection for query: "${query}"`)
+ console.log(" [Agent] Using executePrompt (no session history)")
 
-      const response = await GeminiNanoService.promptWithSession(
-        sessionId,
-        toolSelectionPrompt,
-        {
-          responseConstraint: ToolSelectionSchema
-        }
-      )
+ const response = await GeminiNanoService.promptWithSession(
+ sessionId,
+ toolSelectionPrompt,
+ {
+ responseConstraint: ToolSelectionSchema
+ }
+ )
 
-      // Clean up potential markdown backticks AND malformed responses
-      responseText = response
-        .replace(/```json\s*/g, "")
-        .replace(/```/g, "")
-        .replace(/^[<>]+/g, "") // Remove leading < or > characters (Gemini Nano bug)
-        .replace(/[<>]+$/g, "") // Remove trailing < or > characters
-        .trim()
+ // Clean up potential markdown backticks AND malformed responses
+ responseText = response
+ .replace(/```json\s*/g, "")
+ .replace(/```/g, "")
+ .replace(/^[<>]+/g, "") // Remove leading < or > characters (Gemini Nano bug)
+ .replace(/[<>]+$/g, "") // Remove trailing < or > characters
+ .trim()
 
-      console.log("[Agent] Raw tool selection JSON:", responseText)
-      console.log("[Agent] JSON length:", responseText.length)
+ console.log("[Agent] Raw tool selection JSON:", responseText)
+ console.log("[Agent] JSON length:", responseText.length)
 
-      // Step 3: Parse the structured response
-      let parsed: any
-      let toolName: string = "none" // Default fallback
+ // Step 3: Parse the structured response
+ let parsed: any
+ let toolName: string = "none" // Default fallback
 
-      try {
-        console.log("Raw response for parsing:", responseText)
-        parsed = JSON.parse(responseText)
-        console.log("[Agent] Parsed tool selection:", parsed)
-        toolName = parsed.tool as string
-      } catch (error) {
-        console.error(
-          "[Agent] Zod validation failed, falling back to 'none':",
-          error
-        )
-        toolName = "none"
-      }
+ try {
+ console.log("Raw response for parsing:", responseText)
+ parsed = JSON.parse(responseText)
+ console.log("[Agent] Parsed tool selection:", parsed)
+ toolName = parsed.tool as string
+ } catch (error) {
+ console.error(
+ "[Agent] Zod validation failed, falling back to 'none':",
+ error
+ )
+ toolName = "none"
+ }
 
-      // Step 4: Convert the parsed object into the tool call format
+ // Step 4: Convert the parsed object into the tool call format
 
-      console.log(`🔧 [Agent] Selected tool: ${toolName}`)
+ console.log(` [Agent] Selected tool: ${toolName}`)
 
-      // In PERSONA mode, block non-search tools
-      if (this.mode === AgentMode.PERSONA) {
-        if (
-          toolName !== "search_notes" &&
-          toolName !== "get_note" &&
-          toolName !== "none"
-        ) {
-          console.log(
-            `🎭 [Agent] Tool "${toolName}" not available in PERSONA mode`
-          )
-          return []
-        }
-      }
+ // In PERSONA mode, block non-search tools
+ if (this.mode === AgentMode.PERSONA) {
+ if (
+ toolName !== "search_notes" &&
+ toolName !== "get_note" &&
+ toolName !== "none"
+ ) {
+ console.log(
+ ` [Agent] Tool "${toolName}" not available in PERSONA mode`
+ )
+ return []
+ }
+ }
 
-      switch (toolName) {
-        case "search_notes":
-          // CRITICAL: Use the optimized search_query, not the original user query!
-          if (!parsed.search_query) {
-            console.warn(
-              "[Agent] 'search_notes' tool selected but no search_query was extracted. Falling back to original query."
-            )
-            return [
-              { name: "search_notes", params: { query: query, limit: 5 } }
-            ]
-          }
-          return [
-            {
-              name: "search_notes",
-              params: { query: parsed.search_query, limit: 5 }
-            }
-          ]
-        case "get_note":
-          return [{ name: "get_note", params: { noteId: parsed.note_id } }]
-        case "list_categories":
-          if (this.mode === AgentMode.PERSONA) {
-            console.log(
-              `🎭 [Agent] list_categories not available in PERSONA mode`
-            )
-            return []
-          }
-          return [{ name: "list_categories", params: {} }]
-        case "get_statistics":
-          if (this.mode === AgentMode.PERSONA) {
-            console.log(
-              `🎭 [Agent] get_statistics not available in PERSONA mode`
-            )
-            return []
-          }
-          return [{ name: "get_statistics", params: {} }]
-        case "create_note_from_chat":
-          if (this.mode === AgentMode.PERSONA) {
-            console.log(
-              `🎭 [Agent] create_note_from_chat not available in PERSONA mode`
-            )
-            return []
-          }
-          return [
-            {
-              name: "create_note_from_chat",
-              params: {
-                content: parsed.note_content || this.lastUserMessage, // Use extracted content or fall back to last message
-                title: parsed.note_title || undefined, // Convert null to undefined
-                category: parsed.note_category || undefined, // Convert null to undefined
-                skipClarification: false
-              }
-            }
-          ]
-        case "none":
-        default:
-          return []
-      }
-    } catch (error) {
-      console.error("[Agent] Tool selection failed:", error)
-      return []
-    }
-  }
+ switch (toolName) {
+ case "search_notes":
+ // CRITICAL: Use the optimized search_query, not the original user query!
+ if (!parsed.search_query) {
+ console.warn(
+ "[Agent] 'search_notes' tool selected but no search_query was extracted. Falling back to original query."
+ )
+ return [
+ { name: "search_notes", params: { query: query, limit: 5 } }
+ ]
+ }
+ return [
+ {
+ name: "search_notes",
+ params: { query: parsed.search_query, limit: 5 }
+ }
+ ]
+ case "get_note":
+ return [{ name: "get_note", params: { noteId: parsed.note_id } }]
+ case "list_categories":
+ if (this.mode === AgentMode.PERSONA) {
+ console.log(
+ ` [Agent] list_categories not available in PERSONA mode`
+ )
+ return []
+ }
+ return [{ name: "list_categories", params: {} }]
+ case "get_statistics":
+ if (this.mode === AgentMode.PERSONA) {
+ console.log(
+ ` [Agent] get_statistics not available in PERSONA mode`
+ )
+ return []
+ }
+ return [{ name: "get_statistics", params: {} }]
+ case "create_note_from_chat":
+ if (this.mode === AgentMode.PERSONA) {
+ console.log(
+ ` [Agent] create_note_from_chat not available in PERSONA mode`
+ )
+ return []
+ }
+ return [
+ {
+ name: "create_note_from_chat",
+ params: {
+ content: parsed.note_content || this.lastUserMessage, // Use extracted content or fall back to last message
+ title: parsed.note_title || undefined, // Convert null to undefined
+ category: parsed.note_category || undefined, // Convert null to undefined
+ skipClarification: false
+ }
+ }
+ ]
+ case "none":
+ default:
+ return []
+ }
+ } catch (error) {
+ console.error("[Agent] Tool selection failed:", error)
+ return []
+ }
+ }
 
-  /**
-   * Execute selected tools
-   */
-  private async executeTools(
-    toolCalls: Array<{ name: string; params: any }>,
-    query: string
-  ): Promise<any[]> {
-    const results: any[] = []
-    const availableTools = this.getAvailableTools()
+ /**
+ * Execute selected tools
+ */
+ private async executeTools(
+ toolCalls: Array<{ name: string; params: any }>,
+ query: string
+ ): Promise<any[]> {
+ const results: any[] = []
+ const availableTools = this.getAvailableTools()
 
-    for (const toolCall of toolCalls) {
-      console.log(
-        `🔧 [Agent] Executing tool: ${toolCall.name}`,
-        toolCall.params
-      )
-      const tool = availableTools.find((t) => t.name === toolCall.name)
+ for (const toolCall of toolCalls) {
+ console.log(
+ ` [Agent] Executing tool: ${toolCall.name}`,
+ toolCall.params
+ )
+ const tool = availableTools.find((t) => t.name === toolCall.name)
 
-      if (!tool) {
-        results.push({
-          tool: toolCall.name,
-          result: "Tool not found"
-        })
-        continue
-      }
+ if (!tool) {
+ results.push({
+ tool: toolCall.name,
+ result: "Tool not found"
+ })
+ continue
+ }
 
-      try {
-        if (this.verbose) {
-          console.log(
-            `[Agent] Executing tool: ${toolCall.name}`,
-            toolCall.params
-          )
-        }
+ try {
+ if (this.verbose) {
+ console.log(
+ `[Agent] Executing tool: ${toolCall.name}`,
+ toolCall.params
+ )
+ }
 
-        // For create_note_from_chat, inject conversation history if content is missing
-        let params = toolCall.params
-        if (toolCall.name === "create_note_from_chat" && !params.content) {
-          params = {
-            ...params,
-            _conversationHistory: this.conversationHistory
-          }
-        }
+ // For create_note_from_chat, inject conversation history if content is missing
+ let params = toolCall.params
+ if (toolCall.name === "create_note_from_chat" && !params.content) {
+ params = {
+ ...params,
+ _conversationHistory: this.conversationHistory
+ }
+ }
 
-        const result = await tool.func(params)
+ const result = await tool.func(params)
 
-        // Parse JSON string results to avoid double-encoding
-        let parsedResult = result
-        if (typeof result === "string") {
-          try {
-            parsedResult = JSON.parse(result)
-          } catch (e) {
-            // If not JSON, keep as string
-            parsedResult = result
-          }
-        }
+ // Parse JSON string results to avoid double-encoding
+ let parsedResult = result
+ if (typeof result === "string") {
+ try {
+ parsedResult = JSON.parse(result)
+ } catch (e) {
+ // If not JSON, keep as string
+ parsedResult = result
+ }
+ }
 
-        results.push({
-          tool: toolCall.name,
-          result: parsedResult
-        })
-      } catch (error) {
-        results.push({
-          tool: toolCall.name,
-          error: error.message
-        })
-      }
-    }
+ results.push({
+ tool: toolCall.name,
+ result: parsedResult
+ })
+ } catch (error) {
+ results.push({
+ tool: toolCall.name,
+ error: error.message
+ })
+ }
+ }
 
-    // **NEW: Optimize results before returning to prevent token overflow**
-    // This applies smart content extraction and truncation to search results
-    const optimizedResults = await this.optimizeToolResultsForLLM(
-      results,
-      query,
-      4000 // Max tokens for Gemini Nano context
-    )
+ // **NEW: Optimize results before returning to prevent token overflow**
+ // This applies smart content extraction and truncation to search results
+ const optimizedResults = await this.optimizeToolResultsForLLM(
+ results,
+ query,
+ 4000 // Max tokens for Gemini Nano context
+ )
 
-    return optimizedResults
-  }
+ return optimizedResults
+ }
 
-  ExtractionSchema = z.object({
-    extractedData: z
-      .string()
-      .nullable()
-      .describe(
-        "The specific data requested (e.g., a password, email, URL) or null if not found."
-      ),
-    dataType: z
-      .enum(["email", "password", "url", "code", "text", "date", "other"])
-      .describe("The type of data that was extracted."),
-    confidence: z
-      .number()
-      .min(0)
-      .max(1)
-      .describe(
-        "A score from 0.0 to 1.0 indicating your confidence in the accuracy of the extracted data."
-      ),
-    aiResponse: z
-      .string()
-      .describe(
-        "A brief, friendly, single-sentence response for the user explaining what was found or not found."
-      ),
-    sourceNoteIds: z
-      .array(z.string())
-      .describe(
-        "Array of note IDs from which the answer was derived. Include ALL note IDs that contributed to the response."
-      )
-  })
+ ExtractionSchema = z.object({
+ extractedData: z
+ .string()
+ .nullable()
+ .describe(
+ "The specific data requested (e.g., a password, email, URL) or null if not found."
+ ),
+ dataType: z
+ .enum(["email", "password", "url", "code", "text", "date", "other"])
+ .describe("The type of data that was extracted."),
+ confidence: z
+ .number()
+ .min(0)
+ .max(1)
+ .describe(
+ "A score from 0.0 to 1.0 indicating your confidence in the accuracy of the extracted data."
+ ),
+ aiResponse: z
+ .string()
+ .describe(
+ "A brief, friendly, single-sentence response for the user explaining what was found or not found."
+ ),
+ sourceNoteIds: z
+ .array(z.string())
+ .describe(
+ "Array of note IDs from which the answer was derived. Include ALL note IDs that contributed to the response."
+ )
+ })
 
-  /**
-   * Cleans up the dataType string from the LLM to match the expected Zod enum.
-   * This makes parsing more resilient to minor model variations.
-   * @param type The raw dataType string from the model.
-   * @returns A valid data type enum value.
-   */
-  private normalizeDataType(type: string): string {
-    const lowerType = type.toLowerCase().trim()
+ /**
+ * Cleans up the dataType string from the LLM to match the expected Zod enum.
+ * This makes parsing more resilient to minor model variations.
+ * @param type The raw dataType string from the model.
+ * @returns A valid data type enum value.
+ */
+ private normalizeDataType(type: string): string {
+ const lowerType = type.toLowerCase().trim()
 
-    if (lowerType.includes("email")) return "email"
-    if (lowerType.includes("password")) return "password"
-    if (lowerType.includes("url") || lowerType.includes("link")) return "url"
-    if (lowerType.includes("code")) return "code"
-    if (lowerType.includes("text")) return "text"
-    if (lowerType.includes("date")) return "date"
+ if (lowerType.includes("email")) return "email"
+ if (lowerType.includes("password")) return "password"
+ if (lowerType.includes("url") || lowerType.includes("link")) return "url"
+ if (lowerType.includes("code")) return "code"
+ if (lowerType.includes("text")) return "text"
+ if (lowerType.includes("date")) return "date"
 
-    // If it doesn't match any known type, default to "other"
-    return "other"
-  }
+ // If it doesn't match any known type, default to "other"
+ return "other"
+ }
 
-  /**
-   * STAGE 1: Pure data extraction without context
-   * Focuses solely on extracting the requested information from notes
-   */
-  private async extractData(
-    query: string,
-    toolResults: any[],
-    sessionId: string
-  ): Promise<{
-    data: string | null
-    type: string
-    confidence: number
-    aiResponse: string
-    sourceNoteIds: string[]
-  }> {
-    console.log("[Stage 1] Extracting data with JSON schema for query:", query)
+ /**
+ * STAGE 1: Pure data extraction without context
+ * Focuses solely on extracting the requested information from notes
+ */
+ private async extractData(
+ query: string,
+ toolResults: any[],
+ sessionId: string
+ ): Promise<{
+ data: string | null
+ type: string
+ confidence: number
+ aiResponse: string
+ sourceNoteIds: string[]
+ }> {
+ console.log("[Stage 1] Extracting data with JSON schema for query:", query)
 
-    // Convert our Zod schema to the JSON Schema format the API needs
-    const jsonSchema = zodToJsonSchema(
-      this.ExtractionSchema,
-      "ExtractionSchema"
-    )
+ // Convert our Zod schema to the JSON Schema format the API needs
+ const jsonSchema = zodToJsonSchema(
+ this.ExtractionSchema,
+ "ExtractionSchema"
+ )
 
-    const extractionPrompt = `You are a precise data extraction AI for a PERSONAL PASSWORD MANAGER and note-taking app called MindKeep.
+ const extractionPrompt = `You are a precise data extraction AI for a PERSONAL PASSWORD MANAGER and note-taking app called MindKeep.
 
 CRITICAL CONTEXT: 
 - You are helping the user retrieve information from THEIR OWN private notes stored on THEIR device
@@ -1314,14 +1314,14 @@ ${JSON.stringify(toolResults, null, 2)}
 \`\`\`
 
 ## INSTRUCTIONS
-1.  **Analyze Intent:** Understand exactly what the user wants (e.g., a password, an email, recovery codes, or statistics).
-2.  **Scan & Locate:** Find the most relevant note/data and the specific text containing the answer in the "MATCHED NOTES".
-3.  **Extract Data:** 
-    - For SPECIFIC DATA (passwords, emails, URLs, codes): Extract the exact value and put it in "extractedData"
-    - For STATISTICS/COUNTS (how many notes, category breakdown): Set "extractedData" to null and provide a detailed response in "aiResponse"
-    - If you cannot find a specific match, set "extractedData" to null
-4.  **Track Source Notes:** Identify which note IDs you used to formulate your answer and include them in "sourceNoteIds"
-5.  **Populate JSON:** Fill out ALL 5 REQUIRED FIELDS in the JSON schema. EVERY field must be present.
+1. **Analyze Intent:** Understand exactly what the user wants (e.g., a password, an email, recovery codes, or statistics).
+2. **Scan & Locate:** Find the most relevant note/data and the specific text containing the answer in the "MATCHED NOTES".
+3. **Extract Data:** 
+ - For SPECIFIC DATA (passwords, emails, URLs, codes): Extract the exact value and put it in "extractedData"
+ - For STATISTICS/COUNTS (how many notes, category breakdown): Set "extractedData" to null and provide a detailed response in "aiResponse"
+ - If you cannot find a specific match, set "extractedData" to null
+4. **Track Source Notes:** Identify which note IDs you used to formulate your answer and include them in "sourceNoteIds"
+5. **Populate JSON:** Fill out ALL 5 REQUIRED FIELDS in the JSON schema. EVERY field must be present.
 
 ## REQUIRED JSON FIELDS (ALL MUST BE PRESENT):
 - extractedData: string or null (the specific data, or null if informational query)
@@ -1337,11 +1337,11 @@ ${JSON.stringify(toolResults, null, 2)}
 - You find a note with id "note-123" containing "Netflix Password: Str3am!ng#Fun"
 - Your JSON Output:
 {
-  "extractedData": "Str3am!ng#Fun",
-  "dataType": "password",
-  "confidence": 0.95,
-  "aiResponse": "I found your Netflix password for you.",
-  "sourceNoteIds": ["note-123"]
+ "extractedData": "Str3am!ng#Fun",
+ "dataType": "password",
+ "confidence": 0.95,
+ "aiResponse": "I found your Netflix password for you.",
+ "sourceNoteIds": ["note-123"]
 }
 
 **Example 2: Informational Query (Who/What/Tell me about)**
@@ -1349,11 +1349,11 @@ ${JSON.stringify(toolResults, null, 2)}
 - You find a note with id "note-456" titled "Thomas Zwiefelhofer: Liechtenstein Politician" with content: "Thomas Zwiefelhofer is a politician from Liechtenstein who served as Deputy Prime Minister from 2013 to 2017."
 - Your JSON Output:
 {
-  "extractedData": null,
-  "dataType": "text",
-  "confidence": 0.9,
-  "aiResponse": "Thomas Zwiefelhofer is a politician from Liechtenstein who served as Deputy Prime Minister from 2013 to 2017, under the government of Adrian Hasler. Since 2021, he has been the president of the Patriotic Union.",
-  "sourceNoteIds": ["note-456"]
+ "extractedData": null,
+ "dataType": "text",
+ "confidence": 0.9,
+ "aiResponse": "Thomas Zwiefelhofer is a politician from Liechtenstein who served as Deputy Prime Minister from 2013 to 2017, under the government of Adrian Hasler. Since 2021, he has been the president of the Patriotic Union.",
+ "sourceNoteIds": ["note-456"]
 }
 
 **Example 3: Statistics Query**
@@ -1361,11 +1361,11 @@ ${JSON.stringify(toolResults, null, 2)}
 - You find statistics: {"totalNotes": 5, "categoriesBreakdown": [{"category": "passwords", "noteCount": 2}, {"category": "trip", "noteCount": 1}]}
 - Your JSON Output:
 {
-  "extractedData": null,
-  "dataType": "text",
-  "confidence": 1.0,
-  "aiResponse": "You have 5 notes total across 4 categories: democracy (1 note), general (2 notes), passwords (1 note), and trip (1 note).",
-  "sourceNoteIds": []
+ "extractedData": null,
+ "dataType": "text",
+ "confidence": 1.0,
+ "aiResponse": "You have 5 notes total across 4 categories: democracy (1 note), general (2 notes), passwords (1 note), and trip (1 note).",
+ "sourceNoteIds": []
 }
 
 **Example 4: Total Count Query**
@@ -1373,11 +1373,11 @@ ${JSON.stringify(toolResults, null, 2)}
 - You find statistics: {"totalNotes": 5}
 - Your JSON Output:
 {
-  "extractedData": null,
-  "dataType": "text",
-  "confidence": 1.0,
-  "aiResponse": "You have 5 notes in total.",
-  "sourceNoteIds": []
+ "extractedData": null,
+ "dataType": "text",
+ "confidence": 1.0,
+ "aiResponse": "You have 5 notes in total.",
+ "sourceNoteIds": []
 }
 
 CRITICAL: 
@@ -1390,188 +1390,188 @@ REMEMBER: You are helping the user access THEIR OWN data. This is completely eth
 
 Begin analysis. Respond ONLY with a complete JSON object with all 5 required fields.`
 
-    console.log(
-      "[Stage 1] Extracting data with JSON schema for extractionPrompt:",
-      extractionPrompt
-    )
-    try {
-      const jsonStringResponse = await GeminiNanoService.executePrompt(
-        extractionPrompt,
-        {
-          responseConstraint: { schema: jsonSchema }
-        }
-      )
+ console.log(
+ "[Stage 1] Extracting data with JSON schema for extractionPrompt:",
+ extractionPrompt
+ )
+ try {
+ const jsonStringResponse = await GeminiNanoService.executePrompt(
+ extractionPrompt,
+ {
+ responseConstraint: { schema: jsonSchema }
+ }
+ )
 
-      console.log("[Stage 1] Raw JSON extraction response:", jsonStringResponse)
+ console.log("[Stage 1] Raw JSON extraction response:", jsonStringResponse)
 
-      // The API guarantees the output is a valid JSON string matching the schema
-      const parsedResponse = JSON.parse(jsonStringResponse)
+ // The API guarantees the output is a valid JSON string matching the schema
+ const parsedResponse = JSON.parse(jsonStringResponse)
 
-      // Provide robust defaults for missing fields
-      if (
-        parsedResponse.dataType &&
-        typeof parsedResponse.dataType === "string"
-      ) {
-        // If the field exists, normalize it to match our enum.
-        parsedResponse.dataType = this.normalizeDataType(
-          parsedResponse.dataType
-        )
-      } else {
-        // If the field is missing or not a string, assign a safe default.
-        console.warn(
-          "[Stage 1] AI response was missing 'dataType'. Defaulting to 'text'."
-        )
-        parsedResponse.dataType = "text"
-      }
+ // Provide robust defaults for missing fields
+ if (
+ parsedResponse.dataType &&
+ typeof parsedResponse.dataType === "string"
+ ) {
+ // If the field exists, normalize it to match our enum.
+ parsedResponse.dataType = this.normalizeDataType(
+ parsedResponse.dataType
+ )
+ } else {
+ // If the field is missing or not a string, assign a safe default.
+ console.warn(
+ "[Stage 1] AI response was missing 'dataType'. Defaulting to 'text'."
+ )
+ parsedResponse.dataType = "text"
+ }
 
-      // Ensure confidence has a default value if missing
-      if (typeof parsedResponse.confidence !== "number") {
-        console.warn(
-          "[Stage 1] AI response was missing 'confidence'. Defaulting to 0.7."
-        )
-        parsedResponse.confidence = 0.7
-      }
+ // Ensure confidence has a default value if missing
+ if (typeof parsedResponse.confidence !== "number") {
+ console.warn(
+ "[Stage 1] AI response was missing 'confidence'. Defaulting to 0.7."
+ )
+ parsedResponse.confidence = 0.7
+ }
 
-      // Ensure aiResponse has a default value if missing
-      if (typeof parsedResponse.aiResponse !== "string") {
-        console.warn(
-          "[Stage 1] AI response was missing 'aiResponse'. Generating default response."
-        )
-        // Generate a reasonable default based on extractedData
-        if (parsedResponse.extractedData) {
-          parsedResponse.aiResponse = "Here's the information I found for you."
-        } else {
-          parsedResponse.aiResponse =
-            "I couldn't find specific information matching your query."
-        }
-      }
+ // Ensure aiResponse has a default value if missing
+ if (typeof parsedResponse.aiResponse !== "string") {
+ console.warn(
+ "[Stage 1] AI response was missing 'aiResponse'. Generating default response."
+ )
+ // Generate a reasonable default based on extractedData
+ if (parsedResponse.extractedData) {
+ parsedResponse.aiResponse = "Here's the information I found for you."
+ } else {
+ parsedResponse.aiResponse =
+ "I couldn't find specific information matching your query."
+ }
+ }
 
-      // Ensure sourceNoteIds has a default value if missing
-      if (!Array.isArray(parsedResponse.sourceNoteIds)) {
-        console.warn(
-          "[Stage 1] AI response was missing 'sourceNoteIds'. Defaulting to empty array."
-        )
-        parsedResponse.sourceNoteIds = []
-      }
+ // Ensure sourceNoteIds has a default value if missing
+ if (!Array.isArray(parsedResponse.sourceNoteIds)) {
+ console.warn(
+ "[Stage 1] AI response was missing 'sourceNoteIds'. Defaulting to empty array."
+ )
+ parsedResponse.sourceNoteIds = []
+ }
 
-      // We can still validate with Zod for extra safety
-      const validatedData = this.ExtractionSchema.parse(parsedResponse)
+ // We can still validate with Zod for extra safety
+ const validatedData = this.ExtractionSchema.parse(parsedResponse)
 
-      console.log(
-        "[Stage 1] Successfully extracted and validated data:",
-        validatedData
-      )
+ console.log(
+ "[Stage 1] Successfully extracted and validated data:",
+ validatedData
+ )
 
-      return {
-        data: validatedData.extractedData,
-        type: validatedData.dataType,
-        confidence: validatedData.confidence,
-        aiResponse: validatedData.aiResponse,
-        sourceNoteIds: validatedData.sourceNoteIds
-      }
-    } catch (error) {
-      console.error("[Stage 1] Data extraction with JSON schema failed:", error)
-      return {
-        data: null,
-        type: "other",
-        confidence: 0.1,
-        aiResponse: "I'm sorry, I had trouble processing that information.",
-        sourceNoteIds: []
-      }
-    }
-  }
+ return {
+ data: validatedData.extractedData,
+ type: validatedData.dataType,
+ confidence: validatedData.confidence,
+ aiResponse: validatedData.aiResponse,
+ sourceNoteIds: validatedData.sourceNoteIds
+ }
+ } catch (error) {
+ console.error("[Stage 1] Data extraction with JSON schema failed:", error)
+ return {
+ data: null,
+ type: "other",
+ confidence: 0.1,
+ aiResponse: "I'm sorry, I had trouble processing that information.",
+ sourceNoteIds: []
+ }
+ }
+ }
 
-  /**
-   * STAGE 2: Format response with conversation context
-   * Takes extracted data and creates a friendly conversational response
-   */
+ /**
+ * STAGE 2: Format response with conversation context
+ * Takes extracted data and creates a friendly conversational response
+ */
 
-  private async generateResponse(
-    query: string,
-    toolResults: any[],
-    referenceNotes: string[],
-    sessionId: string
-  ): Promise<AgentResponse> {
-    // STAGE 1: Extract precise data and get the AI-generated response text
-    const extracted = await this.extractData(query, toolResults, sessionId)
+ private async generateResponse(
+ query: string,
+ toolResults: any[],
+ referenceNotes: string[],
+ sessionId: string
+ ): Promise<AgentResponse> {
+ // STAGE 1: Extract precise data and get the AI-generated response text
+ const extracted = await this.extractData(query, toolResults, sessionId)
 
-    console.log(
-      "[Stage 2] Generating final response from extracted data:",
-      extracted
-    )
+ console.log(
+ "[Stage 2] Generating final response from extracted data:",
+ extracted
+ )
 
-    // Use sourceNoteIds from extraction, fallback to referenceNotes if empty
-    const finalReferenceNotes =
-      extracted.sourceNoteIds.length > 0
-        ? extracted.sourceNoteIds
-        : referenceNotes
+ // Use sourceNoteIds from extraction, fallback to referenceNotes if empty
+ const finalReferenceNotes =
+ extracted.sourceNoteIds.length > 0
+ ? extracted.sourceNoteIds
+ : referenceNotes
 
-    console.log(
-      "[Stage 2] Final reference notes:",
-      finalReferenceNotes,
-      "| From extraction:",
-      extracted.sourceNoteIds.length,
-      "| From vector search:",
-      referenceNotes.length
-    )
+ console.log(
+ "[Stage 2] Final reference notes:",
+ finalReferenceNotes,
+ "| From extraction:",
+ extracted.sourceNoteIds.length,
+ "| From vector search:",
+ referenceNotes.length
+ )
 
-    // STAGE 3: Apply persona transformation if in PERSONA mode
-    let finalAiResponse = extracted.aiResponse
-    if (this.mode === AgentMode.PERSONA && this.activePersona) {
-      console.log(
-        `🎭 [Stage 3] Applying persona transformation for: ${this.activePersona.name}`
-      )
-      finalAiResponse = await this.applyPersonaTransformation(
-        query,
-        extracted,
-        toolResults,
-        sessionId
-      )
-    }
+ // STAGE 3: Apply persona transformation if in PERSONA mode
+ let finalAiResponse = extracted.aiResponse
+ if (this.mode === AgentMode.PERSONA && this.activePersona) {
+ console.log(
+ ` [Stage 3] Applying persona transformation for: ${this.activePersona.name}`
+ )
+ finalAiResponse = await this.applyPersonaTransformation(
+ query,
+ extracted,
+ toolResults,
+ sessionId
+ )
+ }
 
-    // STAGE 2: Is now just assembling the final object. No more if/else logic!
-    return {
-      extractedData: extracted.data,
-      referenceNotes: finalReferenceNotes,
-      aiResponse: finalAiResponse, // Use persona-transformed response if applicable
-      dataType: extracted.type as any,
-      confidence: extracted.confidence,
-      suggestedActions: this.generateActions(
-        extracted.data,
-        extracted.type,
-        finalReferenceNotes
-      )
-    }
-  }
+ // STAGE 2: Is now just assembling the final object. No more if/else logic!
+ return {
+ extractedData: extracted.data,
+ referenceNotes: finalReferenceNotes,
+ aiResponse: finalAiResponse, // Use persona-transformed response if applicable
+ dataType: extracted.type as any,
+ confidence: extracted.confidence,
+ suggestedActions: this.generateActions(
+ extracted.data,
+ extracted.type,
+ finalReferenceNotes
+ )
+ }
+ }
 
-  /**
-   * STAGE 3: Apply persona transformation
-   * Takes extracted data and transforms it according to the active persona's role
-   */
-  private async applyPersonaTransformation(
-    query: string,
-    extracted: {
-      data: string | null
-      type: string
-      confidence: number
-      aiResponse: string
-      sourceNoteIds: string[]
-    },
-    toolResults: any[],
-    sessionId: string
-  ): Promise<string> {
-    if (!this.activePersona) {
-      return extracted.aiResponse
-    }
+ /**
+ * STAGE 3: Apply persona transformation
+ * Takes extracted data and transforms it according to the active persona's role
+ */
+ private async applyPersonaTransformation(
+ query: string,
+ extracted: {
+ data: string | null
+ type: string
+ confidence: number
+ aiResponse: string
+ sourceNoteIds: string[]
+ },
+ toolResults: any[],
+ sessionId: string
+ ): Promise<string> {
+ if (!this.activePersona) {
+ return extracted.aiResponse
+ }
 
-    console.log(`🎭 [Persona Transform] Input query: "${query}"`)
-    console.log(`🎭 [Persona Transform] Extracted data type: ${extracted.type}`)
-    console.log(
-      `🎭 [Persona Transform] Source notes: ${extracted.sourceNoteIds.length}`
-    )
+ console.log(` [Persona Transform] Input query: "${query}"`)
+ console.log(` [Persona Transform] Extracted data type: ${extracted.type}`)
+ console.log(
+ ` [Persona Transform] Source notes: ${extracted.sourceNoteIds.length}`
+ )
 
-    // Build persona transformation prompt
-    const transformationPrompt = `You are MindKeep AI, operating as "${this.activePersona.name}".
+ // Build persona transformation prompt
+ const transformationPrompt = `You are MindKeep AI, operating as "${this.activePersona.name}".
 
 === YOUR ROLE ===
 ${this.activePersona.description}
@@ -1580,11 +1580,11 @@ ${this.activePersona.description}
 ${this.activePersona.context}
 
 ${
-  this.activePersona.outputTemplate
-    ? `=== OUTPUT TEMPLATE ===
+ this.activePersona.outputTemplate
+ ? `=== OUTPUT TEMPLATE ===
 ${this.activePersona.outputTemplate}
 `
-    : ""
+ : ""
 }
 
 === USER REQUEST ===
@@ -1611,58 +1611,58 @@ CRITICAL RULES:
 - Stay completely in character as "${this.activePersona.name}"
 
 ${
-  this.activePersona.outputTemplate
-    ? `
+ this.activePersona.outputTemplate
+ ? `
 REMEMBER: Follow your output template structure:
 ${this.activePersona.outputTemplate}
 `
-    : ""
+ : ""
 }
 
 Now generate your response:`
 
-    console.log(
-      `🎭 [Persona Transform] Sending transformation prompt (${transformationPrompt.length} chars)`
-    )
+ console.log(
+ ` [Persona Transform] Sending transformation prompt (${transformationPrompt.length} chars)`
+ )
 
-    try {
-      const transformedResponse = await GeminiNanoService.promptWithSession(
-        sessionId,
-        transformationPrompt,
-        {}
-      )
-      console.log(
-        `🎭 [Persona Transform] Received transformed response (${transformedResponse.length} chars)`
-      )
-      console.log(
-        `🎭 [Persona Transform] Preview: ${transformedResponse.substring(0, 200)}...`
-      )
-      return transformedResponse
-    } catch (error) {
-      console.error(
-        "❌ [Persona Transform] Failed to transform response:",
-        error
-      )
-      // Fallback to original response
-      return extracted.aiResponse
-    }
-  }
+ try {
+ const transformedResponse = await GeminiNanoService.promptWithSession(
+ sessionId,
+ transformationPrompt,
+ {}
+ )
+ console.log(
+ ` [Persona Transform] Received transformed response (${transformedResponse.length} chars)`
+ )
+ console.log(
+ ` [Persona Transform] Preview: ${transformedResponse.substring(0, 200)}...`
+ )
+ return transformedResponse
+ } catch (error) {
+ console.error(
+ " [Persona Transform] Failed to transform response:",
+ error
+ )
+ // Fallback to original response
+ return extracted.aiResponse
+ }
+ }
 
-  /**
-   * OLD METHOD - Keeping for reference/fallback
-   */
-  private async generateResponseOld(
-    query: string,
-    toolResults: any[],
-    history: any[],
-    referenceNotes: string[]
-  ): Promise<AgentResponse> {
-    // Create a natural conversational prompt
-    let userMessage = query
+ /**
+ * OLD METHOD - Keeping for reference/fallback
+ */
+ private async generateResponseOld(
+ query: string,
+ toolResults: any[],
+ history: any[],
+ referenceNotes: string[]
+ ): Promise<AgentResponse> {
+ // Create a natural conversational prompt
+ let userMessage = query
 
-    if (toolResults.length > 0) {
-      try {
-        userMessage = `## ROLE
+ if (toolResults.length > 0) {
+ try {
+ userMessage = `## ROLE
 You are a highly precise data extraction and summarization AI.
 
 ## GOAL
@@ -1686,39 +1686,39 @@ ${JSON.stringify(toolResults, null, 2)}
 
 Follow these steps precisely:
 
-1.  **Analyze Intent:** Read the User Query and Conversation History to understand exactly what information the user wants (e.g., an email, a password for a specific service, recovery codes).
+1. **Analyze Intent:** Read the User Query and Conversation History to understand exactly what information the user wants (e.g., an email, a password for a specific service, recovery codes).
 
-2.  **Scan & Locate:** Search through the provided "Search Results JSON" to find the most relevant note and the specific text containing the answer. Prioritize direct matches.
+2. **Scan & Locate:** Search through the provided "Search Results JSON" to find the most relevant note and the specific text containing the answer. Prioritize direct matches.
 
-3.  **Extract Data:** Isolate the relevant data.
-    * **For single values** (email, password, URL): Extract the one specific value.
-    * **For multiple related values** (recovery codes, multiple codes): Extract ALL of them as a single string, separated by commas or newlines.
-    * If you find it, this is your {extractedData}.
-    * If you cannot find a specific match, set {extractedData} to null. DO NOT guess or return irrelevant data.
+3. **Extract Data:** Isolate the relevant data.
+ * **For single values** (email, password, URL): Extract the one specific value.
+ * **For multiple related values** (recovery codes, multiple codes): Extract ALL of them as a single string, separated by commas or newlines.
+ * If you find it, this is your {extractedData}.
+ * If you cannot find a specific match, set {extractedData} to null. DO NOT guess or return irrelevant data.
 
-4.  **Determine Data Type:** Classify the {extractedData} using one of the following exact values: "email", "password", "url", "text", "code", "date", "other".
+4. **Determine Data Type:** Classify the {extractedData} using one of the following exact values: "email", "password", "url", "text", "code", "date", "other".
 
-5.  **Calculate Confidence:** Assign a confidence score based on these rules:
-    * '0.95': A direct, unambiguous match (e.g., the note says "Public email - sunny@example.com" and the query is for an email).
-    * '0.90': A contextually strong match (e.g., the query is for "the password" after discussing Netflix, and you found a password in a note titled "Netflix").
-    * '0.70': A possible but not definitive match.
-    * '0.50': No specific data was found, but the notes provided might be relevant.
+5. **Calculate Confidence:** Assign a confidence score based on these rules:
+ * '0.95': A direct, unambiguous match (e.g., the note says "Public email - sunny@example.com" and the query is for an email).
+ * '0.90': A contextually strong match (e.g., the query is for "the password" after discussing Netflix, and you found a password in a note titled "Netflix").
+ * '0.70': A possible but not definitive match.
+ * '0.50': No specific data was found, but the notes provided might be relevant.
 
-6.  **Formulate AI Response:** Write a single, brief, friendly sentence for the {aiResponse} field explaining what you found or why you couldn't find it.
+6. **Formulate AI Response:** Write a single, brief, friendly sentence for the {aiResponse} field explaining what you found or why you couldn't find it.
 
-7.  **Construct Final JSON:** Assemble the final JSON object in the required format. This is your ONLY output.
+7. **Construct Final JSON:** Assemble the final JSON object in the required format. This is your ONLY output.
 
-8.  **Dont try to answer from prior conversation, use ONLY the provided Search Results. Previous conversation is only for your context. Just use as context lookup**
+8. **Dont try to answer from prior conversation, use ONLY the provided Search Results. Previous conversation is only for your context. Just use as context lookup**
 
 ## OUTPUT FORMAT
 
 You MUST respond with ONLY the JSON object in this exact format. Do not add any other text, explanations, or markdown formatting around it.
 
 {
-  "extractedData": "the specific data they asked for (email, password, etc.) or null",
-  "dataType": "email|password|url|text|code|date|other",
-  "confidence": <number>,
-  "aiResponse": "A natural, friendly conversational message explaining what you found."
+ "extractedData": "the specific data they asked for (email, password, etc.) or null",
+ "dataType": "email|password|url|text|code|date|other",
+ "confidence": <number>,
+ "aiResponse": "A natural, friendly conversational message explaining what you found."
 }
 
 ## EXAMPLES
@@ -1733,19 +1733,19 @@ You MUST respond with ONLY the JSON object in this exact format. Do not add any 
 Begin analysis.
 
 IMPORTANT: Respond with ONLY the JSON object, nothing else.`
-      } catch (error) {
-        console.error("Failed to parse tool results:", error)
-        userMessage = query
-      }
-    }
+ } catch (error) {
+ console.error("Failed to parse tool results:", error)
+ userMessage = query
+ }
+ }
 
-    // Enhanced prompt with JSON schema constraint
-    const jsonPrompt = `${userMessage}
+ // Enhanced prompt with JSON schema constraint
+ const jsonPrompt = `${userMessage}
 
 You MUST respond with a JSON object only with this structure:
 {
-  "extracted": "specific data extracted (email, password, URL, etc.)",
-  "aiResponse": "helpful explanation to the user"
+ "extracted": "specific data extracted (email, password, URL, etc.)",
+ "aiResponse": "helpful explanation to the user"
 }
 
 IMPORTANT Rules:
@@ -1754,300 +1754,300 @@ IMPORTANT Rules:
 - ALWAYS use the fresh tool results provided, NOT previous answers
 - Use conversation context to understand what the user is referring to`
 
-    console.log("🔧 Generating response with session:", this.sessionId)
+ console.log(" Generating response with session:", this.sessionId)
 
-    // Use promptWithSession with JSON constraint
-    const responseText = await GeminiNanoService.promptWithSession(
-      this.sessionId!,
-      jsonPrompt,
-      {
-        responseConstraint: {
-          type: "object",
-          properties: {
-            extracted: { type: "string" },
-            aiResponse: { type: "string" }
-          },
-          required: ["extracted", "aiResponse"]
-        }
-      }
-    )
+ // Use promptWithSession with JSON constraint
+ const responseText = await GeminiNanoService.promptWithSession(
+ this.sessionId!,
+ jsonPrompt,
+ {
+ responseConstraint: {
+ type: "object",
+ properties: {
+ extracted: { type: "string" },
+ aiResponse: { type: "string" }
+ },
+ required: ["extracted", "aiResponse"]
+ }
+ }
+ )
 
-    console.log("Model response:", responseText)
+ console.log("Model response:", responseText)
 
-    // Parse the JSON response from the AI
-    try {
-      // Remove markdown code blocks if present
-      let cleanedText = responseText
-        .replace(/```json\s*/g, "")
-        .replace(/```/g, "")
-        .trim()
+ // Parse the JSON response from the AI
+ try {
+ // Remove markdown code blocks if present
+ let cleanedText = responseText
+ .replace(/```json\s*/g, "")
+ .replace(/```/g, "")
+ .trim()
 
-      // Extract JSON object
-      const jsonMatch = cleanedText.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        const parsedResponse = JSON.parse(jsonMatch[0])
+ // Extract JSON object
+ const jsonMatch = cleanedText.match(/\{[\s\S]*\}/)
+ if (jsonMatch) {
+ const parsedResponse = JSON.parse(jsonMatch[0])
 
-        return {
-          extractedData: parsedResponse.extractedData || null,
-          referenceNotes: referenceNotes,
-          aiResponse: parsedResponse.aiResponse || responseText,
-          dataType: parsedResponse.dataType || "other",
-          confidence: parsedResponse.confidence || 0.5,
-          suggestedActions: this.generateActions(
-            parsedResponse.extractedData,
-            parsedResponse.dataType,
-            referenceNotes
-          )
-        }
-      }
-    } catch (error) {
-      console.error("Failed to parse AI JSON response:", error)
-    }
+ return {
+ extractedData: parsedResponse.extractedData || null,
+ referenceNotes: referenceNotes,
+ aiResponse: parsedResponse.aiResponse || responseText,
+ dataType: parsedResponse.dataType || "other",
+ confidence: parsedResponse.confidence || 0.5,
+ suggestedActions: this.generateActions(
+ parsedResponse.extractedData,
+ parsedResponse.dataType,
+ referenceNotes
+ )
+ }
+ }
+ } catch (error) {
+ console.error("Failed to parse AI JSON response:", error)
+ }
 
-    // Fallback: if AI didn't return proper JSON, return generic response
-    return {
-      extractedData: null,
-      referenceNotes: referenceNotes,
-      aiResponse:
-        responseText || "I'm sorry, I couldn't generate a proper response.",
-      dataType: "other"
-    }
-  }
+ // Fallback: if AI didn't return proper JSON, return generic response
+ return {
+ extractedData: null,
+ referenceNotes: referenceNotes,
+ aiResponse:
+ responseText || "I'm sorry, I couldn't generate a proper response.",
+ dataType: "other"
+ }
+ }
 
-  /**
-   * Generate suggested actions based on extracted data
-   */
-  private generateActions(
-    extractedData: string | null,
-    dataType: string | undefined,
-    referenceNotes: string[]
-  ): Array<{
-    type: "copy" | "fill" | "view_note" | "open_link"
-    label: string
-    data: any
-  }> {
-    const actions: Array<{
-      type: "copy" | "fill" | "view_note" | "open_link"
-      label: string
-      data: any
-    }> = []
+ /**
+ * Generate suggested actions based on extracted data
+ */
+ private generateActions(
+ extractedData: string | null,
+ dataType: string | undefined,
+ referenceNotes: string[]
+ ): Array<{
+ type: "copy" | "fill" | "view_note" | "open_link"
+ label: string
+ data: any
+ }> {
+ const actions: Array<{
+ type: "copy" | "fill" | "view_note" | "open_link"
+ label: string
+ data: any
+ }> = []
 
-    if (extractedData) {
-      // Add copy action for any extracted data
-      actions.push({
-        type: "copy",
-        label: "Copy to clipboard",
-        data: extractedData
-      })
+ if (extractedData) {
+ // Add copy action for any extracted data
+ actions.push({
+ type: "copy",
+ label: "Copy to clipboard",
+ data: extractedData
+ })
 
-      // Add fill action for passwords/emails
-      if (dataType === "password" || dataType === "email") {
-        actions.push({
-          type: "fill",
-          label: `Fill ${dataType}`,
-          data: extractedData
-        })
-      }
+ // Add fill action for passwords/emails
+ if (dataType === "password" || dataType === "email") {
+ actions.push({
+ type: "fill",
+ label: `Fill ${dataType}`,
+ data: extractedData
+ })
+ }
 
-      // Add open link action for URLs
-      if (dataType === "url") {
-        actions.push({
-          type: "open_link",
-          label: "Open link",
-          data: extractedData
-        })
-      }
-    }
+ // Add open link action for URLs
+ if (dataType === "url") {
+ actions.push({
+ type: "open_link",
+ label: "Open link",
+ data: extractedData
+ })
+ }
+ }
 
-    // Add view note actions
-    referenceNotes.forEach((noteId, index) => {
-      actions.push({
-        type: "view_note",
-        label: `View note ${index + 1}`,
-        data: noteId
-      })
-    })
+ // Add view note actions
+ referenceNotes.forEach((noteId, index) => {
+ actions.push({
+ type: "view_note",
+ label: `View note ${index + 1}`,
+ data: noteId
+ })
+ })
 
-    return actions
-  }
+ return actions
+ }
 
-  /**
-   * Clear conversation history by recreating the session
-   */
-  async clearHistory(): Promise<void> {
-    if (this.sessionId) {
-      await GeminiNanoService.destroySession(this.sessionId)
-      this.sessionId = await GeminiNanoService.createSession({
-        systemPrompt: this.buildSystemPrompt(),
-        temperature: this.temperature,
-        topK: this.topK
-      })
-      if (this.verbose) {
-        console.log("🗑️ [Agent] Conversation history cleared")
-      }
-    }
-  }
+ /**
+ * Clear conversation history by recreating the session
+ */
+ async clearHistory(): Promise<void> {
+ if (this.sessionId) {
+ await GeminiNanoService.destroySession(this.sessionId)
+ this.sessionId = await GeminiNanoService.createSession({
+ systemPrompt: this.buildSystemPrompt(),
+ temperature: this.temperature,
+ topK: this.topK
+ })
+ if (this.verbose) {
+ console.log(" [Agent] Conversation history cleared")
+ }
+ }
+ }
 
-  /**
-   * Get the last user message content
-   * Useful for note creation from chat context
-   */
-  getLastUserMessage(): string {
-    return this.lastUserMessage
-  }
+ /**
+ * Get the last user message content
+ * Useful for note creation from chat context
+ */
+ getLastUserMessage(): string {
+ return this.lastUserMessage
+ }
 
-  /**
-   * Get session metadata (usage stats, etc.)
-   */
-  getSessionInfo(): SessionMetadata | null {
-    if (!this.sessionId) return null
-    return GeminiNanoService.getSessionMetadata(this.sessionId)
-  }
+ /**
+ * Get session metadata (usage stats, etc.)
+ */
+ getSessionInfo(): SessionMetadata | null {
+ if (!this.sessionId) return null
+ return GeminiNanoService.getSessionMetadata(this.sessionId)
+ }
 
-  /**
-   * Get a human-readable summary of session info
-   */
-  getHistorySummary(): string {
-    if (!this.sessionId) {
-      return "No active session."
-    }
+ /**
+ * Get a human-readable summary of session info
+ */
+ getHistorySummary(): string {
+ if (!this.sessionId) {
+ return "No active session."
+ }
 
-    const metadata = GeminiNanoService.getSessionMetadata(this.sessionId)
-    if (!metadata) {
-      return "No session metadata available."
-    }
+ const metadata = GeminiNanoService.getSessionMetadata(this.sessionId)
+ if (!metadata) {
+ return "No session metadata available."
+ }
 
-    return `📊 Session Info:
+ return ` Session Info:
 - Created: ${metadata.createdAt.toLocaleString()}
 - Last used: ${metadata.lastUsedAt.toLocaleString()}
 - Token usage: ${metadata.inputUsage}/${metadata.inputQuota}
 - Mode: ${this.mode}
 ${this.activePersona ? `- Active persona: ${this.activePersona.name}` : ""}`
-  }
+ }
 
-  /**
-   * Generate clarification options for note creation
-   * @param clarificationData Data from the tool indicating what clarification is needed
-   */
-  private async generateClarificationOptions(
-    clarificationData: any
-  ): Promise<AgentResponse["clarificationOptions"]> {
-    const options: AgentResponse["clarificationOptions"] = []
+ /**
+ * Generate clarification options for note creation
+ * @param clarificationData Data from the tool indicating what clarification is needed
+ */
+ private async generateClarificationOptions(
+ clarificationData: any
+ ): Promise<AgentResponse["clarificationOptions"]> {
+ const options: AgentResponse["clarificationOptions"] = []
 
-    const clarificationType = clarificationData.clarificationType
-    const existingCategories = clarificationData.existingCategories || []
-    const noteContent = clarificationData.noteContent || ""
+ const clarificationType = clarificationData.clarificationType
+ const existingCategories = clarificationData.existingCategories || []
+ const noteContent = clarificationData.noteContent || ""
 
-    console.log("[Agent] generateClarificationOptions called with:", {
-      clarificationType,
-      existingCategoriesCount: existingCategories.length,
-      hasContent: !!noteContent
-    })
+ console.log("[Agent] generateClarificationOptions called with:", {
+ clarificationType,
+ existingCategoriesCount: existingCategories.length,
+ hasContent: !!noteContent
+ })
 
-    // Import AI service functions
-    const { generateTitle, generateCategory, getRelevantCategories } =
-      await import("./ai-service")
+ // Import AI service functions
+ const { generateTitle, generateCategory, getRelevantCategories } =
+ await import("./ai-service")
 
-    // If both are missing, show only high-level options (simplified flow)
-    if (clarificationType === "both") {
-      console.log("[Agent] Showing simplified 'both' options")
-      options.push({
-        type: "button",
-        label: "✨ Auto-generate Both",
-        value: "auto_both",
-        action: "auto_generate_both"
-      })
-      options.push({
-        type: "button",
-        label: "I'll choose manually",
-        value: "manual_flow",
-        action: "start_manual_flow"
-      })
-      options.push({
-        type: "button",
-        label: "❌ Cancel",
-        value: "cancel",
-        action: "cancel_note_creation"
-      })
+ // If both are missing, show only high-level options (simplified flow)
+ if (clarificationType === "both") {
+ console.log("[Agent] Showing simplified 'both' options")
+ options.push({
+ type: "button",
+ label: " Auto-generate Both",
+ value: "auto_both",
+ action: "auto_generate_both"
+ })
+ options.push({
+ type: "button",
+ label: "I'll choose manually",
+ value: "manual_flow",
+ action: "start_manual_flow"
+ })
+ options.push({
+ type: "button",
+ label: " Cancel",
+ value: "cancel",
+ action: "cancel_note_creation"
+ })
 
-      // Return early - don't show individual title/category options yet
-      return options
-    }
+ // Return early - don't show individual title/category options yet
+ return options
+ }
 
-    // Handle title clarification (when only title is missing)
-    if (clarificationType === "title") {
-      options.push({
-        type: "button",
-        label: "Auto-generate Title",
-        value: "auto",
-        action: "auto_generate_title"
-      })
-      options.push({
-        type: "button",
-        label: "I'll provide a title",
-        value: "manual",
-        action: "manual_title"
-      })
-      options.push({
-        type: "button",
-        label: "❌ Cancel",
-        value: "cancel",
-        action: "cancel_note_creation"
-      })
-    }
+ // Handle title clarification (when only title is missing)
+ if (clarificationType === "title") {
+ options.push({
+ type: "button",
+ label: "Auto-generate Title",
+ value: "auto",
+ action: "auto_generate_title"
+ })
+ options.push({
+ type: "button",
+ label: "I'll provide a title",
+ value: "manual",
+ action: "manual_title"
+ })
+ options.push({
+ type: "button",
+ label: " Cancel",
+ value: "cancel",
+ action: "cancel_note_creation"
+ })
+ }
 
-    // Handle category clarification (when only category is missing)
-    if (clarificationType === "category") {
-      // If we have existing categories, get relevant ones using semantic similarity
-      if (existingCategories.length > 0 && noteContent) {
-        try {
-          const relevantCategories = await getRelevantCategories(
-            "",
-            noteContent,
-            existingCategories
-          )
+ // Handle category clarification (when only category is missing)
+ if (clarificationType === "category") {
+ // If we have existing categories, get relevant ones using semantic similarity
+ if (existingCategories.length > 0 && noteContent) {
+ try {
+ const relevantCategories = await getRelevantCategories(
+ "",
+ noteContent,
+ existingCategories
+ )
 
-          // Show top 5 most relevant categories as pills
-          relevantCategories.slice(0, 5).forEach((cat) => {
-            options.push({
-              type: "category_pill",
-              label: cat.category,
-              value: cat.category,
-              action: "select_category"
-            })
-          })
-        } catch (error) {
-          console.error("[Agent] Error getting relevant categories:", error)
-        }
-      }
+ // Show top 5 most relevant categories as pills
+ relevantCategories.slice(0, 5).forEach((cat) => {
+ options.push({
+ type: "category_pill",
+ label: cat.category,
+ value: cat.category,
+ action: "select_category"
+ })
+ })
+ } catch (error) {
+ console.error("[Agent] Error getting relevant categories:", error)
+ }
+ }
 
-      // Always add option to auto-generate new category
-      options.push({
-        type: "button",
-        label: "Auto-generate New Category",
-        value: "auto",
-        action: "auto_generate_category"
-      })
+ // Always add option to auto-generate new category
+ options.push({
+ type: "button",
+ label: "Auto-generate New Category",
+ value: "auto",
+ action: "auto_generate_category"
+ })
 
-      // Option to manually enter
-      options.push({
-        type: "button",
-        label: "I'll provide a category",
-        value: "manual",
-        action: "manual_category"
-      })
+ // Option to manually enter
+ options.push({
+ type: "button",
+ label: "I'll provide a category",
+ value: "manual",
+ action: "manual_category"
+ })
 
-      // Always add cancel option
-      options.push({
-        type: "button",
-        label: "❌ Cancel",
-        value: "cancel",
-        action: "cancel_note_creation"
-      })
-    }
+ // Always add cancel option
+ options.push({
+ type: "button",
+ label: " Cancel",
+ value: "cancel",
+ action: "cancel_note_creation"
+ })
+ }
 
-    return options
-  }
+ return options
+ }
 }
 
 // ============================================================================
@@ -2059,11 +2059,11 @@ ${this.activePersona ? `- Active persona: ${this.activePersona.name}` : ""}`
  * Note: You must call agent.initialize() after creation
  */
 export async function createAgent(
-  config: Partial<AgentConfig> = {}
+ config: Partial<AgentConfig> = {}
 ): Promise<MindKeepAgent> {
-  const agent = new MindKeepAgent(config)
-  await agent.initialize() // Initialize session
-  return agent
+ const agent = new MindKeepAgent(config)
+ await agent.initialize() // Initialize session
+ return agent
 }
 
 /**
@@ -2075,15 +2075,15 @@ let globalAgent: MindKeepAgent | null = null
  * Get or create the global agent instance
  */
 export async function getGlobalAgent(): Promise<MindKeepAgent> {
-  if (!globalAgent) {
-    globalAgent = await createAgent({ verbose: true })
-  }
-  return globalAgent
+ if (!globalAgent) {
+ globalAgent = await createAgent({ verbose: true })
+ }
+ return globalAgent
 }
 
 /**
  * Reset the global agent (useful for testing)
  */
 export function resetGlobalAgent(): void {
-  globalAgent = null
+ globalAgent = null
 }

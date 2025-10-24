@@ -1,4 +1,4 @@
 export interface ScoredCategory {
-  category: string
-  relevanceScore: number
+ category: string
+ relevanceScore: number
 }
