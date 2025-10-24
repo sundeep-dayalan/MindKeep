@@ -223,7 +223,10 @@ export function AISearchBar({
   }, [messages])
 
   // Handle persona changes
-  const handlePersonaChange = async (persona: Persona | null, isManualChange: boolean = true) => {
+  const handlePersonaChange = async (
+    persona: Persona | null,
+    isManualChange: boolean = true
+  ) => {
     console.log(
       " [AISearchBar] Persona changed to:",
       persona?.name || "Default Mode",

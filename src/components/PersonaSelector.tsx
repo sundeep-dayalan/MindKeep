@@ -58,31 +58,45 @@ export function PersonaSelector({ onPersonaChange }: PersonaSelectorProps) {
   const restoreSavedPersona = async (allPersonas: Persona[]) => {
     try {
       const savedPersonaId = await getSelectedPersonaId()
-      
+
       if (!savedPersonaId) {
-        console.log(" [PersonaSelector] No saved persona, staying in default mode")
+        console.log(
+          " [PersonaSelector] No saved persona, staying in default mode"
+        )
         return
       }
 
-      console.log(" [PersonaSelector] Restoring saved persona ID:", savedPersonaId)
-      
-      const savedPersona = allPersonas.find(p => p.id === savedPersonaId)
-      
+      console.log(
+        " [PersonaSelector] Restoring saved persona ID:",
+        savedPersonaId
+      )
+
+      const savedPersona = allPersonas.find((p) => p.id === savedPersonaId)
+
       if (savedPersona) {
-        console.log(" [PersonaSelector] Found saved persona:", savedPersona.name)
-        
+        console.log(
+          " [PersonaSelector] Found saved persona:",
+          savedPersona.name
+        )
+
         // Just update local state - don't call setActivePersona() to avoid triggering storage listener
         setActivePersonaState(savedPersona)
-        
+
         // Notify parent to update agent (isManualChange = false for restoration)
         if (onPersonaChange) {
-          console.log(" [PersonaSelector] Notifying parent of restored persona (silent)")
+          console.log(
+            " [PersonaSelector] Notifying parent of restored persona (silent)"
+          )
           onPersonaChange(savedPersona, false) // false = don't show "Switched to..." message
         }
       } else {
-        console.log(" [PersonaSelector] Saved persona not found in database, clearing selection")
+        console.log(
+          " [PersonaSelector] Saved persona not found in database, clearing selection"
+        )
         // Clear invalid saved persona from storage only
-        const { setSelectedPersona } = await import("~services/persona-settings")
+        const { setSelectedPersona } = await import(
+          "~services/persona-settings"
+        )
         await setSelectedPersona(null)
       }
     } catch (error) {
