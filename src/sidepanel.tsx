@@ -429,15 +429,15 @@ function SidePanel() {
               />
             </div>
           ) : view === "list" ? (
-            <div className="plasmo-flex-1 plasmo-flex plasmo-flex-col plasmo-overflow-hidden">
+            <div className="plasmo-flex-1 plasmo-flex plasmo-flex-col plasmo-overflow-hidden plasmo-relative">
               {/* Sticky Top Section - AI Banner only */}
               <div className="plasmo-flex-shrink-0">
                 {/* AI Status Banner */}
                 <AIStatusBanner />
               </div>
 
-              {/* Category Tabs and Scrollable Notes Section */}
-              <div className="plasmo-flex-1 plasmo-min-h-0 plasmo-mt-4">
+              {/* Notes Section - Full height scrollable area */}
+              <div className="plasmo-flex-1 plasmo-min-h-0">
                 <AnimatedCategoryTabs
                   categories={categories}
                   notes={filteredNotes}
