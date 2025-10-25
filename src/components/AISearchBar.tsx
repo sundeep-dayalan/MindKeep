@@ -46,7 +46,8 @@ interface AISearchBarProps {
   placeholder?: string
   onSearch?: (
     query: string,
-    conversationHistory?: Array<{ role: string; content: string }>
+    conversationHistory?: Array<{ role: string; content: string }>,
+    onStreamChunk?: (chunk: string) => void
   ) => Promise<string | AgentResponse>
   onNoteCreated?: () => void // Callback when a note is successfully created
   onNotesChange?: () => Promise<void> // Callback when notes are modified (e.g., category changed)
@@ -141,6 +142,7 @@ export function AISearchBar({
 }: AISearchBarProps) {
   const [messages, setMessages] = React.useState<Message[]>([])
   const [isSearching, setIsSearching] = React.useState(false)
+  const [isStreaming, setIsStreaming] = React.useState(false) // Track if actively streaming
   const [isChatExpanded, setIsChatExpanded] = React.useState(true)
   const [isInputDisabled, setIsInputDisabled] = React.useState(false)
   const [isPersonaInitializing, setIsPersonaInitializing] = React.useState(true) // Track persona loading
@@ -392,6 +394,27 @@ export function AISearchBar({
     const query = editorRef.current?.getText()?.trim() || ""
     const contentJSON = editorRef.current?.getJSON() // Capture rich formatting
 
+    // Validate input size before proceeding
+    const validation = validateInputSize(query)
+    if (!validation.valid) {
+      console.warn("Input validation failed:", validation.reason)
+
+      // Show error message to user
+      const errorMessage: Message = {
+        id: `ai-validation-error-${Date.now()}`,
+        type: "ai",
+        content: `⚠️ ${validation.reason}`,
+        timestamp: Date.now()
+      }
+      setMessages((prev) => [...prev, errorMessage])
+
+      // Clear the input
+      editorRef.current?.setContent("")
+      setCurrentInputLength(0)
+
+      return // Block submission if validation fails
+    }
+
     if (query && onSearch && !isSearching) {
       // Store the rich content JSON for later use when saving
       setLastSubmittedContentJSON(contentJSON)
@@ -435,6 +458,16 @@ export function AISearchBar({
       setCurrentInputLength(0) // Clear input length tracker
       setIsSearching(true)
 
+      // Create a placeholder message for streaming response
+      const streamingMessageId = `ai-streaming-${Date.now()}`
+      const streamingMessage: Message = {
+        id: streamingMessageId,
+        type: "ai",
+        content: "",
+        timestamp: Date.now()
+      }
+      setMessages((prev) => [...prev, streamingMessage])
+
       try {
         // Build conversation history (exclude system messages)
         const conversationHistory = messages
@@ -447,7 +480,44 @@ export function AISearchBar({
         // Add current query
         conversationHistory.push({ role: "user", content: query })
 
-        const aiResponse = await onSearch(query, conversationHistory)
+        // Create a streaming callback to update the message content
+        let accumulatedText = ""
+        let isFirstChunk = true
+        let didReceiveChunks = false // Track if we actually received any chunks
+        const handleStreamChunk = (chunk: string) => {
+          // Mark as streaming on first chunk
+          if (isFirstChunk) {
+            console.log(`📡 [Streaming] First chunk received, starting stream`)
+            setIsStreaming(true)
+            isFirstChunk = false
+            didReceiveChunks = true
+          }
+
+          accumulatedText += chunk
+          console.log(`📡 [Streaming] Chunk received (${chunk.length} chars), total: ${accumulatedText.length}`)
+          // Update the streaming message with accumulated text
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === streamingMessageId
+                ? { ...m, content: accumulatedText }
+                : m
+            )
+          )
+        }
+
+        const aiResponse = await onSearch(query, conversationHistory, handleStreamChunk)
+
+        // Stop streaming when complete
+        setIsStreaming(false)
+
+        // Remove the streaming placeholder message only if we received chunks
+        // (for non-streaming responses like clarifications, we never created a visible streaming message)
+        if (didReceiveChunks) {
+          setMessages((prev) => prev.filter((m) => m.id !== streamingMessageId))
+        } else {
+          // No chunks received, remove the empty placeholder
+          setMessages((prev) => prev.filter((m) => m.id !== streamingMessageId))
+        }
 
         // Check if response is an AgentResponse object (has aiResponse field or referenceNotes)
         if (
@@ -481,6 +551,15 @@ export function AISearchBar({
             pendingNoteData: aiResponse.pendingNoteData,
             referenceNotes: fullReferenceNotes
           }
+          
+          // Debug logging
+          console.log("🔍 [AISearchBar] Creating AI message with clarifications:", {
+            hasClarificationOptions: !!aiResponse.clarificationOptions,
+            clarificationCount: aiResponse.clarificationOptions?.length || 0,
+            clarificationOptions: aiResponse.clarificationOptions,
+            messageId: aiMessage.id
+          })
+          
           setMessages((prev) => [...prev, aiMessage])
 
           // Disable input if clarification is needed
@@ -512,6 +591,9 @@ export function AISearchBar({
         }
       } catch (error) {
         console.error("Search error:", error)
+        // Remove streaming message on error
+        setMessages((prev) => prev.filter((m) => m.id !== streamingMessageId))
+
         const errorMessage: Message = {
           id: `ai-error-${Date.now()}`,
           type: "ai",
@@ -521,6 +603,7 @@ export function AISearchBar({
         setMessages((prev) => [...prev, errorMessage])
       } finally {
         setIsSearching(false)
+        setIsStreaming(false) // Always reset streaming state
       }
     }
   }
@@ -1404,7 +1487,15 @@ export function AISearchBar({
       {/* Chat Messages */}
       {messages.length > 0 && isChatExpanded && (
         <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-space-y-4 plasmo-px-4 plasmo-py-4 plasmo-max-h-[500px] plasmo-bg-white/10 plasmo-backdrop-blur-lg plasmo-rounded-2xl plasmo-border plasmo-border-white/30 plasmo-mb-4">
-          {messages.map((message) => (
+          {messages
+            .filter((message) => {
+              // Filter out empty AI messages (streaming placeholders before content arrives)
+              if (message.type === "ai" && !message.content.trim()) {
+                return false
+              }
+              return true
+            })
+            .map((message) => (
             <div key={message.id} className="plasmo-space-y-2">
               <div
                 className={`plasmo-flex ${
@@ -1438,7 +1529,17 @@ export function AISearchBar({
                         Choose an option:
                       </div>
                       <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-2">
-                        {message.clarificationOptions.map((option, idx) => (
+                        {message.clarificationOptions.map((option, idx) => {
+                          // Debug logging
+                          if (idx === 0) {
+                            console.log("🎨 [AISearchBar] Rendering clarification buttons for message:", {
+                              messageId: message.id,
+                              optionCount: message.clarificationOptions.length,
+                              isHandled: handledClarifications.has(message.id),
+                              options: message.clarificationOptions
+                            })
+                          }
+                          return (
                           <button
                             key={idx}
                             disabled={isSearching}
@@ -1457,7 +1558,8 @@ export function AISearchBar({
                             } plasmo-rounded-full plasmo-text-[12px] plasmo-font-normal plasmo-transition-all plasmo-cursor-pointer plasmo-shadow-sm hover:plasmo-shadow disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed`}>
                             {option.label}
                           </button>
-                        ))}
+                          )
+                        })}
                       </div>
                     </div>
                   </div>
@@ -1472,7 +1574,8 @@ export function AISearchBar({
               )}
             </div>
           ))}
-          {isSearching && (
+          {/* Show loading dots only when searching but NOT streaming */}
+          {isSearching && !isStreaming && (
             <div className="plasmo-flex plasmo-justify-start">
               <div className="plasmo-max-w-[80%] plasmo-px-4 plasmo-py-2 plasmo-rounded-lg plasmo-bg-white/20 plasmo-backdrop-blur-md plasmo-text-slate-900 plasmo-border plasmo-border-white/40">
                 <div className="plasmo-flex plasmo-items-center plasmo-gap-2">

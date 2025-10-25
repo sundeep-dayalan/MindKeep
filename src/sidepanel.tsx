@@ -359,7 +359,8 @@ function SidePanel() {
 
   const handleAISearch = async (
     query: string,
-    conversationHistory?: Array<{ role: string; content: string }>
+    conversationHistory?: Array<{ role: string; content: string }>,
+    onStreamChunk?: (chunk: string) => void
   ): Promise<string | import("~services/langchain-agent").AgentResponse> => {
     const startTime = performance.now()
 
@@ -369,6 +370,30 @@ function SidePanel() {
       // Use the LangChain agent for agentic search (already imported at top)
       const agent = await getGlobalAgent()
 
+      // Use streaming if callback is provided
+      if (onStreamChunk) {
+        console.log(" [LangChain Agent] Using streaming mode")
+
+        let finalResponse: import("~services/langchain-agent").AgentResponse | null = null
+
+        for await (const event of agent.runStream(query, conversationHistory)) {
+          if (event.type === "chunk") {
+            // Stream text chunks to UI
+            onStreamChunk(event.data as string)
+          } else if (event.type === "complete") {
+            // Store final response
+            finalResponse = event.data as import("~services/langchain-agent").AgentResponse
+          }
+        }
+
+        const totalTime = performance.now() - startTime
+        console.log(` [LangChain Agent] TOTAL stream time: ${totalTime.toFixed(2)}ms`)
+        console.log(` [LangChain Agent] Final response:`, finalResponse)
+
+        return finalResponse || { aiResponse: "", extractedData: null, referenceNotes: [] }
+      }
+
+      // Fallback to non-streaming mode
       const response = await agent.run(query, conversationHistory)
 
       const totalTime = performance.now() - startTime

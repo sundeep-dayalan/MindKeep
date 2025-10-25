@@ -847,7 +847,9 @@ Current user message: "${input}"
 This is a general conversation or greeting. Respond naturally and helpfully based on the conversation context. Keep it brief (1-2 sentences).
 ${this.mode === AgentMode.PERSONA && this.activePersona ? `Stay in character as ${this.activePersona.name}.` : ""}
 
-IMPORTANT:
+CRITICAL INSTRUCTIONS:
+- Respond with ONLY plain text. NO JSON. NO code blocks. NO structured data.
+- Write as if you're speaking directly to the user
 - If the user is asking about something mentioned in the recent conversation, reference it in your response
 - Be contextually aware and maintain conversation flow
 - If asked "do you know why...", check if the reason was mentioned in the conversation context above
@@ -1103,11 +1105,13 @@ Current message: "${input}"
 
 Respond naturally and helpfully. Keep it brief (1-2 sentences).
 
-IMPORTANT:
+CRITICAL INSTRUCTIONS:
+- Respond with ONLY plain text. NO JSON. NO code blocks. NO structured data.
+- Write as if you're speaking directly to the user
 - **If user expresses INTENT to create/add/save a note WITHOUT providing content**, ask what they'd like to save
 - Examples: "I need to create a note" → "I can create a note for you! What would you like the note to contain?"
 
-Respond with ONLY the conversational text, no JSON.`
+Your response (PLAIN TEXT ONLY, NO JSON):`
 
         // Stream the conversational response
         const stream = GeminiNanoService.promptStreamWithSession(
@@ -1130,6 +1134,62 @@ Respond with ONLY the conversational text, no JSON.`
             aiResponse: fullResponse.trim(),
             dataType: "text",
             confidence: 1.0
+          }
+        }
+        return
+      }
+
+      // Check if any tool requested clarification
+      const clarificationNeeded = toolResults.find(
+        (result) => result.result?.needsClarification
+      )
+
+      if (clarificationNeeded) {
+        const clarificationData = clarificationNeeded.result
+        console.log("[Agent Stream] Clarification needed:", clarificationData)
+
+        // Generate clarification options based on type
+        const clarificationOptions =
+          await this.generateClarificationOptions(clarificationData)
+
+        yield {
+          type: "complete",
+          data: {
+            extractedData: null,
+            referenceNotes: [],
+            aiResponse: clarificationData.message,
+            needsClarification: true,
+            clarificationType: clarificationData.clarificationType,
+            clarificationOptions: clarificationOptions,
+            pendingNoteData: {
+              content: clarificationData.noteContent,
+              title: clarificationData.noteTitle,
+              category: clarificationData.noteCategory
+            }
+          }
+        }
+        return
+      }
+
+      // Check if a note was successfully created
+      const noteCreated = toolResults.find(
+        (result) => result.result?.noteCreated === true
+      )
+
+      if (noteCreated) {
+        const creationData = noteCreated.result
+        console.log("[Agent Stream] Note created successfully:", creationData)
+
+        // Return note creation confirmation
+        yield {
+          type: "complete",
+          data: {
+            extractedData: null,
+            referenceNotes: [],
+            aiResponse: creationData.message,
+            dataType: "text",
+            confidence: 1.0,
+            noteCreated: true
           }
         }
         return
@@ -1203,14 +1263,14 @@ Respond with ONLY the conversational text, no JSON.`
             "none"
           ]
 
-    const ToolSelectionSchema = {
-      tool: toolEnum,
-      search_query: "string | null",
-      note_id: "string | null",
-      note_content: "string | null",
-      note_title: "string | null",
-      note_category: "string | null"
-    }
+    const ToolSelectionSchema = z.object({
+      tool: z.enum(toolEnum as [string, ...string[]]),
+      search_query: z.string().nullable().optional(),
+      note_id: z.string().nullable().optional(),
+      note_content: z.string().nullable().optional(),
+      note_title: z.string().nullable().optional(),
+      note_category: z.string().nullable().optional()
+    })
 
     // const ToolSelectionSchema = z.object({
     // tool: toolEnum,
@@ -1295,13 +1355,15 @@ RULES:
 - "How many notes" / "statistics" → "get_statistics"
 - ADD/SAVE/CREATE note WITH actual content → "create_note_from_chat"
 - "add THAT/THIS as note" → extract from PREVIOUS user message in conversation below
+- User sends ACTUAL CONTENT after being asked "what to save" → "create_note_from_chat" (extract full content)
 - Greetings/small talk → "none"
-- **INTENT to create** (no actual content) → "none" (let conversational AI ask for content)
+- **INTENT to create** (no actual content, just "I want to create a note") → "none" (let conversational AI ask for content)
 
 create_note_from_chat CRITICAL:
 - ONLY use if there's ACTUAL content to save (either in query or in conversation context)
 - If query is just "I want to create a note" or "I need to make a note" WITHOUT content → use "none"
 - If query contains ONLY action words like "create note", "add note", "save note" with no actual information → use "none"
+- **IMPORTANT**: If the PREVIOUS assistant message asked "What would you like the note to contain?" or "What would you like to save?", and the current user message contains substantial text (more than 20 characters), treat it as content to save → use "create_note_from_chat"
 - note_content: FULL text from conversation or query, NO truncation/summary
 - note_content should NEVER be the action phrase itself (e.g., don't save "create a note" as content)
 - note_title: null (unless user says "with title X")
@@ -1328,6 +1390,7 @@ Examples:
 - "I want to add a note" (NO content) → {"tool": "none"}
 - "create a new note" (NO content) → {"tool": "none"}
 - "add note" (NO content) → {"tool": "none"}
+- With context [Assistant: "What would you like the note to contain?"] + User sends actual content → {"tool": "create_note_from_chat", "note_content": "FULL CONTENT HERE", "note_title": null, "note_category": null}
 - With context [User: "Password: abc123"] + "add that as note" → {"tool": "create_note_from_chat", "note_content": "Password: abc123", "note_title": null, "note_category": null}
 - "The sky is blue - save as note" → {"tool": "create_note_from_chat", "note_content": "The sky is blue", "note_title": null, "note_category": null}
 - "Meeting at 3pm with Sarah - add as note" → {"tool": "create_note_from_chat", "note_content": "Meeting at 3pm with Sarah", "note_title": null, "note_category": null}
@@ -1340,15 +1403,23 @@ Respond ONLY with JSON.`
       // CRITICAL: Use one-off prompt (NO session history) for tool selection
       // Tool selection should be based ONLY on the current query, not conversation context
       // This prevents "Hi" from triggering searches due to previous conversation
+      //
+      // IMPORTANT: We use executePrompt instead of promptWithSession because:
+      // 1. Tool selection doesn't need conversation history
+      // 2. Using promptWithSession with responseConstraint would TAINT the session,
+      //    causing all subsequent responses in that session to be JSON-constrained!
 
       console.log(` [Agent] Tool selection for query: "${query}"`)
       console.log(" [Agent] Using executePrompt (no session history)")
+
+      // Convert Zod schema to JSON Schema for the API
+      const toolSelectionJsonSchema = zodToJsonSchema(ToolSelectionSchema, "ToolSelectionSchema")
 
       const response = await GeminiNanoService.promptWithSession(
         sessionId,
         toolSelectionPrompt,
         {
-          responseConstraint: ToolSelectionSchema
+          responseConstraint: { schema: toolSelectionJsonSchema }
         }
       )
 
