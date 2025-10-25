@@ -1044,7 +1044,10 @@ export function AISearchBar({
             let accumulatedMarkdown = ""
 
             for (const node of lastSubmittedContentJSON.content || []) {
-              const nodeMarkdown = tiptapToMarkdown({ type: "doc", content: [node] })
+              const nodeMarkdown = tiptapToMarkdown({
+                type: "doc",
+                content: [node]
+              })
 
               // Check if this node is part of the extracted content
               if (noteContent.includes(nodeMarkdown.trim())) {
@@ -1466,7 +1469,9 @@ export function AISearchBar({
 
         <div className="plasmo-bg-white/90 plasmo-backdrop-blur-sm plasmo-rounded-[10px] plasmo-px-4 plasmo-py-3 plasmo-border plasmo-border-slate-200/80 hover:plasmo-border-slate-300 plasmo-transition-all focus-within:plasmo-border-slate-400 plasmo-shadow-sm plasmo-space-y-3">
           {/* Rich Text Editor - Full Width on Top */}
-          <div className="plasmo-w-full plasmo-overflow-y-auto plasmo-no-visible-scrollbar" style={{ minHeight: "2.5em", maxHeight: "150px" }}>
+          <div
+            className="plasmo-w-full plasmo-overflow-y-auto plasmo-no-visible-scrollbar"
+            style={{ minHeight: "2.5em", maxHeight: "150px" }}>
             <RichTextEditor
               ref={editorRef}
               placeholder={
