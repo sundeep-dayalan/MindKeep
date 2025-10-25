@@ -126,14 +126,15 @@ img {
 
 /* Compact editor styling for chat input */
 .compact-editor .ProseMirror {
-  min-height: 40px !important;
+  min-height: 2.5em !important;
   padding: 0 !important;
   font-size: 0.875rem;
+  line-height: 1.4;
 }
 
 .compact-editor .ProseMirror p {
-  margin-top: 0.25em;
-  margin-bottom: 0.25em;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
 }
 
 .ProseMirror h1 {
@@ -305,4 +306,20 @@ img {
 
 .ProseMirror table p {
   margin: 0;
+}
+
+/* Toolbar Slide-Up Animation */
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.plasmo-animate-slide-up {
+  animation: slideUp 0.3s ease-out forwards;
 }

@@ -182,16 +182,13 @@ export function CategorySuggestions({
  )}
 
  {!isLoading && suggestions.length > 0 && (
- <div className="plasmo-space-y-2">
- <div className="plasmo-text-sm plasmo-font-medium plasmo-text-slate-700">
- Suggested categories:
- </div>
- <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-2">
+ <div className="plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-overflow-x-auto plasmo-no-visible-scrollbar">
+ <div className="plasmo-flex plasmo-gap-2 plasmo-flex-nowrap">
  {suggestions.map((item) => (
  <button
  key={item.category}
  onClick={() => handleCategoryClick(item.category)}
- className="plasmo-inline-flex plasmo-items-center plasmo-gap-2 plasmo-px-3 plasmo-py-1.5 plasmo-bg-gradient-to-r plasmo-from-blue-50 plasmo-to-indigo-50 hover:plasmo-from-blue-100 hover:plasmo-to-indigo-100 plasmo-text-blue-700 plasmo-rounded-full plasmo-text-sm plasmo-font-medium plasmo-transition-all plasmo-duration-200 plasmo-border plasmo-border-blue-200 hover:plasmo-border-blue-300 hover:plasmo-shadow-sm plasmo-cursor-pointer"
+ className="plasmo-inline-flex plasmo-items-center plasmo-gap-1.5 plasmo-px-3 plasmo-py-1.5 plasmo-bg-gradient-to-r plasmo-from-blue-50 plasmo-to-indigo-50 hover:plasmo-from-blue-100 hover:plasmo-to-indigo-100 plasmo-text-blue-700 plasmo-rounded-full plasmo-text-sm plasmo-font-medium plasmo-transition-all plasmo-duration-200 plasmo-border plasmo-border-blue-200 hover:plasmo-border-blue-300 hover:plasmo-shadow-sm plasmo-cursor-pointer plasmo-whitespace-nowrap plasmo-flex-shrink-0"
  title={`Click to assign "${item.category}" category`}>
  <svg
  className="plasmo-w-3.5 plasmo-h-3.5 plasmo-text-blue-500"

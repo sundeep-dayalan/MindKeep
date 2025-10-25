@@ -1480,7 +1480,7 @@ export function AISearchBar({
 
         <div className="plasmo-bg-white/90 plasmo-backdrop-blur-sm plasmo-rounded-[10px] plasmo-px-4 plasmo-py-3 plasmo-border plasmo-border-slate-200/80 hover:plasmo-border-slate-300 plasmo-transition-all focus-within:plasmo-border-slate-400 plasmo-shadow-sm plasmo-space-y-3">
           {/* Rich Text Editor - Full Width on Top */}
-          <div className="plasmo-w-full plasmo-min-h-[44px] plasmo-max-h-[200px] plasmo-overflow-y-auto">
+          <div className="plasmo-w-full plasmo-overflow-y-auto plasmo-no-visible-scrollbar" style={{ minHeight: "2.5em", maxHeight: "150px" }}>
             <RichTextEditor
               ref={editorRef}
               placeholder={
