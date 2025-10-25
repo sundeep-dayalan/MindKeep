@@ -17,11 +17,13 @@ import type { Persona } from "~types/persona"
 interface PersonaSelectorProps {
   onPersonaChange?: (persona: Persona | null, isManualChange?: boolean) => void
   onInitializationChange?: (isInitializing: boolean) => void // Notify parent of initialization state
+  onManageClick?: () => void // Callback to open Personas management page
 }
 
 export function PersonaSelector({
   onPersonaChange,
-  onInitializationChange
+  onInitializationChange,
+  onManageClick
 }: PersonaSelectorProps) {
   const [personas, setPersonas] = useState<Persona[]>([])
   const [activePersona, setActivePersonaState] = useState<Persona | null>(null)
@@ -50,7 +52,12 @@ export function PersonaSelector({
       console.log(` [PersonaSelector] Loaded ${allPersonas.length} personas`)
       console.log(" [PersonaSelector] Active persona:", active?.name || "None")
 
-      setPersonas(allPersonas)
+      // Sort personas by createdAt: newest first (descending order)
+      const sortedPersonas = allPersonas.sort(
+        (a, b) => b.createdAt - a.createdAt
+      )
+
+      setPersonas(sortedPersonas)
       setActivePersonaState(active)
 
       // On first load, restore saved persona from chrome.storage
@@ -220,10 +227,39 @@ export function PersonaSelector({
           {/* Menu Panel - Opens UPWARD - Compact Style */}
           <div className="plasmo-absolute plasmo-bottom-full plasmo-mb-2 plasmo-left-0 plasmo-w-[260px] plasmo-bg-white plasmo-border plasmo-border-slate-200 plasmo-rounded-lg plasmo-shadow-xl plasmo-z-[101] plasmo-max-h-[360px] plasmo-overflow-hidden plasmo-flex plasmo-flex-col">
             {/* Header */}
-            <div className="plasmo-px-3 plasmo-py-2.5 plasmo-border-b plasmo-border-slate-100 plasmo-bg-slate-50">
+            <div className="plasmo-px-3 plasmo-py-2.5 plasmo-border-b plasmo-border-slate-100 plasmo-bg-slate-50 plasmo-flex plasmo-items-center plasmo-justify-between">
               <h3 className="plasmo-text-xs plasmo-font-semibold plasmo-text-slate-700">
                 Select Persona
               </h3>
+              {onManageClick && (
+                <button
+                  onClick={() => {
+                    setIsOpen(false)
+                    onManageClick()
+                  }}
+                  type="button"
+                  className="plasmo-flex plasmo-items-center plasmo-gap-1 plasmo-px-2 plasmo-py-1 plasmo-rounded plasmo-text-xs plasmo-text-slate-600 hover:plasmo-bg-slate-200 plasmo-transition-colors"
+                  title="Manage Personas">
+                  <svg
+                    className="plasmo-w-3.5 plasmo-h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2}>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                  </svg>
+                  <span className="plasmo-font-medium">Manage</span>
+                </button>
+              )}
             </div>
 
             {/* Scrollable Content */}
@@ -240,7 +276,7 @@ export function PersonaSelector({
                 <div className="plasmo-flex-1 plasmo-min-w-0">
                   <div className="plasmo-flex plasmo-items-center plasmo-gap-1.5">
                     <span className="plasmo-text-[13px] plasmo-font-medium plasmo-text-slate-800">
-                      Default
+                      MindKeepAI | Default
                     </span>
                     {!activePersona && (
                       <svg
@@ -256,7 +292,7 @@ export function PersonaSelector({
                     )}
                   </div>
                   <p className="plasmo-text-[11px] plasmo-text-slate-500 plasmo-truncate">
-                    Full tool access
+                    Full access to agentic tools
                   </p>
                 </div>
               </button>

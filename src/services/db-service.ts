@@ -860,7 +860,6 @@ export async function addPersona(personaData: PersonaInput): Promise<Persona> {
     name: personaData.name,
     description: personaData.description,
     context: personaData.context,
-    emoji: personaData.emoji,
     outputTemplate: personaData.outputTemplate,
     isDefault: personaData.isDefault || false,
     isActive: false,

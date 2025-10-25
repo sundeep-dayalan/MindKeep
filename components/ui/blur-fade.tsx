@@ -1,12 +1,12 @@
-import { useRef } from "react"
 import {
   AnimatePresence,
   motion,
   MotionProps,
   useInView,
   UseInViewOptions,
-  Variants,
+  Variants
 } from "motion/react"
+import { useRef } from "react"
 
 type MarginType = UseInViewOptions["margin"]
 
@@ -47,13 +47,13 @@ export function BlurFade({
       [direction === "left" || direction === "right" ? "x" : "y"]:
         direction === "right" || direction === "down" ? -offset : offset,
       opacity: 0,
-      filter: `blur(${blur})`,
+      filter: `blur(${blur})`
     },
     visible: {
       [direction === "left" || direction === "right" ? "x" : "y"]: 0,
       opacity: 1,
-      filter: `blur(0px)`,
-    },
+      filter: `blur(0px)`
+    }
   }
   const combinedVariants = variant || defaultVariants
   return (
@@ -67,11 +67,10 @@ export function BlurFade({
         transition={{
           delay: 0.04 + delay,
           duration,
-          ease: "easeOut",
+          ease: "easeOut"
         }}
         className={className}
-        {...props}
-      >
+        {...props}>
         {children}
       </motion.div>
     </AnimatePresence>
