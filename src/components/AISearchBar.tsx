@@ -10,6 +10,7 @@ import type { Note } from "~services/db-service"
 import type { AgentResponse } from "~services/langchain-agent"
 import { getGlobalAgent } from "~services/langchain-agent"
 import type { Persona } from "~types/persona"
+import { tiptapToMarkdown } from "~util/tiptap-to-markdown"
 
 // Helper function to get dynamic greeting based on time of day
 function getTimeBasedGreeting(): string {
@@ -1026,28 +1027,13 @@ export function AISearchBar({
           // Extract only the portion of TipTap JSON that matches the agent's extracted content
           console.log(" Extracting relevant portion from rich content JSON...")
 
-          // Get the full plaintext from the stored JSON to compare
-          const extractPlainTextFromJSON = (json: any): string => {
-            if (!json || !json.content) return ""
-            return json.content
-              .map((node: any) => {
-                if (node.type === "paragraph" || node.type === "heading") {
-                  return node.content
-                    ?.map((child: any) => child.text || "")
-                    .join("")
-                }
-                return ""
-              })
-              .join("\n")
-              .trim()
-          }
+          // Get the full markdown from the stored JSON to compare
+          const fullMarkdown = tiptapToMarkdown(lastSubmittedContentJSON)
 
-          const fullText = extractPlainTextFromJSON(lastSubmittedContentJSON)
-
-          // Check if noteContent is a subset of fullText (agent extracted only part)
+          // Check if noteContent is a subset of fullMarkdown (agent extracted only part)
           if (
-            fullText.includes(noteContent) &&
-            fullText.length > noteContent.length
+            fullMarkdown.includes(noteContent) &&
+            fullMarkdown.length > noteContent.length
           ) {
             console.log(
               " Agent extracted partial content, filtering TipTap nodes..."
@@ -1055,18 +1041,18 @@ export function AISearchBar({
 
             // Filter TipTap nodes to only include those that are part of noteContent
             const filteredNodes: any[] = []
-            let accumulatedText = ""
+            let accumulatedMarkdown = ""
 
             for (const node of lastSubmittedContentJSON.content || []) {
-              const nodeText = extractPlainTextFromJSON({ content: [node] })
+              const nodeMarkdown = tiptapToMarkdown({ type: "doc", content: [node] })
 
               // Check if this node is part of the extracted content
-              if (noteContent.includes(nodeText.trim())) {
+              if (noteContent.includes(nodeMarkdown.trim())) {
                 filteredNodes.push(node)
-                accumulatedText += nodeText + "\n"
+                accumulatedMarkdown += nodeMarkdown + "\n"
 
                 // Stop if we've accumulated enough content
-                if (accumulatedText.trim().length >= noteContent.length) {
+                if (accumulatedMarkdown.trim().length >= noteContent.length) {
                   break
                 }
               }

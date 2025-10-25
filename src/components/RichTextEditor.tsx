@@ -21,6 +21,8 @@ import {
   useState
 } from "react"
 
+import { tiptapToMarkdown } from "~util/tiptap-to-markdown"
+
 interface RichTextEditorProps {
   initialContent?: string // JSON string or plain text
   placeholder?: string
@@ -116,9 +118,10 @@ export const RichTextEditor = forwardRef<
       },
       onUpdate: ({ editor }) => {
         if (onUpdate) {
-          const plainText = editor.getText()
           const json = editor.getJSON()
-          onUpdate(plainText, json)
+          // Convert TipTap JSON to Markdown for better AI readability
+          const markdown = tiptapToMarkdown(json)
+          onUpdate(markdown, json)
         }
       },
       onFocus: () => {
@@ -159,7 +162,11 @@ export const RichTextEditor = forwardRef<
 
     // Expose methods to parent via ref
     useImperativeHandle(ref, () => ({
-      getText: () => editor?.getText() || "",
+      getText: () => {
+        if (!editor) return ""
+        // Return markdown instead of plain text for better context preservation
+        return tiptapToMarkdown(editor.getJSON())
+      },
       getJSON: () => editor?.getJSON() || null,
       setContent: (content: string | any) => {
         if (editor) {
