@@ -10,6 +10,11 @@ import type { Note } from "~services/db-service"
 import type { AgentResponse } from "~services/langchain-agent"
 import { getGlobalAgent } from "~services/langchain-agent"
 import type { Persona } from "~types/persona"
+import {
+  clearChatMessages,
+  loadChatMessages,
+  saveChatMessages
+} from "~util/session-storage"
 import { tiptapToMarkdown } from "~util/tiptap-to-markdown"
 
 // Helper function to get dynamic greeting based on time of day
@@ -140,6 +145,7 @@ export function AISearchBar({
   const [isInputDisabled, setIsInputDisabled] = React.useState(false)
   const [isPersonaInitializing, setIsPersonaInitializing] = React.useState(true) // Track persona loading
   const [greeting, setGreeting] = React.useState(getTimeBasedGreeting())
+  const [isLoadingFromStorage, setIsLoadingFromStorage] = React.useState(true) // Track if we're loading from storage
 
   // Track which messages have had their clarifications handled (to hide buttons after click)
   const [handledClarifications, setHandledClarifications] = React.useState<
@@ -168,6 +174,40 @@ export function AISearchBar({
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const editorRef = React.useRef<RichTextEditorRef>(null)
+
+  // Load messages from session storage on mount
+  React.useEffect(() => {
+    const loadStoredMessages = async () => {
+      try {
+        const storedMessages = await loadChatMessages()
+        if (storedMessages.length > 0) {
+          console.log(
+            `🔄 [AISearchBar] Restored ${storedMessages.length} messages from session storage`
+          )
+          setMessages(storedMessages)
+        }
+      } catch (error) {
+        console.error("Failed to load messages from storage:", error)
+      } finally {
+        setIsLoadingFromStorage(false)
+      }
+    }
+
+    loadStoredMessages()
+  }, [])
+
+  // Save messages to session storage whenever they change
+  React.useEffect(() => {
+    // Don't save during initial load
+    if (isLoadingFromStorage) {
+      return
+    }
+
+    // Save to session storage
+    saveChatMessages(messages).catch((error) => {
+      console.error("Failed to save messages to storage:", error)
+    })
+  }, [messages, isLoadingFromStorage])
 
   // Notify parent when messages change
   React.useEffect(() => {
@@ -241,6 +281,9 @@ export function AISearchBar({
     // Clear local messages
     setMessages([])
 
+    // Clear session storage
+    await clearChatMessages()
+
     // Clear handled clarifications
     setHandledClarifications(new Set())
 
@@ -263,7 +306,7 @@ export function AISearchBar({
     // Clear input length tracker
     setCurrentInputLength(0)
 
-    console.log(" [AISearchBar] Chat cleared")
+    console.log(" [AISearchBar] Chat cleared (including session storage)")
   }
 
   // Check and update token usage
