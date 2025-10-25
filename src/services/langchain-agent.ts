@@ -116,6 +116,7 @@ Important:
 - Keep responses concise (2-3 sentences when possible)
 - Always protect user privacy - all data stays on their device
 - If a tool returns an error, explain it to the user helpfully
+- When user asks about any sensitive information, dont aware them because all data is stored locally and securely. Give them the information directly if you found in notes.
 - When asked about "how many notes" or "statistics", use the get_statistics tool`
 
 // ============================================================================
@@ -471,7 +472,10 @@ export class MindKeepAgent {
 
     try {
       const conversationText = messages
-        .map((msg) => `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`)
+        .map(
+          (msg) =>
+            `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`
+        )
         .join("\n")
 
       const summaryPrompt = `Summarize this conversation in 2-3 sentences, preserving key topics and context:
@@ -485,7 +489,9 @@ Provide ONLY the summary, no preamble.`
         topK: 1
       })
 
-      console.log(` [Session Rotation] Context summary created: ${summary.length} chars`)
+      console.log(
+        ` [Session Rotation] Context summary created: ${summary.length} chars`
+      )
       return summary.trim()
     } catch (error) {
       console.error(" [Session Rotation] Failed to create summary:", error)
@@ -531,7 +537,9 @@ Provide ONLY the summary, no preamble.`
       })
 
       console.log(`✅ [Agent] Session rotated successfully: ${this.sessionId}`)
-      console.log(` [Agent] Context preserved: "${summary.substring(0, 100)}..."`)
+      console.log(
+        ` [Agent] Context preserved: "${summary.substring(0, 100)}..."`
+      )
     } catch (error) {
       console.error("❌ [Agent] Session rotation failed:", error)
       // Fallback to simple clear
@@ -745,7 +753,9 @@ When helping users:
 
         try {
           await this.rotateSessionWithSummary()
-          console.log(`✅ [Agent] Session rotation complete. Ready to continue.`)
+          console.log(
+            `✅ [Agent] Session rotation complete. Ready to continue.`
+          )
         } catch (error) {
           console.error(`❌ [Agent] Session rotation failed:`, error)
           console.log(`⚠️ [Agent] Falling back to simple session clear...`)
@@ -1037,7 +1047,10 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
   async *runStream(
     input: string,
     conversationHistory?: Array<{ role: string; content: string }>
-  ): AsyncGenerator<{ type: "chunk" | "complete"; data: string | AgentResponse }> {
+  ): AsyncGenerator<{
+    type: "chunk" | "complete"
+    data: string | AgentResponse
+  }> {
     if (!this.sessionId) {
       throw new Error("Agent not initialized. Call initialize() first.")
     }
@@ -1050,7 +1063,9 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
     // Check and auto-rotate session if needed
     const usage = GeminiNanoService.getSessionTokenUsage(this.sessionId)
     if (usage && usage.percentage >= 80) {
-      console.log(`🔄 [Agent Stream] Auto-rotating session at ${usage.percentage.toFixed(1)}%...`)
+      console.log(
+        `🔄 [Agent Stream] Auto-rotating session at ${usage.percentage.toFixed(1)}%...`
+      )
       await this.rotateSessionWithSummary()
     }
 
@@ -1067,7 +1082,10 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
 
         // Extract note IDs
         const searchResult = toolResults.find((t) => t.tool === "search_notes")
-        if (searchResult?.result?.notes && Array.isArray(searchResult.result.notes)) {
+        if (
+          searchResult?.result?.notes &&
+          Array.isArray(searchResult.result.notes)
+        ) {
           referenceNotes = searchResult.result.notes.map((note: any) => note.id)
         }
       }
