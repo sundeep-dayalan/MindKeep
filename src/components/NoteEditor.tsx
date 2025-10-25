@@ -204,7 +204,7 @@ export function NoteEditor({
           value={title}
           onChange={(e) => onTitleChange(e.target.value)}
           placeholder="Untitled Note"
-          className="plasmo-flex-1 plasmo-text-lg plasmo-font-semibold plasmo-text-slate-900 plasmo-bg-transparent plasmo-border-none focus:plasmo-outline-none placeholder:plasmo-text-slate-400"
+          className="plasmo-flex-1 plasmo-text-lg plasmo-font-normal plasmo-text-slate-900 plasmo-bg-transparent plasmo-border-none focus:plasmo-outline-none placeholder:plasmo-text-slate-400"
         />
         <button
           onClick={handleGenerateTitle}
