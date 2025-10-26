@@ -33,10 +33,7 @@ function isContentScript(): boolean {
 /**
  * Send a message to the offscreen document and wait for response
  */
-async function sendToOffscreen<T>(
-  type: string,
-  payload: any = {}
-): Promise<T> {
+async function sendToOffscreen<T>(type: string, payload: any = {}): Promise<T> {
   try {
     const response = await chrome.runtime.sendMessage({
       type,
@@ -214,7 +211,9 @@ export async function getActivePersona(): Promise<Persona | null> {
 /**
  * Add a new persona
  */
-export async function addPersona(persona: Omit<Persona, "id">): Promise<string> {
+export async function addPersona(
+  persona: Omit<Persona, "id">
+): Promise<string> {
   if (isContentScript()) {
     console.log("📡 [DB Proxy] Routing addPersona to offscreen")
     return await sendToOffscreen("DB_ADD_PERSONA", { persona })

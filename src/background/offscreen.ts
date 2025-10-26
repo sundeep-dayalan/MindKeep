@@ -102,7 +102,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case "DB_GET_STATISTICS": {
           console.log("📊 [Offscreen] Getting database statistics")
           const stats = await dbService.getDatabaseStatistics()
-          console.log(`✅ [Offscreen] Stats: ${stats.totalNotes} notes, ${stats.categories.length} categories`)
+          console.log(
+            `✅ [Offscreen] Stats: ${stats.totalNotes} notes, ${stats.categories.length} categories`
+          )
           sendResponse({ success: true, data: stats })
           break
         }
@@ -167,9 +169,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         case "AI_GENERATE_EMBEDDING": {
           const { text } = message.payload
-          console.log(`🤖 [Offscreen] Generating embedding for text (${text.length} chars)`)
+          console.log(
+            `🤖 [Offscreen] Generating embedding for text (${text.length} chars)`
+          )
           const embedding = await generateEmbedding(text)
-          console.log(`✅ [Offscreen] Generated embedding (${embedding.length} dimensions)`)
+          console.log(
+            `✅ [Offscreen] Generated embedding (${embedding.length} dimensions)`
+          )
           sendResponse({ success: true, data: embedding })
           break
         }
