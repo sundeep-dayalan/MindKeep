@@ -388,30 +388,38 @@ export class MindKeepAgent {
    */
   async setPersona(persona: Persona | null): Promise<void> {
     console.log(
-      " [Agent] setPersona called with:",
+      "🎭 [Agent] setPersona called with:",
       persona?.name || "null (default mode)"
     )
+    console.log("🎭 [Agent] Current state before change:", {
+      currentPersona: this.activePersona?.name || "None",
+      currentMode: this.mode,
+      currentSessionId: this.sessionId
+    })
 
     this.activePersona = persona
     this.mode = persona ? AgentMode.PERSONA : AgentMode.DEFAULT
 
     // Destroy old session and create new one with updated system prompt
-    console.log(" [Agent] Recreating session due to persona change")
+    console.log("🎭 [Agent] Recreating session due to persona change")
 
     if (this.sessionId) {
+      console.log("🎭 [Agent] Destroying old session:", this.sessionId)
       await GeminiNanoService.destroySession(this.sessionId)
     }
 
     // Create new session with updated system prompt
+    console.log("🎭 [Agent] Creating new session...")
     this.sessionId = await GeminiNanoService.createSession({
       systemPrompt: this.buildSystemPrompt(),
       temperature: this.temperature,
       topK: this.topK
     })
 
-    console.log(` [Agent] Mode set to: ${this.mode}`)
-    console.log(` [Agent] Active persona: ${persona?.name || "None"}`)
-    console.log(` [Agent] New session: ${this.sessionId}`)
+    console.log(`🎭 [Agent] Mode set to: ${this.mode}`)
+    console.log(`🎭 [Agent] Active persona: ${persona?.name || "None"}`)
+    console.log(`🎭 [Agent] New session: ${this.sessionId}`)
+    console.log("🎭 [Agent] setPersona completed successfully")
   }
 
   /**
@@ -876,10 +884,31 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
 
         console.log("[Agent] Conversational response:", responseText)
 
+        // CRITICAL: Ensure response is clean text, not JSON
+        let cleanResponse = responseText?.trim() || ""
+
+        // If response accidentally contains JSON (starts with {), extract the actual message
+        if (cleanResponse.startsWith("{")) {
+          console.warn(
+            "[Agent] Response contains JSON, attempting to extract message"
+          )
+          try {
+            const parsed = JSON.parse(cleanResponse)
+            // Look for common response fields
+            cleanResponse =
+              parsed.aiResponse ||
+              parsed.message ||
+              parsed.note_content ||
+              cleanResponse
+          } catch (e) {
+            console.error("[Agent] Failed to parse JSON response:", e)
+          }
+        }
+
         return {
           extractedData: null,
           referenceNotes: [],
-          aiResponse: responseText?.trim(),
+          aiResponse: cleanResponse,
           dataType: "text",
           confidence: 1.0
         }
@@ -1131,13 +1160,34 @@ Your response (PLAIN TEXT ONLY, NO JSON):`
           yield { type: "chunk", data: chunk }
         }
 
+        // CRITICAL: Ensure response is clean text, not JSON
+        let cleanResponse = fullResponse.trim()
+
+        // If response accidentally contains JSON (starts with {), extract the actual message
+        if (cleanResponse.startsWith("{")) {
+          console.warn(
+            "[Agent Stream] Response contains JSON, attempting to extract message"
+          )
+          try {
+            const parsed = JSON.parse(cleanResponse)
+            // Look for common response fields
+            cleanResponse =
+              parsed.aiResponse ||
+              parsed.message ||
+              parsed.note_content ||
+              cleanResponse
+          } catch (e) {
+            console.error("[Agent Stream] Failed to parse JSON response:", e)
+          }
+        }
+
         // Yield complete response
         yield {
           type: "complete",
           data: {
             extractedData: null,
             referenceNotes: [],
-            aiResponse: fullResponse.trim(),
+            aiResponse: cleanResponse,
             dataType: "text",
             confidence: 1.0
           }

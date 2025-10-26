@@ -184,6 +184,11 @@ export function AISearchBar({
     new Set()
   )
 
+  // Track copied message ID for visual feedback
+  const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(
+    null
+  )
+
   // Store the rich content JSON when user submits (to preserve formatting)
   const [lastSubmittedContentJSON, setLastSubmittedContentJSON] =
     React.useState<any>(null)
@@ -249,21 +254,50 @@ export function AISearchBar({
     scrollToBottom()
   }, [messages])
 
+  // Handle copying AI message content
+  const handleCopyMessage = async (messageId: string, content: string) => {
+    try {
+      await navigator.clipboard.writeText(content)
+      setCopiedMessageId(messageId)
+
+      // Reset copied state after 2 seconds
+      setTimeout(() => {
+        setCopiedMessageId(null)
+      }, 2000)
+
+      console.log("📋 [AISearchBar] Message copied to clipboard")
+    } catch (error) {
+      console.error("❌ [AISearchBar] Failed to copy message:", error)
+    }
+  }
+
   // Handle persona changes
   const handlePersonaChange = async (
     persona: Persona | null,
     isManualChange: boolean = true
   ) => {
     console.log(
-      " [AISearchBar] Persona changed to:",
+      "🎭 [AISearchBar] handlePersonaChange called:",
       persona?.name || "Default Mode",
       isManualChange ? "(manual)" : "(auto-restored)"
     )
 
     try {
       // Update the global agent with the new persona
+      console.log("🎭 [AISearchBar] Getting global agent...")
       const agent = await getGlobalAgent()
+
+      console.log("🎭 [AISearchBar] Calling agent.setPersona()...")
       await agent.setPersona(persona) // Now async - recreates session
+
+      console.log("🎭 [AISearchBar] Verifying persona was set...")
+      const currentPersona = agent.getPersona()
+      const currentMode = agent.getMode()
+      console.log("🎭 [AISearchBar] Agent state after setPersona:", {
+        personaName: currentPersona?.name || "None",
+        mode: currentMode,
+        sessionId: agent.getSessionId()
+      })
 
       // Clear chat history when switching personas
       setMessages([])
@@ -277,16 +311,16 @@ export function AISearchBar({
           id: `system-${Date.now()}`,
           type: "ai",
           content: persona
-            ? ` Switched to ${persona.name} persona. Conversation history cleared.\n\n${persona.description}`
-            : " Switched to Default Mode. Full tool access restored.",
+            ? `🎭 Switched to ${persona.name} persona. Conversation history cleared.\n\n${persona.description}`
+            : "🎭 Switched to Default Mode. Full tool access restored.",
           timestamp: Date.now()
         }
         setMessages([systemMessage])
       }
 
-      console.log(" [AISearchBar] Agent persona updated successfully")
+      console.log("🎭 [AISearchBar] Agent persona updated successfully")
     } catch (error) {
-      console.error(" [AISearchBar] Error updating agent persona:", error)
+      console.error("🎭 [AISearchBar] Error updating agent persona:", error)
     }
   }
 
@@ -1691,7 +1725,51 @@ export function AISearchBar({
                           )}
                         </div>
                       ) : (
-                        <MarkdownRenderer content={message.content} />
+                        <div className="plasmo-relative plasmo-group">
+                          <MarkdownRenderer content={message.content} />
+
+                          {/* Copy Button - Appears on hover */}
+                          <button
+                            onClick={() =>
+                              handleCopyMessage(message.id, message.content)
+                            }
+                            className="plasmo-absolute plasmo-top-2 plasmo-right-2 plasmo-p-1.5 plasmo-rounded-md plasmo-bg-white/80 hover:plasmo-bg-white plasmo-border plasmo-border-slate-200 plasmo-shadow-sm plasmo-opacity-0 group-hover:plasmo-opacity-100 plasmo-transition-all plasmo-duration-200"
+                            title={
+                              copiedMessageId === message.id
+                                ? "Copied!"
+                                : "Copy response"
+                            }>
+                            {copiedMessageId === message.id ? (
+                              // Checkmark icon (copied state)
+                              <svg
+                                className="plasmo-w-3.5 plasmo-h-3.5 plasmo-text-green-600"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2.5}
+                                  d="M5 13l4 4L19 7"
+                                />
+                              </svg>
+                            ) : (
+                              // Copy icon (default state)
+                              <svg
+                                className="plasmo-w-3.5 plasmo-h-3.5 plasmo-text-slate-600"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                                />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>

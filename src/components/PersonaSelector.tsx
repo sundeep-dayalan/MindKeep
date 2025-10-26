@@ -34,16 +34,17 @@ export function PersonaSelector({
   const [isInitializing, setIsInitializing] = useState(true) // Start as true - we're loading
 
   useEffect(() => {
-    console.log(" [PersonaSelector] Component mounted, loading personas")
+    console.log("🎭 [PersonaSelector] Component mounted, loading personas")
+    console.log(
+      "🎭 [PersonaSelector] onPersonaChange callback exists?",
+      !!onPersonaChange
+    )
+    console.log("🎭 [PersonaSelector] Callback type:", typeof onPersonaChange)
     loadPersonas()
   }, [])
 
   // Listen for persona changes from other contexts (in-page chat, other tabs)
   useEffect(() => {
-    console.log(
-      " [PersonaSelector] Setting up storage listener for persona sync"
-    )
-
     const handleStorageChange = async (
       changes: { [key: string]: chrome.storage.StorageChange },
       areaName: string
@@ -59,9 +60,7 @@ export function PersonaSelector({
         })
 
         // Check if selectedPersonaId changed
-        if (
-          newSettings?.selectedPersonaId !== oldSettings?.selectedPersonaId
-        ) {
+        if (newSettings?.selectedPersonaId !== oldSettings?.selectedPersonaId) {
           console.log(
             " [PersonaSelector] Selected persona changed to:",
             newSettings?.selectedPersonaId
@@ -186,17 +185,18 @@ export function PersonaSelector({
 
   const restoreSavedPersona = async (allPersonas: Persona[]) => {
     try {
+      console.log("🎭 [PersonaSelector] restoreSavedPersona called")
       const savedPersonaId = await getSelectedPersonaId()
 
       if (!savedPersonaId) {
         console.log(
-          " [PersonaSelector] No saved persona, staying in default mode"
+          "🎭 [PersonaSelector] No saved persona, staying in default mode"
         )
         return
       }
 
       console.log(
-        " [PersonaSelector] Restoring saved persona ID:",
+        "🎭 [PersonaSelector] Restoring saved persona ID:",
         savedPersonaId
       )
 
@@ -204,7 +204,7 @@ export function PersonaSelector({
 
       if (savedPersona) {
         console.log(
-          " [PersonaSelector] Found saved persona:",
+          "🎭 [PersonaSelector] Found saved persona:",
           savedPersona.name
         )
 
@@ -214,13 +214,23 @@ export function PersonaSelector({
         // Notify parent to update agent (isManualChange = false for restoration)
         if (onPersonaChange) {
           console.log(
-            " [PersonaSelector] Notifying parent of restored persona (silent)"
+            "🎭 [PersonaSelector] Calling onPersonaChange callback with restored persona"
           )
+          console.log("🎭 [PersonaSelector] Persona data:", {
+            id: savedPersona.id,
+            name: savedPersona.name,
+            isManualChange: false
+          })
           onPersonaChange(savedPersona, false) // false = don't show "Switched to..." message
+          console.log("🎭 [PersonaSelector] onPersonaChange callback completed")
+        } else {
+          console.warn(
+            "🎭 [PersonaSelector] No onPersonaChange callback provided!"
+          )
         }
       } else {
         console.log(
-          " [PersonaSelector] Saved persona not found in database, clearing selection"
+          "🎭 [PersonaSelector] Saved persona not found in database, clearing selection"
         )
         // Clear invalid saved persona from storage only
         const { setSelectedPersona } = await import(
@@ -229,7 +239,10 @@ export function PersonaSelector({
         await setSelectedPersona(null)
       }
     } catch (error) {
-      console.error(" [PersonaSelector] Error restoring saved persona:", error)
+      console.error(
+        "🎭 [PersonaSelector] Error restoring saved persona:",
+        error
+      )
     }
   }
 
@@ -355,9 +368,12 @@ export function PersonaSelector({
           />
 
           {/* Menu Panel - Opens UPWARD or DOWNWARD - Compact Style */}
-          <div className={`plasmo-absolute plasmo-left-0 plasmo-w-[260px] plasmo-bg-white plasmo-border plasmo-border-slate-200 plasmo-rounded-lg plasmo-shadow-xl plasmo-z-[101] plasmo-max-h-[500px] plasmo-overflow-hidden plasmo-flex plasmo-flex-col ${
-            openUpward ? "plasmo-bottom-full plasmo-mb-2" : "plasmo-top-full plasmo-mt-2"
-          }`}>
+          <div
+            className={`plasmo-absolute plasmo-left-0 plasmo-w-[260px] plasmo-bg-white plasmo-border plasmo-border-slate-200 plasmo-rounded-lg plasmo-shadow-xl plasmo-z-[101] plasmo-max-h-[500px] plasmo-overflow-hidden plasmo-flex plasmo-flex-col ${
+              openUpward
+                ? "plasmo-bottom-full plasmo-mb-2"
+                : "plasmo-top-full plasmo-mt-2"
+            }`}>
             {/* Header */}
             <div className="plasmo-px-3 plasmo-py-2.5 plasmo-border-b plasmo-border-slate-100 plasmo-bg-slate-50 plasmo-flex plasmo-items-center plasmo-justify-between">
               <h3 className="plasmo-text-xs plasmo-font-semibold plasmo-text-slate-700">
@@ -395,7 +411,9 @@ export function PersonaSelector({
             </div>
 
             {/* Scrollable Content */}
-            <div className="plasmo-overflow-y-auto plasmo-flex-1 plasmo-max-h-[400px]" style={{ overflowY: 'auto' }}>
+            <div
+              className="plasmo-overflow-y-auto plasmo-flex-1 plasmo-max-h-[400px]"
+              style={{ overflowY: "auto" }}>
               {/* Default Mode Option */}
               <button
                 onClick={() => handleSelect(null)}

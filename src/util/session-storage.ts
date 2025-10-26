@@ -37,7 +37,10 @@ export interface ChatMetadata {
 function isContentScript(): boolean {
   try {
     // Content scripts have window object, extension pages don't
-    return typeof window !== 'undefined' && window.location.protocol.startsWith('http')
+    return (
+      typeof window !== "undefined" &&
+      window.location.protocol.startsWith("http")
+    )
   } catch {
     return false
   }
@@ -55,7 +58,9 @@ export async function saveChatMessages(messages: ChatMessage[]): Promise<void> {
         type: "SESSION_STORAGE_SAVE",
         data: { messages }
       })
-      console.log(`💾 [Session Storage] Saved ${messages.length} chat messages (via background)`)
+      console.log(
+        `💾 [Session Storage] Saved ${messages.length} chat messages (via background)`
+      )
     } else {
       // Direct access from extension context
       await chrome.storage.session.set({
@@ -85,13 +90,19 @@ export async function loadChatMessages(): Promise<ChatMessage[]> {
         type: "SESSION_STORAGE_LOAD"
       })
       const messages = response?.messages || []
-      console.log(`📥 [Session Storage] Loaded ${messages.length} chat messages (via background)`)
+      console.log(
+        `📥 [Session Storage] Loaded ${messages.length} chat messages (via background)`
+      )
       return messages
     } else {
       // Direct access from extension context
-      const result = await chrome.storage.session.get(STORAGE_KEYS.AI_CHAT_MESSAGES)
+      const result = await chrome.storage.session.get(
+        STORAGE_KEYS.AI_CHAT_MESSAGES
+      )
       const messages = result[STORAGE_KEYS.AI_CHAT_MESSAGES] || []
-      console.log(`📥 [Session Storage] Loaded ${messages.length} chat messages`)
+      console.log(
+        `📥 [Session Storage] Loaded ${messages.length} chat messages`
+      )
       return messages
     }
   } catch (error) {
@@ -140,7 +151,9 @@ export async function getChatMetadata(): Promise<ChatMetadata | null> {
       return response?.metadata || null
     } else {
       // Direct access from extension context
-      const result = await chrome.storage.session.get(STORAGE_KEYS.AI_CHAT_METADATA)
+      const result = await chrome.storage.session.get(
+        STORAGE_KEYS.AI_CHAT_METADATA
+      )
       return result[STORAGE_KEYS.AI_CHAT_METADATA] || null
     }
   } catch (error) {
