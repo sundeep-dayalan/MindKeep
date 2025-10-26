@@ -17,7 +17,7 @@ const STORAGE_KEYS = {
 
 export interface ChatMessage {
   id: string
-  type: "user" | "ai"
+  type: "user" | "ai" | "system" // Added "system" for session management notices
   content: string
   timestamp: number
   clarificationOptions?: any

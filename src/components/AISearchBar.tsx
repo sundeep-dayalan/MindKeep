@@ -34,7 +34,7 @@ function getTimeBasedGreeting(): string {
 
 interface Message {
   id: string
-  type: "user" | "ai"
+  type: "user" | "ai" | "system" // Added "system" for compaction notices
   content: string
   timestamp: number
   clarificationOptions?: AgentResponse["clarificationOptions"]
@@ -366,10 +366,15 @@ export function AISearchBar({
   // Validate if input would exceed safe token limits
   const validateInputSize = (
     inputText: string
-  ): { valid: boolean; reason?: string } => {
+  ): {
+    valid: boolean
+    reason?: string
+    needsCompaction?: boolean
+    compactionThreshold?: number
+  } => {
     const estimatedInputTokens = estimateTokens(inputText)
     const MAX_INPUT_TOKENS = 2000 // Safe threshold for single message (leaves room for response)
-    const SAFE_SESSION_THRESHOLD = 7000 // Don't allow new messages if session already at 7000 tokens
+    const COMPACTION_THRESHOLD = 0.7 // Auto-compact at 70% usage (before 80% critical threshold)
 
     // Check 1: Input itself is too large
     if (estimatedInputTokens > MAX_INPUT_TOKENS) {
@@ -379,21 +384,29 @@ export function AISearchBar({
       }
     }
 
-    // Check 2: Session already too full
-    if (tokenUsage && tokenUsage.usage >= SAFE_SESSION_THRESHOLD) {
-      return {
-        valid: false,
-        reason: `Session limit reached (${tokenUsage.usage}/${tokenUsage.quota} tokens). Please start a new chat.`
-      }
-    }
-
-    // Check 3: Combined would exceed quota
+    // Check 2: Session approaching limit - trigger auto-compaction instead of blocking
     if (tokenUsage) {
+      const currentUsagePercent = tokenUsage.usage / tokenUsage.quota
       const projectedTotal = tokenUsage.usage + estimatedInputTokens + 500 // +500 for response
-      if (projectedTotal > tokenUsage.quota) {
+
+      // If we're at 70%+ usage, suggest compaction (seamless, non-blocking)
+      if (currentUsagePercent >= COMPACTION_THRESHOLD) {
+        console.log(
+          `🔄 [Token Management] Session at ${(currentUsagePercent * 100).toFixed(1)}% - auto-compaction recommended`
+        )
+        return {
+          valid: true,
+          needsCompaction: true,
+          compactionThreshold: currentUsagePercent
+        }
+      }
+
+      // If input would exceed quota even after compaction, block it
+      if (projectedTotal > tokenUsage.quota * 1.2) {
+        // Allow 20% overshoot for safety
         return {
           valid: false,
-          reason: `Input would exceed token limit (~${estimatedInputTokens} tokens). ${Math.floor(tokenUsage.quota - tokenUsage.usage - 500)} tokens remaining.`
+          reason: `Input too large for current session. Try a shorter message or start a new chat.`
         }
       }
     }
@@ -427,6 +440,89 @@ export function AISearchBar({
       setCurrentInputLength(0)
 
       return // Block submission if validation fails
+    }
+
+    // Auto-compact session if approaching token limit
+    if (validation.needsCompaction) {
+      const compactionPercent = (
+        (validation.compactionThreshold || 0) * 100
+      ).toFixed(1)
+      console.log(
+        `🔄 [Auto-Compaction] Session at ${compactionPercent}% usage - compacting now...`
+      )
+
+      // Show compaction notice to user (non-blocking)
+      const compactionNotice: Message = {
+        id: `compaction-notice-${Date.now()}`,
+        type: "system",
+        content: `Optimizing conversation history (${compactionPercent}% capacity used)...`,
+        timestamp: Date.now()
+      }
+      setMessages((prev) => [...prev, compactionNotice])
+
+      try {
+        // Get agent instance and trigger session rotation with summary
+        const agent = await getGlobalAgent()
+        await agent.rotateSessionWithSummary()
+
+        // Update success message
+        const successMessage: Message = {
+          id: `compaction-success-${Date.now()}`,
+          type: "system",
+          content: `Session optimized! Your conversation context has been preserved. Continuing...`,
+          timestamp: Date.now()
+        }
+        setMessages((prev) => [...prev, successMessage])
+
+        console.log(
+          `✅ [Auto-Compaction] Session compacted successfully. Ready to continue.`
+        )
+
+        // Refresh token usage after compaction
+        const { getSessionTokenUsage } = await import(
+          "~services/gemini-nano-service"
+        )
+        const sessionId = agent.getSessionId()
+        if (sessionId) {
+          const newUsage = getSessionTokenUsage(sessionId)
+          if (newUsage) {
+            setTokenUsage(newUsage)
+            console.log(
+              ` [Token Usage] After compaction: ${newUsage.usage}/${newUsage.quota} tokens (${newUsage.percentage.toFixed(1)}%)`
+            )
+          }
+        }
+      } catch (error) {
+        console.error(`❌ [Auto-Compaction] Failed:`, error)
+
+        // Fallback to simple clear if compaction fails
+        const fallbackMessage: Message = {
+          id: `compaction-fallback-${Date.now()}`,
+          type: "system",
+          content: `Session reset to free up space. Previous context cleared.`,
+          timestamp: Date.now()
+        }
+        setMessages((prev) => [...prev, fallbackMessage])
+
+        try {
+          const agent = await getGlobalAgent()
+          await agent.clearSession()
+
+          // Refresh token usage after clear
+          const { getSessionTokenUsage } = await import(
+            "~services/gemini-nano-service"
+          )
+          const sessionId = agent.getSessionId()
+          if (sessionId) {
+            const newUsage = getSessionTokenUsage(sessionId)
+            if (newUsage) {
+              setTokenUsage(newUsage)
+            }
+          }
+        } catch (clearError) {
+          console.error(`❌ [Session Clear] Failed:`, clearError)
+        }
+      }
     }
 
     if (query && onSearch && !isSearching) {
@@ -1530,6 +1626,21 @@ export function AISearchBar({
             })
             .map((message) => {
               const isExpanded = expandedMessages.has(message.id)
+              const isSystemMessage = message.type === "system"
+
+              // System messages get special centered styling
+              if (isSystemMessage) {
+                return (
+                  <div
+                    key={message.id}
+                    className="plasmo-flex plasmo-justify-center plasmo-my-2">
+                    <div className="plasmo-px-4 plasmo-py-2 plasmo-rounded-full plasmo-bg-blue-50/80 plasmo-backdrop-blur-md plasmo-text-blue-700 plasmo-border plasmo-border-blue-200/50 plasmo-text-xs plasmo-font-medium plasmo-shadow-sm">
+                      {message.content}
+                    </div>
+                  </div>
+                )
+              }
+
               return (
                 <div key={message.id} className="plasmo-space-y-2">
                   <div
@@ -1585,66 +1696,66 @@ export function AISearchBar({
                     </div>
                   </div>
 
-                {/* Clarification Options - Only show if not handled */}
-                {message.clarificationOptions &&
-                  message.clarificationOptions.length > 0 &&
-                  !handledClarifications.has(message.id) && (
-                    <div className="plasmo-flex plasmo-justify-start">
-                      <div className="plasmo-max-w-[80%] plasmo-space-y-2">
-                        <div className="plasmo-text-xs plasmo-font-light plasmo-text-slate-600 plasmo-pl-2">
-                          Choose an option:
-                        </div>
-                        <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-2">
-                          {message.clarificationOptions.map((option, idx) => {
-                            // Debug logging
-                            if (idx === 0) {
-                              console.log(
-                                "🎨 [AISearchBar] Rendering clarification buttons for message:",
-                                {
-                                  messageId: message.id,
-                                  optionCount:
-                                    message.clarificationOptions.length,
-                                  isHandled: handledClarifications.has(
-                                    message.id
-                                  ),
-                                  options: message.clarificationOptions
-                                }
+                  {/* Clarification Options - Only show if not handled */}
+                  {message.clarificationOptions &&
+                    message.clarificationOptions.length > 0 &&
+                    !handledClarifications.has(message.id) && (
+                      <div className="plasmo-flex plasmo-justify-start">
+                        <div className="plasmo-max-w-[80%] plasmo-space-y-2">
+                          <div className="plasmo-text-xs plasmo-font-light plasmo-text-slate-600 plasmo-pl-2">
+                            Choose an option:
+                          </div>
+                          <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-2">
+                            {message.clarificationOptions.map((option, idx) => {
+                              // Debug logging
+                              if (idx === 0) {
+                                console.log(
+                                  "🎨 [AISearchBar] Rendering clarification buttons for message:",
+                                  {
+                                    messageId: message.id,
+                                    optionCount:
+                                      message.clarificationOptions.length,
+                                    isHandled: handledClarifications.has(
+                                      message.id
+                                    ),
+                                    options: message.clarificationOptions
+                                  }
+                                )
+                              }
+                              return (
+                                <button
+                                  key={idx}
+                                  disabled={isSearching}
+                                  onClick={() =>
+                                    handleClarificationOption(
+                                      option.action,
+                                      option.value,
+                                      message.pendingNoteData,
+                                      message.id
+                                    )
+                                  }
+                                  className={`${
+                                    option.type === "category_pill"
+                                      ? "plasmo-px-3 plasmo-py-1.5 plasmo-bg-blue-50 hover:plasmo-bg-blue-100 plasmo-text-blue-700 plasmo-border plasmo-border-blue-200 hover:plasmo-border-blue-300"
+                                      : "plasmo-px-4 plasmo-py-2 plasmo-bg-white/20 plasmo-backdrop-blur-sm hover:plasmo-bg-white/30 plasmo-text-slate-900 plasmo-border plasmo-border-white/40 hover:plasmo-border-white/50"
+                                  } plasmo-rounded-full plasmo-text-[12px] plasmo-font-normal plasmo-transition-all plasmo-cursor-pointer plasmo-shadow-sm hover:plasmo-shadow disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed`}>
+                                  {option.label}
+                                </button>
                               )
-                            }
-                            return (
-                              <button
-                                key={idx}
-                                disabled={isSearching}
-                                onClick={() =>
-                                  handleClarificationOption(
-                                    option.action,
-                                    option.value,
-                                    message.pendingNoteData,
-                                    message.id
-                                  )
-                                }
-                                className={`${
-                                  option.type === "category_pill"
-                                    ? "plasmo-px-3 plasmo-py-1.5 plasmo-bg-blue-50 hover:plasmo-bg-blue-100 plasmo-text-blue-700 plasmo-border plasmo-border-blue-200 hover:plasmo-border-blue-300"
-                                    : "plasmo-px-4 plasmo-py-2 plasmo-bg-white/20 plasmo-backdrop-blur-sm hover:plasmo-bg-white/30 plasmo-text-slate-900 plasmo-border plasmo-border-white/40 hover:plasmo-border-white/50"
-                                } plasmo-rounded-full plasmo-text-[12px] plasmo-font-normal plasmo-transition-all plasmo-cursor-pointer plasmo-shadow-sm hover:plasmo-shadow disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed`}>
-                                {option.label}
-                              </button>
-                            )
-                          })}
+                            })}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                {/* Reference Notes */}
-                {message.referenceNotes &&
-                  message.referenceNotes.length > 0 && (
-                    <ReferenceNotesSection
-                      notes={message.referenceNotes}
-                      onNoteClick={onNoteClick}
-                    />
-                  )}
+                  {/* Reference Notes */}
+                  {message.referenceNotes &&
+                    message.referenceNotes.length > 0 && (
+                      <ReferenceNotesSection
+                        notes={message.referenceNotes}
+                        onNoteClick={onNoteClick}
+                      />
+                    )}
                 </div>
               )
             })}
@@ -1708,7 +1819,11 @@ export function AISearchBar({
                 setCurrentInputLength(currentText.length)
 
                 // Reset insert button when user starts typing (back to send mode)
-                if (enableInsertMode && showInsertButton && currentText.length > 0) {
+                if (
+                  enableInsertMode &&
+                  showInsertButton &&
+                  currentText.length > 0
+                ) {
                   setShowInsertButton(false)
                 }
               }}
@@ -1756,16 +1871,15 @@ export function AISearchBar({
                     ? "Loading persona..."
                     : currentInputLength > 8000
                       ? "Input too large (max 8000 chars)"
-                      : tokenUsage && tokenUsage.usage >= 7000
-                        ? "Session limit reached - start new chat"
+                      : tokenUsage && tokenUsage.percentage >= 70
+                        ? `Session at ${tokenUsage.percentage.toFixed(0)}% capacity - will auto-optimize`
                         : "Send (Enter)"
               }
               disabled={
                 isPersonaInitializing ||
                 isSearching ||
                 isInputDisabled ||
-                currentInputLength > 8000 ||
-                (tokenUsage !== null && tokenUsage.usage >= 7000)
+                currentInputLength > 8000
               }>
               {showInsertButton && enableInsertMode ? (
                 // Insert icon
