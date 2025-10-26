@@ -1326,25 +1326,33 @@ NOTE: You are in PERSONA mode. You can ONLY search and read notes. You CANNOT cr
 - create_note_from_chat: Create a NEW note from the conversation. Use when user wants to ADD, SAVE, CREATE, or MAKE a note. Keywords: "add note", "save note", "create note", "make note", "add this", "save this", "new note".
 - none: ONLY for greetings (hi, hello, thanks) or meta questions about the conversation itself (what did we talk about?).`
 
-    // Build OPTIMIZED conversation context for note creation detection
-    // Use raw history for full content, but optimize for session to prevent token overflow
+    // Build conversation context for note creation detection
+    // For "save that/this as note" queries, we need FULL content from recent messages
+    // Use the last 5 messages with their FULL content (with reasonable per-message limit)
     let conversationContext = ""
     if (this.rawConversationHistory && this.rawConversationHistory.length > 0) {
-      const recentHistory = buildOptimizedSessionHistory(
-        this.rawConversationHistory,
-        query,
-        2000 // Limit context to 2000 tokens for tool selection
-      )
+      // For tool selection, we need the FULL content from recent messages
+      // to properly extract what the user wants to save as a note
+      const recentMessages = this.rawConversationHistory.slice(-5)
 
-      if (recentHistory.length > 0) {
+      console.log(`[Tool Selection] Building conversation context from ${recentMessages.length} recent messages`)
+
+      if (recentMessages.length > 0) {
         conversationContext =
           "\n\nRecent conversation:\n" +
-          recentHistory
-            .map(
-              (msg) =>
-                `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`
-            )
+          recentMessages
+            .map((msg, idx) => {
+              // Apply a reasonable per-message limit (2000 chars) to prevent token overflow
+              // but keep enough content for proper extraction
+              const content = msg.content.length > 2000
+                ? msg.content.substring(0, 2000) + "... [truncated]"
+                : msg.content
+              console.log(`[Tool Selection] Message ${idx} (${msg.role}): ${content.substring(0, 100)}...`)
+              return `${msg.role === "user" ? "User" : "Assistant"}: ${content}`
+            })
             .join("\n")
+
+        console.log(`[Tool Selection] Conversation context length: ${conversationContext.length} chars`)
       }
     }
 
@@ -1354,7 +1362,7 @@ RULES:
 - FIND/SEARCH/GET info → "search_notes" (optimize query: "my netflix password" → "netflix password")
 - "How many notes" / "statistics" → "get_statistics"
 - ADD/SAVE/CREATE note WITH actual content → "create_note_from_chat"
-- "add THAT/THIS as note" → extract from PREVIOUS user message in conversation below
+- "add THAT/THIS as note" → extract content from conversation context (look for the actual content the user is referring to)
 - User sends ACTUAL CONTENT after being asked "what to save" → "create_note_from_chat" (extract full content)
 - Greetings/small talk → "none"
 - **INTENT to create** (no actual content, just "I want to create a note") → "none" (let conversational AI ask for content)
@@ -1364,8 +1372,12 @@ create_note_from_chat CRITICAL:
 - If query is just "I want to create a note" or "I need to make a note" WITHOUT content → use "none"
 - If query contains ONLY action words like "create note", "add note", "save note" with no actual information → use "none"
 - **IMPORTANT**: If the PREVIOUS assistant message asked "What would you like the note to contain?" or "What would you like to save?", and the current user message contains substantial text (more than 20 characters), treat it as content to save → use "create_note_from_chat"
+- **CRITICAL for "save THAT/THIS" queries**: When user says "save that", "add this", "create that as note", etc., you MUST look through the conversation context to find the actual content they're referring to. Look for:
+  1. The most recent user message that contains substantial content (more than 20 characters, not just a greeting or question)
+  2. If the assistant recently provided information or quoted content, extract that content
+  3. The content to extract should be the actual information/text, NOT the current query phrase
 - note_content: FULL text from conversation or query, NO truncation/summary
-- note_content should NEVER be the action phrase itself (e.g., don't save "create a note" as content)
+- note_content should NEVER be the action phrase itself (e.g., don't save "can u create that as note" as content - extract the ACTUAL content being referenced)
 - note_title: null (unless user says "with title X")
 - note_category: null (unless user says "under X category")
 ${conversationContext}
@@ -1392,8 +1404,11 @@ Examples:
 - "add note" (NO content) → {"tool": "none"}
 - With context [Assistant: "What would you like the note to contain?"] + User sends actual content → {"tool": "create_note_from_chat", "note_content": "FULL CONTENT HERE", "note_title": null, "note_category": null}
 - With context [User: "Password: abc123"] + "add that as note" → {"tool": "create_note_from_chat", "note_content": "Password: abc123", "note_title": null, "note_category": null}
+- With context [User: "Gualberto Villarroel was born on 15 December 1908 in Villa Rivero..."] + "can u create that as note" → {"tool": "create_note_from_chat", "note_content": "Gualberto Villarroel was born on 15 December 1908 in Villa Rivero...", "note_title": null, "note_category": null}
 - "The sky is blue - save as note" → {"tool": "create_note_from_chat", "note_content": "The sky is blue", "note_title": null, "note_category": null}
 - "Meeting at 3pm with Sarah - add as note" → {"tool": "create_note_from_chat", "note_content": "Meeting at 3pm with Sarah", "note_title": null, "note_category": null}
+
+CRITICAL REMINDER: When extracting note_content from conversation context, find the ACTUAL content the user is referring to, NOT the current query phrase. Look through the conversation history carefully.
 
 Respond ONLY with JSON.`
 
@@ -1509,11 +1524,19 @@ Respond ONLY with JSON.`
             )
             return []
           }
+
+          // Debug logging for content extraction
+          console.log("[Agent] create_note_from_chat - parsed.note_content:", parsed.note_content)
+          console.log("[Agent] create_note_from_chat - this.lastUserMessage:", this.lastUserMessage)
+
+          const noteContent = parsed.note_content || this.lastUserMessage
+          console.log("[Agent] create_note_from_chat - final content:", noteContent)
+
           return [
             {
               name: "create_note_from_chat",
               params: {
-                content: parsed.note_content || this.lastUserMessage, // Use extracted content or fall back to last message
+                content: noteContent, // Use extracted content or fall back to last message
                 title: parsed.note_title || undefined, // Convert null to undefined
                 category: parsed.note_category || undefined, // Convert null to undefined
                 skipClarification: false

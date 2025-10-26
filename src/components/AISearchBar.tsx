@@ -170,6 +170,11 @@ export function AISearchBar({
     pendingNoteData?: AgentResponse["pendingNoteData"]
   }>({ type: null })
 
+  // Track which user messages are expanded
+  const [expandedMessages, setExpandedMessages] = React.useState<Set<string>>(
+    new Set()
+  )
+
   // Store the rich content JSON when user submits (to preserve formatting)
   const [lastSubmittedContentJSON, setLastSubmittedContentJSON] =
     React.useState<any>(null)
@@ -494,7 +499,9 @@ export function AISearchBar({
           }
 
           accumulatedText += chunk
-          console.log(`📡 [Streaming] Chunk received (${chunk.length} chars), total: ${accumulatedText.length}`)
+          console.log(
+            `📡 [Streaming] Chunk received (${chunk.length} chars), total: ${accumulatedText.length}`
+          )
           // Update the streaming message with accumulated text
           setMessages((prev) =>
             prev.map((m) =>
@@ -505,7 +512,11 @@ export function AISearchBar({
           )
         }
 
-        const aiResponse = await onSearch(query, conversationHistory, handleStreamChunk)
+        const aiResponse = await onSearch(
+          query,
+          conversationHistory,
+          handleStreamChunk
+        )
 
         // Stop streaming when complete
         setIsStreaming(false)
@@ -551,15 +562,18 @@ export function AISearchBar({
             pendingNoteData: aiResponse.pendingNoteData,
             referenceNotes: fullReferenceNotes
           }
-          
+
           // Debug logging
-          console.log("🔍 [AISearchBar] Creating AI message with clarifications:", {
-            hasClarificationOptions: !!aiResponse.clarificationOptions,
-            clarificationCount: aiResponse.clarificationOptions?.length || 0,
-            clarificationOptions: aiResponse.clarificationOptions,
-            messageId: aiMessage.id
-          })
-          
+          console.log(
+            "🔍 [AISearchBar] Creating AI message with clarifications:",
+            {
+              hasClarificationOptions: !!aiResponse.clarificationOptions,
+              clarificationCount: aiResponse.clarificationOptions?.length || 0,
+              clarificationOptions: aiResponse.clarificationOptions,
+              messageId: aiMessage.id
+            }
+          )
+
           setMessages((prev) => [...prev, aiMessage])
 
           // Disable input if clarification is needed
@@ -1486,7 +1500,7 @@ export function AISearchBar({
 
       {/* Chat Messages */}
       {messages.length > 0 && isChatExpanded && (
-        <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-space-y-4 plasmo-px-4 plasmo-py-4 plasmo-max-h-[500px] plasmo-bg-white/10 plasmo-backdrop-blur-lg plasmo-rounded-2xl plasmo-border plasmo-border-white/30 plasmo-mb-4">
+        <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-overflow-x-hidden plasmo-space-y-4 plasmo-px-4 plasmo-py-4 plasmo-max-h-[500px] plasmo-bg-white/10 plasmo-backdrop-blur-lg plasmo-rounded-2xl plasmo-border plasmo-border-white/30 plasmo-mb-4">
           {messages
             .filter((message) => {
               // Filter out empty AI messages (streaming placeholders before content arrives)
@@ -1495,85 +1509,126 @@ export function AISearchBar({
               }
               return true
             })
-            .map((message) => (
-            <div key={message.id} className="plasmo-space-y-2">
-              <div
-                className={`plasmo-flex ${
-                  message.type === "user"
-                    ? "plasmo-justify-end"
-                    : "plasmo-justify-start"
-                }`}>
-                <div
-                  className={`plasmo-px-4 plasmo-py-3 plasmo-rounded-2xl plasmo-shadow-sm plasmo-max-w-[85%] ${
-                    message.type === "user"
-                      ? "plasmo-bg-gradient-to-br plasmo-from-gray-50 plasmo-via-gray-100/80 plasmo-to-gray-100 plasmo-text-slate-900 plasmo-border plasmo-border-gray-200/50"
-                      : "plasmo-bg-gradient-to-br plasmo-from-white plasmo-via-blue-50/30 plasmo-to-purple-50/20 plasmo-backdrop-blur-md plasmo-text-slate-900 plasmo-border plasmo-border-slate-200/50"
-                  }`}>
-                  {message.type === "user" ? (
-                    <div className="plasmo-text-sm plasmo-whitespace-pre-wrap plasmo-text-slate-900">
-                      {message.content}
-                    </div>
-                  ) : (
-                    <MarkdownRenderer content={message.content} />
-                  )}
-                </div>
-              </div>
-
-              {/* Clarification Options - Only show if not handled */}
-              {message.clarificationOptions &&
-                message.clarificationOptions.length > 0 &&
-                !handledClarifications.has(message.id) && (
-                  <div className="plasmo-flex plasmo-justify-start">
-                    <div className="plasmo-max-w-[80%] plasmo-space-y-2">
-                      <div className="plasmo-text-xs plasmo-font-light plasmo-text-slate-600 plasmo-pl-2">
-                        Choose an option:
-                      </div>
-                      <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-2">
-                        {message.clarificationOptions.map((option, idx) => {
-                          // Debug logging
-                          if (idx === 0) {
-                            console.log("🎨 [AISearchBar] Rendering clarification buttons for message:", {
-                              messageId: message.id,
-                              optionCount: message.clarificationOptions.length,
-                              isHandled: handledClarifications.has(message.id),
-                              options: message.clarificationOptions
-                            })
-                          }
-                          return (
-                          <button
-                            key={idx}
-                            disabled={isSearching}
-                            onClick={() =>
-                              handleClarificationOption(
-                                option.action,
-                                option.value,
-                                message.pendingNoteData,
-                                message.id
-                              )
-                            }
-                            className={`${
-                              option.type === "category_pill"
-                                ? "plasmo-px-3 plasmo-py-1.5 plasmo-bg-blue-50 hover:plasmo-bg-blue-100 plasmo-text-blue-700 plasmo-border plasmo-border-blue-200 hover:plasmo-border-blue-300"
-                                : "plasmo-px-4 plasmo-py-2 plasmo-bg-white/20 plasmo-backdrop-blur-sm hover:plasmo-bg-white/30 plasmo-text-slate-900 plasmo-border plasmo-border-white/40 hover:plasmo-border-white/50"
-                            } plasmo-rounded-full plasmo-text-[12px] plasmo-font-normal plasmo-transition-all plasmo-cursor-pointer plasmo-shadow-sm hover:plasmo-shadow disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed`}>
-                            {option.label}
-                          </button>
-                          )
-                        })}
-                      </div>
+            .map((message) => {
+              const isExpanded = expandedMessages.has(message.id)
+              return (
+                <div key={message.id} className="plasmo-space-y-2">
+                  <div
+                    className={`plasmo-flex ${
+                      message.type === "user"
+                        ? "plasmo-justify-end"
+                        : "plasmo-justify-start"
+                    }`}>
+                    <div
+                      className={`plasmo-px-4 plasmo-py-3 plasmo-rounded-2xl plasmo-shadow-sm plasmo-max-w-[85%] plasmo-break-words plasmo-overflow-hidden ${
+                        message.type === "user"
+                          ? "plasmo-bg-gradient-to-br plasmo-from-gray-50 plasmo-via-gray-100/80 plasmo-to-gray-100 plasmo-text-slate-900 plasmo-border plasmo-border-gray-200/50"
+                          : "plasmo-bg-gradient-to-br plasmo-from-white plasmo-via-blue-50/30 plasmo-to-purple-50/20 plasmo-backdrop-blur-md plasmo-text-slate-900 plasmo-border plasmo-border-slate-200/50"
+                      }`}>
+                      {message.type === "user" ? (
+                        <div className="plasmo-space-y-2">
+                          <div
+                            className={`plasmo-text-sm plasmo-text-slate-900 plasmo-break-words plasmo-overflow-wrap-anywhere ${
+                              !isExpanded
+                                ? "plasmo-line-clamp-2 plasmo-overflow-hidden"
+                                : "plasmo-whitespace-pre-wrap"
+                            }`}
+                            style={{
+                              display: "-webkit-box",
+                              WebkitLineClamp: isExpanded ? "unset" : 2,
+                              WebkitBoxOrient: "vertical",
+                              overflow: isExpanded ? "visible" : "hidden",
+                              wordBreak: "break-word"
+                            }}>
+                            {message.content}
+                          </div>
+                          {message.content.length > 100 && (
+                            <button
+                              onClick={() => {
+                                setExpandedMessages((prev) => {
+                                  const newSet = new Set(prev)
+                                  if (isExpanded) {
+                                    newSet.delete(message.id)
+                                  } else {
+                                    newSet.add(message.id)
+                                  }
+                                  return newSet
+                                })
+                              }}
+                              className="plasmo-text-xs plasmo-text-slate-500 hover:plasmo-text-slate-700 plasmo-transition-colors">
+                              {isExpanded ? "Show less" : "Show more"}
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <MarkdownRenderer content={message.content} />
+                      )}
                     </div>
                   </div>
-                )}
 
-              {/* Reference Notes */}
-              {message.referenceNotes && message.referenceNotes.length > 0 && (
-                <ReferenceNotesSection
-                  notes={message.referenceNotes}
-                  onNoteClick={onNoteClick}
-                />
-              )}
-            </div>
-          ))}
+                {/* Clarification Options - Only show if not handled */}
+                {message.clarificationOptions &&
+                  message.clarificationOptions.length > 0 &&
+                  !handledClarifications.has(message.id) && (
+                    <div className="plasmo-flex plasmo-justify-start">
+                      <div className="plasmo-max-w-[80%] plasmo-space-y-2">
+                        <div className="plasmo-text-xs plasmo-font-light plasmo-text-slate-600 plasmo-pl-2">
+                          Choose an option:
+                        </div>
+                        <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-2">
+                          {message.clarificationOptions.map((option, idx) => {
+                            // Debug logging
+                            if (idx === 0) {
+                              console.log(
+                                "🎨 [AISearchBar] Rendering clarification buttons for message:",
+                                {
+                                  messageId: message.id,
+                                  optionCount:
+                                    message.clarificationOptions.length,
+                                  isHandled: handledClarifications.has(
+                                    message.id
+                                  ),
+                                  options: message.clarificationOptions
+                                }
+                              )
+                            }
+                            return (
+                              <button
+                                key={idx}
+                                disabled={isSearching}
+                                onClick={() =>
+                                  handleClarificationOption(
+                                    option.action,
+                                    option.value,
+                                    message.pendingNoteData,
+                                    message.id
+                                  )
+                                }
+                                className={`${
+                                  option.type === "category_pill"
+                                    ? "plasmo-px-3 plasmo-py-1.5 plasmo-bg-blue-50 hover:plasmo-bg-blue-100 plasmo-text-blue-700 plasmo-border plasmo-border-blue-200 hover:plasmo-border-blue-300"
+                                    : "plasmo-px-4 plasmo-py-2 plasmo-bg-white/20 plasmo-backdrop-blur-sm hover:plasmo-bg-white/30 plasmo-text-slate-900 plasmo-border plasmo-border-white/40 hover:plasmo-border-white/50"
+                                } plasmo-rounded-full plasmo-text-[12px] plasmo-font-normal plasmo-transition-all plasmo-cursor-pointer plasmo-shadow-sm hover:plasmo-shadow disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed`}>
+                                {option.label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                {/* Reference Notes */}
+                {message.referenceNotes &&
+                  message.referenceNotes.length > 0 && (
+                    <ReferenceNotesSection
+                      notes={message.referenceNotes}
+                      onNoteClick={onNoteClick}
+                    />
+                  )}
+                </div>
+              )
+            })}
           {/* Show loading dots only when searching but NOT streaming */}
           {isSearching && !isStreaming && (
             <div className="plasmo-flex plasmo-justify-start">
