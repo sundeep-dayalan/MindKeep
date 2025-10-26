@@ -10,6 +10,11 @@ import type { Note } from "~services/db-service"
 import type { AgentResponse } from "~services/langchain-agent"
 import { getGlobalAgent } from "~services/langchain-agent"
 import type { Persona } from "~types/persona"
+import {
+  clearChatMessages,
+  loadChatMessages,
+  saveChatMessages
+} from "~util/session-storage"
 import { tiptapToMarkdown } from "~util/tiptap-to-markdown"
 
 // Helper function to get dynamic greeting based on time of day
@@ -41,7 +46,8 @@ interface AISearchBarProps {
   placeholder?: string
   onSearch?: (
     query: string,
-    conversationHistory?: Array<{ role: string; content: string }>
+    conversationHistory?: Array<{ role: string; content: string }>,
+    onStreamChunk?: (chunk: string) => void
   ) => Promise<string | AgentResponse>
   onNoteCreated?: () => void // Callback when a note is successfully created
   onNotesChange?: () => Promise<void> // Callback when notes are modified (e.g., category changed)
@@ -136,10 +142,12 @@ export function AISearchBar({
 }: AISearchBarProps) {
   const [messages, setMessages] = React.useState<Message[]>([])
   const [isSearching, setIsSearching] = React.useState(false)
+  const [isStreaming, setIsStreaming] = React.useState(false) // Track if actively streaming
   const [isChatExpanded, setIsChatExpanded] = React.useState(true)
   const [isInputDisabled, setIsInputDisabled] = React.useState(false)
   const [isPersonaInitializing, setIsPersonaInitializing] = React.useState(true) // Track persona loading
   const [greeting, setGreeting] = React.useState(getTimeBasedGreeting())
+  const [isLoadingFromStorage, setIsLoadingFromStorage] = React.useState(true) // Track if we're loading from storage
 
   // Track which messages have had their clarifications handled (to hide buttons after click)
   const [handledClarifications, setHandledClarifications] = React.useState<
@@ -162,12 +170,51 @@ export function AISearchBar({
     pendingNoteData?: AgentResponse["pendingNoteData"]
   }>({ type: null })
 
+  // Track which user messages are expanded
+  const [expandedMessages, setExpandedMessages] = React.useState<Set<string>>(
+    new Set()
+  )
+
   // Store the rich content JSON when user submits (to preserve formatting)
   const [lastSubmittedContentJSON, setLastSubmittedContentJSON] =
     React.useState<any>(null)
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const editorRef = React.useRef<RichTextEditorRef>(null)
+
+  // Load messages from session storage on mount
+  React.useEffect(() => {
+    const loadStoredMessages = async () => {
+      try {
+        const storedMessages = await loadChatMessages()
+        if (storedMessages.length > 0) {
+          console.log(
+            `🔄 [AISearchBar] Restored ${storedMessages.length} messages from session storage`
+          )
+          setMessages(storedMessages)
+        }
+      } catch (error) {
+        console.error("Failed to load messages from storage:", error)
+      } finally {
+        setIsLoadingFromStorage(false)
+      }
+    }
+
+    loadStoredMessages()
+  }, [])
+
+  // Save messages to session storage whenever they change
+  React.useEffect(() => {
+    // Don't save during initial load
+    if (isLoadingFromStorage) {
+      return
+    }
+
+    // Save to session storage
+    saveChatMessages(messages).catch((error) => {
+      console.error("Failed to save messages to storage:", error)
+    })
+  }, [messages, isLoadingFromStorage])
 
   // Notify parent when messages change
   React.useEffect(() => {
@@ -241,6 +288,9 @@ export function AISearchBar({
     // Clear local messages
     setMessages([])
 
+    // Clear session storage
+    await clearChatMessages()
+
     // Clear handled clarifications
     setHandledClarifications(new Set())
 
@@ -263,7 +313,7 @@ export function AISearchBar({
     // Clear input length tracker
     setCurrentInputLength(0)
 
-    console.log(" [AISearchBar] Chat cleared")
+    console.log(" [AISearchBar] Chat cleared (including session storage)")
   }
 
   // Check and update token usage
@@ -349,6 +399,27 @@ export function AISearchBar({
     const query = editorRef.current?.getText()?.trim() || ""
     const contentJSON = editorRef.current?.getJSON() // Capture rich formatting
 
+    // Validate input size before proceeding
+    const validation = validateInputSize(query)
+    if (!validation.valid) {
+      console.warn("Input validation failed:", validation.reason)
+
+      // Show error message to user
+      const errorMessage: Message = {
+        id: `ai-validation-error-${Date.now()}`,
+        type: "ai",
+        content: `⚠️ ${validation.reason}`,
+        timestamp: Date.now()
+      }
+      setMessages((prev) => [...prev, errorMessage])
+
+      // Clear the input
+      editorRef.current?.setContent("")
+      setCurrentInputLength(0)
+
+      return // Block submission if validation fails
+    }
+
     if (query && onSearch && !isSearching) {
       // Store the rich content JSON for later use when saving
       setLastSubmittedContentJSON(contentJSON)
@@ -392,6 +463,16 @@ export function AISearchBar({
       setCurrentInputLength(0) // Clear input length tracker
       setIsSearching(true)
 
+      // Create a placeholder message for streaming response
+      const streamingMessageId = `ai-streaming-${Date.now()}`
+      const streamingMessage: Message = {
+        id: streamingMessageId,
+        type: "ai",
+        content: "",
+        timestamp: Date.now()
+      }
+      setMessages((prev) => [...prev, streamingMessage])
+
       try {
         // Build conversation history (exclude system messages)
         const conversationHistory = messages
@@ -404,7 +485,50 @@ export function AISearchBar({
         // Add current query
         conversationHistory.push({ role: "user", content: query })
 
-        const aiResponse = await onSearch(query, conversationHistory)
+        // Create a streaming callback to update the message content
+        let accumulatedText = ""
+        let isFirstChunk = true
+        let didReceiveChunks = false // Track if we actually received any chunks
+        const handleStreamChunk = (chunk: string) => {
+          // Mark as streaming on first chunk
+          if (isFirstChunk) {
+            console.log(`📡 [Streaming] First chunk received, starting stream`)
+            setIsStreaming(true)
+            isFirstChunk = false
+            didReceiveChunks = true
+          }
+
+          accumulatedText += chunk
+          console.log(
+            `📡 [Streaming] Chunk received (${chunk.length} chars), total: ${accumulatedText.length}`
+          )
+          // Update the streaming message with accumulated text
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === streamingMessageId
+                ? { ...m, content: accumulatedText }
+                : m
+            )
+          )
+        }
+
+        const aiResponse = await onSearch(
+          query,
+          conversationHistory,
+          handleStreamChunk
+        )
+
+        // Stop streaming when complete
+        setIsStreaming(false)
+
+        // Remove the streaming placeholder message only if we received chunks
+        // (for non-streaming responses like clarifications, we never created a visible streaming message)
+        if (didReceiveChunks) {
+          setMessages((prev) => prev.filter((m) => m.id !== streamingMessageId))
+        } else {
+          // No chunks received, remove the empty placeholder
+          setMessages((prev) => prev.filter((m) => m.id !== streamingMessageId))
+        }
 
         // Check if response is an AgentResponse object (has aiResponse field or referenceNotes)
         if (
@@ -438,6 +562,18 @@ export function AISearchBar({
             pendingNoteData: aiResponse.pendingNoteData,
             referenceNotes: fullReferenceNotes
           }
+
+          // Debug logging
+          console.log(
+            "🔍 [AISearchBar] Creating AI message with clarifications:",
+            {
+              hasClarificationOptions: !!aiResponse.clarificationOptions,
+              clarificationCount: aiResponse.clarificationOptions?.length || 0,
+              clarificationOptions: aiResponse.clarificationOptions,
+              messageId: aiMessage.id
+            }
+          )
+
           setMessages((prev) => [...prev, aiMessage])
 
           // Disable input if clarification is needed
@@ -469,6 +605,9 @@ export function AISearchBar({
         }
       } catch (error) {
         console.error("Search error:", error)
+        // Remove streaming message on error
+        setMessages((prev) => prev.filter((m) => m.id !== streamingMessageId))
+
         const errorMessage: Message = {
           id: `ai-error-${Date.now()}`,
           type: "ai",
@@ -478,6 +617,7 @@ export function AISearchBar({
         setMessages((prev) => [...prev, errorMessage])
       } finally {
         setIsSearching(false)
+        setIsStreaming(false) // Always reset streaming state
       }
     }
   }
@@ -1360,76 +1500,137 @@ export function AISearchBar({
 
       {/* Chat Messages */}
       {messages.length > 0 && isChatExpanded && (
-        <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-space-y-4 plasmo-px-4 plasmo-py-4 plasmo-max-h-[500px] plasmo-bg-white/10 plasmo-backdrop-blur-lg plasmo-rounded-2xl plasmo-border plasmo-border-white/30 plasmo-mb-4">
-          {messages.map((message) => (
-            <div key={message.id} className="plasmo-space-y-2">
-              <div
-                className={`plasmo-flex ${
-                  message.type === "user"
-                    ? "plasmo-justify-end"
-                    : "plasmo-justify-start"
-                }`}>
-                <div
-                  className={`plasmo-px-4 plasmo-py-3 plasmo-rounded-2xl plasmo-shadow-sm plasmo-max-w-[85%] ${
-                    message.type === "user"
-                      ? "plasmo-bg-gradient-to-br plasmo-from-gray-50 plasmo-via-gray-100/80 plasmo-to-gray-100 plasmo-text-slate-900 plasmo-border plasmo-border-gray-200/50"
-                      : "plasmo-bg-gradient-to-br plasmo-from-white plasmo-via-blue-50/30 plasmo-to-purple-50/20 plasmo-backdrop-blur-md plasmo-text-slate-900 plasmo-border plasmo-border-slate-200/50"
-                  }`}>
-                  {message.type === "user" ? (
-                    <div className="plasmo-text-sm plasmo-whitespace-pre-wrap plasmo-text-slate-900">
-                      {message.content}
-                    </div>
-                  ) : (
-                    <MarkdownRenderer content={message.content} />
-                  )}
-                </div>
-              </div>
-
-              {/* Clarification Options - Only show if not handled */}
-              {message.clarificationOptions &&
-                message.clarificationOptions.length > 0 &&
-                !handledClarifications.has(message.id) && (
-                  <div className="plasmo-flex plasmo-justify-start">
-                    <div className="plasmo-max-w-[80%] plasmo-space-y-2">
-                      <div className="plasmo-text-xs plasmo-font-light plasmo-text-slate-600 plasmo-pl-2">
-                        Choose an option:
-                      </div>
-                      <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-2">
-                        {message.clarificationOptions.map((option, idx) => (
-                          <button
-                            key={idx}
-                            disabled={isSearching}
-                            onClick={() =>
-                              handleClarificationOption(
-                                option.action,
-                                option.value,
-                                message.pendingNoteData,
-                                message.id
-                              )
-                            }
-                            className={`${
-                              option.type === "category_pill"
-                                ? "plasmo-px-3 plasmo-py-1.5 plasmo-bg-blue-50 hover:plasmo-bg-blue-100 plasmo-text-blue-700 plasmo-border plasmo-border-blue-200 hover:plasmo-border-blue-300"
-                                : "plasmo-px-4 plasmo-py-2 plasmo-bg-white/20 plasmo-backdrop-blur-sm hover:plasmo-bg-white/30 plasmo-text-slate-900 plasmo-border plasmo-border-white/40 hover:plasmo-border-white/50"
-                            } plasmo-rounded-full plasmo-text-[12px] plasmo-font-normal plasmo-transition-all plasmo-cursor-pointer plasmo-shadow-sm hover:plasmo-shadow disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed`}>
-                            {option.label}
-                          </button>
-                        ))}
-                      </div>
+        <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-overflow-x-hidden plasmo-space-y-4 plasmo-px-4 plasmo-py-4 plasmo-max-h-[500px] plasmo-bg-white/10 plasmo-backdrop-blur-lg plasmo-rounded-2xl plasmo-border plasmo-border-white/30 plasmo-mb-4">
+          {messages
+            .filter((message) => {
+              // Filter out empty AI messages (streaming placeholders before content arrives)
+              if (message.type === "ai" && !message.content.trim()) {
+                return false
+              }
+              return true
+            })
+            .map((message) => {
+              const isExpanded = expandedMessages.has(message.id)
+              return (
+                <div key={message.id} className="plasmo-space-y-2">
+                  <div
+                    className={`plasmo-flex ${
+                      message.type === "user"
+                        ? "plasmo-justify-end"
+                        : "plasmo-justify-start"
+                    }`}>
+                    <div
+                      className={`plasmo-px-4 plasmo-py-3 plasmo-rounded-2xl plasmo-shadow-sm plasmo-max-w-[85%] plasmo-break-words plasmo-overflow-hidden ${
+                        message.type === "user"
+                          ? "plasmo-bg-gradient-to-br plasmo-from-gray-50 plasmo-via-gray-100/80 plasmo-to-gray-100 plasmo-text-slate-900 plasmo-border plasmo-border-gray-200/50"
+                          : "plasmo-bg-gradient-to-br plasmo-from-white plasmo-via-blue-50/30 plasmo-to-purple-50/20 plasmo-backdrop-blur-md plasmo-text-slate-900 plasmo-border plasmo-border-slate-200/50"
+                      }`}>
+                      {message.type === "user" ? (
+                        <div className="plasmo-space-y-2">
+                          <div
+                            className={`plasmo-text-sm plasmo-text-slate-900 plasmo-break-words plasmo-overflow-wrap-anywhere ${
+                              !isExpanded
+                                ? "plasmo-line-clamp-2 plasmo-overflow-hidden"
+                                : "plasmo-whitespace-pre-wrap"
+                            }`}
+                            style={{
+                              display: "-webkit-box",
+                              WebkitLineClamp: isExpanded ? "unset" : 2,
+                              WebkitBoxOrient: "vertical",
+                              overflow: isExpanded ? "visible" : "hidden",
+                              wordBreak: "break-word"
+                            }}>
+                            {message.content}
+                          </div>
+                          {message.content.length > 100 && (
+                            <button
+                              onClick={() => {
+                                setExpandedMessages((prev) => {
+                                  const newSet = new Set(prev)
+                                  if (isExpanded) {
+                                    newSet.delete(message.id)
+                                  } else {
+                                    newSet.add(message.id)
+                                  }
+                                  return newSet
+                                })
+                              }}
+                              className="plasmo-text-xs plasmo-text-slate-500 hover:plasmo-text-slate-700 plasmo-transition-colors">
+                              {isExpanded ? "Show less" : "Show more"}
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <MarkdownRenderer content={message.content} />
+                      )}
                     </div>
                   </div>
-                )}
 
-              {/* Reference Notes */}
-              {message.referenceNotes && message.referenceNotes.length > 0 && (
-                <ReferenceNotesSection
-                  notes={message.referenceNotes}
-                  onNoteClick={onNoteClick}
-                />
-              )}
-            </div>
-          ))}
-          {isSearching && (
+                {/* Clarification Options - Only show if not handled */}
+                {message.clarificationOptions &&
+                  message.clarificationOptions.length > 0 &&
+                  !handledClarifications.has(message.id) && (
+                    <div className="plasmo-flex plasmo-justify-start">
+                      <div className="plasmo-max-w-[80%] plasmo-space-y-2">
+                        <div className="plasmo-text-xs plasmo-font-light plasmo-text-slate-600 plasmo-pl-2">
+                          Choose an option:
+                        </div>
+                        <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-2">
+                          {message.clarificationOptions.map((option, idx) => {
+                            // Debug logging
+                            if (idx === 0) {
+                              console.log(
+                                "🎨 [AISearchBar] Rendering clarification buttons for message:",
+                                {
+                                  messageId: message.id,
+                                  optionCount:
+                                    message.clarificationOptions.length,
+                                  isHandled: handledClarifications.has(
+                                    message.id
+                                  ),
+                                  options: message.clarificationOptions
+                                }
+                              )
+                            }
+                            return (
+                              <button
+                                key={idx}
+                                disabled={isSearching}
+                                onClick={() =>
+                                  handleClarificationOption(
+                                    option.action,
+                                    option.value,
+                                    message.pendingNoteData,
+                                    message.id
+                                  )
+                                }
+                                className={`${
+                                  option.type === "category_pill"
+                                    ? "plasmo-px-3 plasmo-py-1.5 plasmo-bg-blue-50 hover:plasmo-bg-blue-100 plasmo-text-blue-700 plasmo-border plasmo-border-blue-200 hover:plasmo-border-blue-300"
+                                    : "plasmo-px-4 plasmo-py-2 plasmo-bg-white/20 plasmo-backdrop-blur-sm hover:plasmo-bg-white/30 plasmo-text-slate-900 plasmo-border plasmo-border-white/40 hover:plasmo-border-white/50"
+                                } plasmo-rounded-full plasmo-text-[12px] plasmo-font-normal plasmo-transition-all plasmo-cursor-pointer plasmo-shadow-sm hover:plasmo-shadow disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed`}>
+                                {option.label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                {/* Reference Notes */}
+                {message.referenceNotes &&
+                  message.referenceNotes.length > 0 && (
+                    <ReferenceNotesSection
+                      notes={message.referenceNotes}
+                      onNoteClick={onNoteClick}
+                    />
+                  )}
+                </div>
+              )
+            })}
+          {/* Show loading dots only when searching but NOT streaming */}
+          {isSearching && !isStreaming && (
             <div className="plasmo-flex plasmo-justify-start">
               <div className="plasmo-max-w-[80%] plasmo-px-4 plasmo-py-2 plasmo-rounded-lg plasmo-bg-white/20 plasmo-backdrop-blur-md plasmo-text-slate-900 plasmo-border plasmo-border-white/40">
                 <div className="plasmo-flex plasmo-items-center plasmo-gap-2">
