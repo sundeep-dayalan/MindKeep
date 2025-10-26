@@ -107,7 +107,6 @@ export function PersonaSelector({
     chrome.storage.onChanged.addListener(handleStorageChange)
 
     return () => {
-      console.log(" [PersonaSelector] Removing storage listener")
       chrome.storage.onChanged.removeListener(handleStorageChange)
     }
   }, [onPersonaChange])

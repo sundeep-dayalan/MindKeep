@@ -2682,10 +2682,18 @@ let globalAgent: MindKeepAgent | null = null
 
 /**
  * Get or create the global agent instance
+ * @param initialPersona - Optional persona to set during initial creation
  */
-export async function getGlobalAgent(): Promise<MindKeepAgent> {
+export async function getGlobalAgent(
+  initialPersona?: Persona | null
+): Promise<MindKeepAgent> {
   if (!globalAgent) {
     globalAgent = await createAgent({ verbose: true })
+
+    // If an initial persona is provided, set it immediately
+    if (initialPersona !== undefined) {
+      await globalAgent.setPersona(initialPersona)
+    }
   }
   return globalAgent
 }

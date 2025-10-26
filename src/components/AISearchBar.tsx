@@ -284,20 +284,27 @@ export function AISearchBar({
 
     try {
       // Update the global agent with the new persona
-      console.log("🎭 [AISearchBar] Getting global agent...")
-      const agent = await getGlobalAgent()
-
-      console.log("🎭 [AISearchBar] Calling agent.setPersona()...")
-      await agent.setPersona(persona) // Now async - recreates session
+      // Pass the persona during agent creation to avoid double initialization
+      console.log("🎭 [AISearchBar] Getting global agent with persona...")
+      const agent = await getGlobalAgent(persona)
 
       console.log("🎭 [AISearchBar] Verifying persona was set...")
       const currentPersona = agent.getPersona()
       const currentMode = agent.getMode()
-      console.log("🎭 [AISearchBar] Agent state after setPersona:", {
+      console.log("🎭 [AISearchBar] Agent state after initialization:", {
         personaName: currentPersona?.name || "None",
         mode: currentMode,
         sessionId: agent.getSessionId()
       })
+
+      // If agent already existed and persona changed, update it
+      // Compare IDs, handling null/undefined cases
+      const currentId = currentPersona?.id || null
+      const newId = persona?.id || null
+      if (currentId !== newId) {
+        console.log("🎭 [AISearchBar] Persona mismatch, calling setPersona()...")
+        await agent.setPersona(persona)
+      }
 
       // Clear chat history when switching personas
       setMessages([])
