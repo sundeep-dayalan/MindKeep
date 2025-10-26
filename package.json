@@ -6,8 +6,8 @@
   "author": "Sundeep Dayalan",
   "scripts": {
     "dev": "plasmo dev && node fix-manifest.js",
-    "build": "plasmo build && node fix-manifest.js",
-    "package": "plasmo package && node fix-manifest.js",
+    "build": "plasmo build && node fix-manifest.js && node setup-offscreen.js",
+    "package": "plasmo package && node fix-manifest.js && node setup-offscreen.js",
     "format": "prettier --write ."
   },
   "dependencies": {
@@ -70,6 +70,7 @@
       "sidePanel",
       "contextMenus",
       "storage",
+      "offscreen",
       "ai",
       "rewriter",
       "aiLanguageModelOriginTrial"

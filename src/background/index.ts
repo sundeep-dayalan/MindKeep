@@ -28,6 +28,7 @@ import {
   setActivePersona,
   updateNote
 } from "~services/db-service"
+import * as dbService from "~services/db-service"
 import { getGlobalAgent } from "~services/langchain-agent"
 import { encrypt } from "~util/crypto"
 
@@ -35,6 +36,56 @@ export {}
 
 // Track side panel state per tab
 const sidePanelState = new Map<number, boolean>()
+
+// ==================== OFFSCREEN DOCUMENT MANAGEMENT ====================
+
+let creatingOffscreen: Promise<void> | null = null
+
+/**
+ * Ensure the offscreen document is created and ready
+ * This provides a shared context for database operations accessible from content scripts
+ */
+async function ensureOffscreenDocument() {
+  // Check if an offscreen document already exists
+  const existingContexts = await chrome.runtime.getContexts({
+    contextTypes: ["OFFSCREEN_DOCUMENT" as chrome.runtime.ContextType]
+  })
+
+  if (existingContexts.length > 0) {
+    console.log("🟢 [Background] Offscreen document already exists")
+    return
+  }
+
+  // If already in the process of creating, wait for that to finish
+  if (creatingOffscreen) {
+    console.log("⏳ [Background] Waiting for offscreen document creation...")
+    await creatingOffscreen
+    return
+  }
+
+  // Create the offscreen document
+  creatingOffscreen = chrome.offscreen.createDocument({
+    url: "offscreen/offscreen.html",
+    reasons: ["DOM_SCRAPING" as chrome.offscreen.Reason], // Required reason
+    justification:
+      "Provide shared IndexedDB access for database operations across extension contexts"
+  })
+
+  console.log("🔄 [Background] Creating offscreen document...")
+
+  await creatingOffscreen
+  creatingOffscreen = null
+
+  console.log("✅ [Background] Offscreen document created successfully")
+}
+
+/**
+ * Initialize offscreen document on extension startup
+ */
+chrome.runtime.onStartup.addListener(async () => {
+  console.log("🚀 [Background] Extension startup - initializing offscreen document")
+  await ensureOffscreenDocument()
+})
 
 // ==================== SIDE PANEL & UI MANAGEMENT ====================
 
@@ -76,14 +127,20 @@ chrome.runtime.onMessage.addListener((message, sender) => {
 // ==================== CONTEXT MENU ====================
 
 /**
- * Create context menu item for saving selected text
+ * Create context menu item for saving selected text and initialize offscreen document
  */
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener(async () => {
+  console.log("📦 [Background] Extension installed/updated")
+
+  // Create context menu
   chrome.contextMenus.create({
     id: "saveToMindKeep",
     title: "Save to MindKeep",
     contexts: ["selection"]
   })
+
+  // Initialize offscreen document
+  await ensureOffscreenDocument()
 })
 
 /**
@@ -140,6 +197,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
 /**
  * Message handler for processing note operations
+ * Also handles offscreen document database operations when running in offscreen context
  */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log(` [Background Listener] Received message type: ${message.type}`, {
@@ -151,6 +209,129 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   ;(async () => {
     try {
       switch (message.type) {
+        // ==================== OFFSCREEN DOCUMENT DATABASE OPERATIONS ====================
+        // These handlers are used when this same bundle runs in the offscreen document context
+
+        case "DB_SEARCH_BY_VECTOR": {
+          const { vector, limit } = message.payload
+          console.log(`🔍 [Offscreen] Searching by vector (limit: ${limit})`)
+          const results = await dbService.searchNotesByVector(vector, limit)
+          console.log(`✅ [Offscreen] Found ${results.length} results`)
+          return { success: true, data: results }
+        }
+
+        case "DB_SEARCH_BY_TITLE": {
+          const { query } = message.payload
+          console.log(`🔍 [Offscreen] Searching by title: "${query}"`)
+          const results = await dbService.searchNotesByTitle(query)
+          console.log(`✅ [Offscreen] Found ${results.length} results`)
+          return { success: true, data: results }
+        }
+
+        case "DB_GET_NOTE": {
+          const { id } = message.payload
+          console.log(`📄 [Offscreen] Getting note: ${id}`)
+          const note = await dbService.getNote(id)
+          return { success: true, data: note }
+        }
+
+        case "DB_GET_ALL_NOTES": {
+          console.log("📚 [Offscreen] Getting all notes")
+          const notes = await dbService.getAllNotes()
+          console.log(`✅ [Offscreen] Retrieved ${notes.length} notes`)
+          return { success: true, data: notes }
+        }
+
+        case "DB_ADD_NOTE": {
+          const { note } = message.payload
+          console.log(`➕ [Offscreen] Adding note: ${note.title}`)
+          const id = await dbService.addNote(note)
+          return { success: true, data: id }
+        }
+
+        case "DB_UPDATE_NOTE": {
+          const { note } = message.payload
+          console.log(`🔄 [Offscreen] Updating note: ${note.id}`)
+          const { id, ...updates } = note
+          await dbService.updateNote(id, updates)
+          return { success: true }
+        }
+
+        case "DB_DELETE_NOTE": {
+          const { id } = message.payload
+          console.log(`🗑️  [Offscreen] Deleting note: ${id}`)
+          await dbService.deleteNote(id)
+          return { success: true }
+        }
+
+        case "DB_GET_ALL_CATEGORIES": {
+          console.log("🏷️  [Offscreen] Getting all categories")
+          const categories = await dbService.getAllCategories()
+          return { success: true, data: categories }
+        }
+
+        case "DB_GET_PERSONA": {
+          const { id } = message.payload
+          console.log(`👤 [Offscreen] Getting persona: ${id}`)
+          const persona = await dbService.getPersona(id)
+          return { success: true, data: persona }
+        }
+
+        case "DB_GET_ALL_PERSONAS": {
+          console.log("👥 [Offscreen] Getting all personas")
+          const personas = await dbService.getAllPersonas()
+          return { success: true, data: personas }
+        }
+
+        case "DB_GET_ACTIVE_PERSONA": {
+          console.log("👤 [Offscreen] Getting active persona")
+          const persona = await dbService.getActivePersona()
+          return { success: true, data: persona }
+        }
+
+        case "DB_ADD_PERSONA": {
+          const { persona } = message.payload
+          console.log(`➕ [Offscreen] Adding persona: ${persona.name}`)
+          const id = await dbService.addPersona(persona)
+          return { success: true, data: id }
+        }
+
+        case "DB_UPDATE_PERSONA": {
+          const { persona } = message.payload
+          console.log(`🔄 [Offscreen] Updating persona: ${persona.id}`)
+          const { id, ...updates } = persona
+          await dbService.updatePersona(id, updates)
+          return { success: true }
+        }
+
+        case "DB_DELETE_PERSONA": {
+          const { id } = message.payload
+          console.log(`🗑️  [Offscreen] Deleting persona: ${id}`)
+          await dbService.deletePersona(id)
+          return { success: true }
+        }
+
+        case "DB_SET_ACTIVE_PERSONA": {
+          const { id } = message.payload
+          console.log(`✅ [Offscreen] Setting active persona: ${id}`)
+          await dbService.setActivePersona(id)
+          return { success: true }
+        }
+
+        case "AI_GENERATE_EMBEDDING": {
+          const { text } = message.payload
+          console.log(
+            `🤖 [Offscreen] Generating embedding for text (${text.length} chars)`
+          )
+          const embedding = await generateEmbedding(text)
+          console.log(
+            `✅ [Offscreen] Generated embedding (${embedding.length} dimensions)`
+          )
+          return { success: true, data: embedding }
+        }
+
+        // ==================== BACKGROUND SCRIPT OPERATIONS ====================
+
         case "SAVE_NOTE":
           return await handleSaveNote(message.data)
 
