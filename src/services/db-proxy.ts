@@ -157,6 +157,25 @@ export async function getAllCategories(): Promise<string[]> {
   return await dbService.getAllCategories()
 }
 
+// ==================== STATISTICS OPERATIONS ====================
+
+/**
+ * Get database statistics
+ */
+export async function getDatabaseStatistics(): Promise<{
+  totalNotes: number
+  categories: Array<{ category: string; count: number; lastUpdated: number }>
+  oldestNoteDate: number | null
+  newestNoteDate: number | null
+  lastModifiedDate: number | null
+}> {
+  if (isContentScript()) {
+    console.log("📡 [DB Proxy] Routing getDatabaseStatistics to offscreen")
+    return await sendToOffscreen("DB_GET_STATISTICS")
+  }
+  return await dbService.getDatabaseStatistics()
+}
+
 // ==================== PERSONA OPERATIONS ====================
 
 /**

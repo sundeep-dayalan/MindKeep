@@ -944,9 +944,10 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
 
             console.log("[Agent] Organize result:", organizeResult)
 
-            // Check if reorganization is needed
+            // Check if reorganization is needed and was successful
             const organizeData = organizeResult[0]?.result
             if (
+              organizeData?.success !== false &&
               organizeData?.needsReorganization &&
               organizeData?.suggestedCategory
             ) {
@@ -995,6 +996,11 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
                   suggestedCategory: organizeData.suggestedCategory
                 }
               }
+            } else if (organizeData?.success === false) {
+              console.log(
+                "[Agent] Organize failed (likely embedding issue in content script), skipping:",
+                organizeData.error
+              )
             } else {
               console.log(
                 "[Agent] No reorganization needed or no similar notes found"

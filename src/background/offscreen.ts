@@ -97,6 +97,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           break
         }
 
+        // ==================== STATISTICS OPERATIONS ====================
+
+        case "DB_GET_STATISTICS": {
+          console.log("📊 [Offscreen] Getting database statistics")
+          const stats = await dbService.getDatabaseStatistics()
+          console.log(`✅ [Offscreen] Stats: ${stats.totalNotes} notes, ${stats.categories.length} categories`)
+          sendResponse({ success: true, data: stats })
+          break
+        }
+
         // ==================== PERSONA OPERATIONS ====================
 
         case "DB_GET_PERSONA": {
