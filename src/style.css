@@ -4,13 +4,16 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Apply Poppins font family globally */
-* {
+/* Apply Poppins font family only to extension UI components (side panel, etc.) */
+/* DO NOT apply to all elements - this would affect the host webpage! */
+#plasmo-shadow-container,
+#plasmo-shadow-container * {
   font-family: "Poppins", sans-serif;
 }
 
-body,
-html {
+/* Only apply to the extension's own pages (side panel, options, etc.) */
+body.extension-page,
+html.extension-page {
   font-family: "Poppins", sans-serif;
 }
 
@@ -20,8 +23,8 @@ html {
   font-family: "Poppins", sans-serif;
 }
 
-/* Image optimization for high-quality rendering */
-img {
+/* Image optimization for high-quality rendering - scoped to extension only */
+#plasmo-shadow-container img {
   image-rendering: -webkit-optimize-contrast;
   image-rendering: -moz-crisp-edges;
   image-rendering: optimizeQuality;

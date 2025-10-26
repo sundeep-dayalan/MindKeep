@@ -1,0 +1,33 @@
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
+
+/* DO NOT include @tailwind base here - it would reset styles for the entire webpage! */
+/* Only include components and utilities which are prefixed with 'plasmo-' */
+@tailwind components;
+@tailwind utilities;
+
+/* Apply Poppins font family only to MindKeep components */
+#mindkeep-in-page-chat,
+#mindkeep-in-page-chat *,
+.mindkeep-icon-container,
+.mindkeep-icon-container * {
+  font-family: "Poppins", sans-serif !important;
+  /* Reset box-sizing for extension components only */
+  box-sizing: border-box !important;
+}
+
+/* Ensure extension components don't inherit webpage styles */
+#mindkeep-in-page-chat {
+  all: initial;
+  position: fixed;
+  z-index: 999999;
+  pointer-events: none;
+  font-family: "Poppins", sans-serif !important;
+}
+
+.mindkeep-icon-container {
+  all: initial;
+  position: fixed;
+  z-index: 999999;
+  pointer-events: auto;
+  font-family: "Poppins", sans-serif !important;
+}

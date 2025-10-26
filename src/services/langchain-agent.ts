@@ -1335,7 +1335,9 @@ NOTE: You are in PERSONA mode. You can ONLY search and read notes. You CANNOT cr
       // to properly extract what the user wants to save as a note
       const recentMessages = this.rawConversationHistory.slice(-5)
 
-      console.log(`[Tool Selection] Building conversation context from ${recentMessages.length} recent messages`)
+      console.log(
+        `[Tool Selection] Building conversation context from ${recentMessages.length} recent messages`
+      )
 
       if (recentMessages.length > 0) {
         conversationContext =
@@ -1344,15 +1346,20 @@ NOTE: You are in PERSONA mode. You can ONLY search and read notes. You CANNOT cr
             .map((msg, idx) => {
               // Apply a reasonable per-message limit (2000 chars) to prevent token overflow
               // but keep enough content for proper extraction
-              const content = msg.content.length > 2000
-                ? msg.content.substring(0, 2000) + "... [truncated]"
-                : msg.content
-              console.log(`[Tool Selection] Message ${idx} (${msg.role}): ${content.substring(0, 100)}...`)
+              const content =
+                msg.content.length > 2000
+                  ? msg.content.substring(0, 2000) + "... [truncated]"
+                  : msg.content
+              console.log(
+                `[Tool Selection] Message ${idx} (${msg.role}): ${content.substring(0, 100)}...`
+              )
               return `${msg.role === "user" ? "User" : "Assistant"}: ${content}`
             })
             .join("\n")
 
-        console.log(`[Tool Selection] Conversation context length: ${conversationContext.length} chars`)
+        console.log(
+          `[Tool Selection] Conversation context length: ${conversationContext.length} chars`
+        )
       }
     }
 
@@ -1428,7 +1435,10 @@ Respond ONLY with JSON.`
       console.log(" [Agent] Using executePrompt (no session history)")
 
       // Convert Zod schema to JSON Schema for the API
-      const toolSelectionJsonSchema = zodToJsonSchema(ToolSelectionSchema, "ToolSelectionSchema")
+      const toolSelectionJsonSchema = zodToJsonSchema(
+        ToolSelectionSchema,
+        "ToolSelectionSchema"
+      )
 
       const response = await GeminiNanoService.promptWithSession(
         sessionId,
@@ -1526,11 +1536,20 @@ Respond ONLY with JSON.`
           }
 
           // Debug logging for content extraction
-          console.log("[Agent] create_note_from_chat - parsed.note_content:", parsed.note_content)
-          console.log("[Agent] create_note_from_chat - this.lastUserMessage:", this.lastUserMessage)
+          console.log(
+            "[Agent] create_note_from_chat - parsed.note_content:",
+            parsed.note_content
+          )
+          console.log(
+            "[Agent] create_note_from_chat - this.lastUserMessage:",
+            this.lastUserMessage
+          )
 
           const noteContent = parsed.note_content || this.lastUserMessage
-          console.log("[Agent] create_note_from_chat - final content:", noteContent)
+          console.log(
+            "[Agent] create_note_from_chat - final content:",
+            noteContent
+          )
 
           return [
             {
@@ -1971,9 +1990,38 @@ Begin analysis. Respond ONLY with a complete JSON object with all 5 required fie
     console.log(
       ` [Persona Transform] Source notes: ${extracted.sourceNoteIds.length}`
     )
+    console.log(
+      ` [Persona Transform] Confidence: ${extracted.confidence}`
+    )
+
+    // Extract note content from tool results for cleaner presentation
+    const notesContent = toolResults
+      .map((result) => {
+        if (result.result?.notes) {
+          // Handle search_notes results
+          return result.result.notes
+            .map((note: any, noteIdx: number) => {
+              return `Note ${noteIdx + 1}: ${note.title || "Untitled"}
+${note.content}
+${note.category ? `Category: ${note.category}` : ""}`
+            })
+            .join("\n\n---\n\n")
+        }
+        return null
+      })
+      .filter(Boolean)
+      .join("\n\n---\n\n")
+
+    // Check if we have relevant notes (confidence > 0.5 and notes exist)
+    const hasRelevantNotes = notesContent.length > 0 && extracted.confidence > 0.5
+
+    console.log(
+      ` [Persona Transform] Has relevant notes: ${hasRelevantNotes}`
+    )
 
     // Build persona transformation prompt
-    const transformationPrompt = `You are MindKeep AI, operating as "${this.activePersona.name}".
+    const transformationPrompt = hasRelevantNotes
+      ? `You are MindKeep AI, operating as "${this.activePersona.name}".
 
 === YOUR ROLE ===
 ${this.activePersona.description}
@@ -1992,11 +2040,8 @@ ${this.activePersona.outputTemplate}
 === USER REQUEST ===
 "${query}"
 
-=== RETRIEVED DATA ===
-The system found ${extracted.sourceNoteIds.length} relevant note(s):
-\`\`\`json
-${JSON.stringify(toolResults, null, 2)}
-\`\`\`
+=== RETRIEVED NOTES ===
+${notesContent}
 
 === YOUR TASK ===
 Based on the user's request and the retrieved notes, generate a response that:
@@ -2006,17 +2051,70 @@ Based on the user's request and the retrieved notes, generate a response that:
 4. **Addresses the user directly** with the requested content
 
 CRITICAL RULES:
+- DO NOT show raw JSON or technical data - present information naturally
 - DO NOT just say "I found a note" - actually PRODUCE the content the user requested
 - If the user asks you to write something, WRITE IT using the information from the notes
 - If the user asks for a specific format (email, letter, summary), PROVIDE IT in that format
 - Use ALL relevant information from the retrieved notes
 - Stay completely in character as "${this.activePersona.name}"
+- Extract and present the actual note content, not metadata
 
 ${
   this.activePersona.outputTemplate
     ? `
 REMEMBER: Follow your output template structure:
 ${this.activePersona.outputTemplate}
+`
+    : ""
+}
+
+Now generate your response:`
+      : `You are MindKeep AI, operating as "${this.activePersona.name}".
+
+=== YOUR ROLE ===
+${this.activePersona.description}
+
+=== PERSONA CONTEXT ===
+${this.activePersona.context}
+
+${
+  this.activePersona.outputTemplate
+    ? `=== OUTPUT TEMPLATE ===
+${this.activePersona.outputTemplate}
+`
+    : ""
+}
+
+=== USER REQUEST ===
+"${query}"
+
+=== SITUATION ===
+The search did not find any relevant notes containing information needed for this request.
+However, you can still fulfill the user's request by extracting information DIRECTLY from their query.
+
+=== YOUR TASK ===
+Based ONLY on the user's request (the query above), generate a response that:
+1. **Stays in character** as "${this.activePersona.name}"
+2. **Extracts any required information directly from the user's query** (e.g., amounts, dates, names)
+3. **Follows your output template** if one is provided
+4. **Addresses the user directly** with the requested content
+
+CRITICAL RULES:
+- EXTRACT information from the user query itself (e.g., "loan email 5 lakhs" → extract "5 lakhs" or "INR 500000")
+- DO NOT say "I couldn't find notes" - instead, GENERATE the content they requested using info from their query
+- If the user asks you to write something (email, letter, document), WRITE IT using the query information
+- If the query contains amounts, dates, or specific values, USE THEM in your output
+- Follow your output template structure strictly
+- Stay completely in character as "${this.activePersona.name}"
+- Be helpful and productive - don't refuse the task just because notes weren't found
+
+${
+  this.activePersona.outputTemplate
+    ? `
+REMEMBER: Follow your output template structure:
+${this.activePersona.outputTemplate}
+
+Replace <amount from user query> or similar placeholders with the actual values extracted from the user query.
 `
     : ""
 }

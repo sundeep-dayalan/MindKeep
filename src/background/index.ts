@@ -20,7 +20,15 @@
  */
 
 import { generateEmbedding } from "~services/ai-service"
-import { addNote, updateNote } from "~services/db-service"
+import {
+  addNote,
+  getActivePersona,
+  getAllPersonas,
+  getPersona,
+  setActivePersona,
+  updateNote
+} from "~services/db-service"
+import { getGlobalAgent } from "~services/langchain-agent"
 import { encrypt } from "~util/crypto"
 
 export {}
@@ -148,6 +156,149 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         case "UPDATE_NOTE":
           return await handleUpdateNote(message.data)
+
+        case "GET_ALL_PERSONAS":
+          console.log(" [Background] GET_ALL_PERSONAS request received")
+          const personas = await getAllPersonas()
+          console.log(` [Background] Returning ${personas.length} personas`)
+          return { success: true, personas }
+
+        case "GET_ACTIVE_PERSONA":
+          console.log(" [Background] GET_ACTIVE_PERSONA request received")
+          const activePersona = await getActivePersona()
+          console.log(
+            " [Background] Active persona:",
+            activePersona?.name || "None"
+          )
+          return { success: true, persona: activePersona }
+
+        case "SET_ACTIVE_PERSONA":
+          console.log(
+            " [Background] SET_ACTIVE_PERSONA request received for ID:",
+            message.data?.personaId
+          )
+          try {
+            // First, check if the persona exists (if ID is provided)
+            if (message.data?.personaId) {
+              console.log(
+                " [Background] Checking if persona exists:",
+                message.data.personaId
+              )
+              const persona = await getPersona(message.data.personaId)
+              if (!persona) {
+                console.error(
+                  " [Background] Persona not found for ID:",
+                  message.data.personaId
+                )
+                return { success: false, error: "Persona not found" }
+              }
+              console.log(" [Background] Persona found:", persona.name)
+            }
+
+            // Update the active persona in database
+            console.log(" [Background] Calling setActivePersona...")
+            const success = await setActivePersona(
+              message.data?.personaId || null
+            )
+
+            if (!success) {
+              console.error(" [Background] setActivePersona returned false")
+              return {
+                success: false,
+                error: "Failed to set active persona in database"
+              }
+            }
+
+            console.log(" [Background] Database updated successfully")
+
+            // Update the global agent in background context
+            console.log(" [Background] Updating global agent...")
+            const agent = await getGlobalAgent()
+
+            const persona = message.data?.personaId
+              ? await getPersona(message.data.personaId)
+              : null
+
+            await agent.setPersona(persona || null)
+            console.log(
+              " [Background] Persona updated successfully:",
+              persona?.name || "Default"
+            )
+
+            return { success: true, persona: persona || null }
+          } catch (error) {
+            console.error(" [Background] Error in SET_ACTIVE_PERSONA:", error)
+            console.error(" [Background] Error stack:", error?.stack)
+            return {
+              success: false,
+              error: error instanceof Error ? error.message : String(error)
+            }
+          }
+
+        case "SESSION_STORAGE_SAVE":
+          console.log(
+            " [Background] SESSION_STORAGE_SAVE request received",
+            message.data?.messages?.length || 0,
+            "messages"
+          )
+          try {
+            await chrome.storage.session.set({
+              ai_chat_messages: message.data.messages,
+              ai_chat_metadata: {
+                lastUpdated: Date.now(),
+                messageCount: message.data.messages.length
+              }
+            })
+            return { success: true }
+          } catch (error) {
+            console.error(" [Background] SESSION_STORAGE_SAVE error:", error)
+            return { success: false, error: String(error) }
+          }
+
+        case "SESSION_STORAGE_LOAD":
+          console.log(" [Background] SESSION_STORAGE_LOAD request received")
+          try {
+            const result = await chrome.storage.session.get("ai_chat_messages")
+            const messages = result.ai_chat_messages || []
+            console.log(
+              " [Background] Loaded",
+              messages.length,
+              "messages from session storage"
+            )
+            return { success: true, messages }
+          } catch (error) {
+            console.error(" [Background] SESSION_STORAGE_LOAD error:", error)
+            return { success: false, messages: [], error: String(error) }
+          }
+
+        case "SESSION_STORAGE_CLEAR":
+          console.log(" [Background] SESSION_STORAGE_CLEAR request received")
+          try {
+            await chrome.storage.session.remove([
+              "ai_chat_messages",
+              "ai_chat_metadata"
+            ])
+            return { success: true }
+          } catch (error) {
+            console.error(" [Background] SESSION_STORAGE_CLEAR error:", error)
+            return { success: false, error: String(error) }
+          }
+
+        case "SESSION_STORAGE_GET_METADATA":
+          console.log(
+            " [Background] SESSION_STORAGE_GET_METADATA request received"
+          )
+          try {
+            const result = await chrome.storage.session.get("ai_chat_metadata")
+            const metadata = result.ai_chat_metadata || null
+            return { success: true, metadata }
+          } catch (error) {
+            console.error(
+              " [Background] SESSION_STORAGE_GET_METADATA error:",
+              error
+            )
+            return { success: false, metadata: null, error: String(error) }
+          }
 
         default:
           return { success: false, error: "Unknown message type" }

@@ -55,6 +55,10 @@ interface AISearchBarProps {
   onNoteClick?: (note: Note) => void // Callback when a reference note is clicked
   onManagePersonas?: () => void // Callback to open Personas management page
   className?: string
+  maxInputHeight?: string // Maximum height for the input area (default: "150px")
+  personaDropdownUpward?: boolean // Control persona dropdown direction (default: true)
+  enableInsertMode?: boolean // Enable insert button transformation (for in-page chat)
+  onInsert?: (text: string) => void // Callback when insert button is clicked
 }
 
 // Reference Notes Component - Collapsible chip design
@@ -138,7 +142,11 @@ export function AISearchBar({
   onMessagesChange,
   onNoteClick,
   onManagePersonas,
-  className = ""
+  className = "",
+  maxInputHeight = "150px",
+  personaDropdownUpward = true,
+  enableInsertMode = false,
+  onInsert
 }: AISearchBarProps) {
   const [messages, setMessages] = React.useState<Message[]>([])
   const [isSearching, setIsSearching] = React.useState(false)
@@ -148,6 +156,7 @@ export function AISearchBar({
   const [isPersonaInitializing, setIsPersonaInitializing] = React.useState(true) // Track persona loading
   const [greeting, setGreeting] = React.useState(getTimeBasedGreeting())
   const [isLoadingFromStorage, setIsLoadingFromStorage] = React.useState(true) // Track if we're loading from storage
+  const [showInsertButton, setShowInsertButton] = React.useState(false) // Track if insert button should be shown (for in-page chat)
 
   // Track which messages have had their clarifications handled (to hide buttons after click)
   const [handledClarifications, setHandledClarifications] = React.useState<
@@ -581,6 +590,11 @@ export function AISearchBar({
             setIsInputDisabled(true)
           }
 
+          // Enable insert button for in-page chat after AI response
+          if (enableInsertMode && !aiResponse.needsClarification) {
+            setShowInsertButton(true)
+          }
+
           // If a note was created, refresh the notes list
           if (aiResponse.noteCreated && onNoteCreated) {
             console.log("Note created, calling onNoteCreated callback")
@@ -599,6 +613,11 @@ export function AISearchBar({
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, aiMessage])
+
+          // Enable insert button for in-page chat after AI response
+          if (enableInsertMode) {
+            setShowInsertButton(true)
+          }
 
           // Check token usage after AI response
           await checkTokenUsage()
@@ -1500,7 +1519,7 @@ export function AISearchBar({
 
       {/* Chat Messages */}
       {messages.length > 0 && isChatExpanded && (
-        <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-overflow-x-hidden plasmo-space-y-4 plasmo-px-4 plasmo-py-4 plasmo-max-h-[500px] plasmo-bg-white/10 plasmo-backdrop-blur-lg plasmo-rounded-2xl plasmo-border plasmo-border-white/30 plasmo-mb-4">
+        <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-overflow-x-hidden plasmo-no-visible-scrollbar plasmo-space-y-4 plasmo-px-4 plasmo-py-4 plasmo-max-h-[500px] plasmo-bg-white/10 plasmo-backdrop-blur-lg plasmo-rounded-2xl plasmo-border plasmo-border-white/30 plasmo-mb-4">
           {messages
             .filter((message) => {
               // Filter out empty AI messages (streaming placeholders before content arrives)
@@ -1672,7 +1691,7 @@ export function AISearchBar({
           {/* Rich Text Editor - Full Width on Top */}
           <div
             className="plasmo-w-full plasmo-overflow-y-auto plasmo-no-visible-scrollbar"
-            style={{ minHeight: "2.5em", maxHeight: "150px" }}>
+            style={{ minHeight: "2.5em", maxHeight: maxInputHeight }}>
             <RichTextEditor
               ref={editorRef}
               placeholder={
@@ -1687,6 +1706,11 @@ export function AISearchBar({
                 // Track input length for validation feedback
                 const currentText = editorRef.current?.getText() || ""
                 setCurrentInputLength(currentText.length)
+
+                // Reset insert button when user starts typing (back to send mode)
+                if (enableInsertMode && showInsertButton && currentText.length > 0) {
+                  setShowInsertButton(false)
+                }
               }}
             />
           </div>
@@ -1699,21 +1723,42 @@ export function AISearchBar({
                 onPersonaChange={handlePersonaChange}
                 onInitializationChange={setIsPersonaInitializing}
                 onManageClick={onManagePersonas}
+                openUpward={personaDropdownUpward}
               />
             </div>
 
-            {/* Submit Button - Right Side */}
+            {/* Submit Button - Right Side (transforms to Insert button in insert mode) */}
             <button
-              type="submit"
-              className="plasmo-flex-shrink-0 plasmo-w-9 plasmo-h-9 plasmo-bg-slate-900 plasmo-text-white plasmo-rounded-lg plasmo-flex plasmo-items-center plasmo-justify-center hover:plasmo-bg-slate-700 plasmo-transition-colors disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed"
+              type={showInsertButton && enableInsertMode ? "button" : "submit"}
+              onClick={
+                showInsertButton && enableInsertMode && onInsert
+                  ? () => {
+                      // Get last AI message
+                      const lastAiMessage = messages
+                        .slice()
+                        .reverse()
+                        .find((m) => m.type === "ai")
+                      if (lastAiMessage) {
+                        onInsert(lastAiMessage.content)
+                      }
+                    }
+                  : undefined
+              }
+              className={`plasmo-flex-shrink-0 plasmo-w-9 plasmo-h-9 plasmo-text-white plasmo-rounded-lg plasmo-flex plasmo-items-center plasmo-justify-center hover:plasmo-bg-slate-700 plasmo-transition-colors disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed ${
+                showInsertButton && enableInsertMode
+                  ? "plasmo-bg-purple-600 hover:plasmo-bg-purple-700"
+                  : "plasmo-bg-slate-900"
+              }`}
               title={
-                isPersonaInitializing
-                  ? "Loading persona..."
-                  : currentInputLength > 8000
-                    ? "Input too large (max 8000 chars)"
-                    : tokenUsage && tokenUsage.usage >= 7000
-                      ? "Session limit reached - start new chat"
-                      : "Send (Enter)"
+                showInsertButton && enableInsertMode
+                  ? "Insert to page"
+                  : isPersonaInitializing
+                    ? "Loading persona..."
+                    : currentInputLength > 8000
+                      ? "Input too large (max 8000 chars)"
+                      : tokenUsage && tokenUsage.usage >= 7000
+                        ? "Session limit reached - start new chat"
+                        : "Send (Enter)"
               }
               disabled={
                 isPersonaInitializing ||
@@ -1722,18 +1767,35 @@ export function AISearchBar({
                 currentInputLength > 8000 ||
                 (tokenUsage !== null && tokenUsage.usage >= 7000)
               }>
-              <svg
-                className="plasmo-w-4 plasmo-h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M14 5l7 7m0 0l-7 7m7-7H3"
-                />
-              </svg>
+              {showInsertButton && enableInsertMode ? (
+                // Insert icon
+                <svg
+                  className="plasmo-w-4 plasmo-h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+              ) : (
+                // Send icon
+                <svg
+                  className="plasmo-w-4 plasmo-h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M14 5l7 7m0 0l-7 7m7-7H3"
+                  />
+                </svg>
+              )}
             </button>
           </div>
         </div>
