@@ -1363,6 +1363,53 @@ NOTE: You are in PERSONA mode. You can ONLY search and read notes. You CANNOT cr
       }
     }
 
+    // Check if this is a follow-up to a note creation request
+    const isNoteCreationFollowUp = this.rawConversationHistory.some(
+      (msg, idx) => {
+        // Check if any recent assistant message asked for note content
+        if (
+          msg.role === "assistant" &&
+          idx >= this.rawConversationHistory.length - 3
+        ) {
+          const content = msg.content.toLowerCase()
+          return (
+            content.includes("what would you like to save") ||
+            content.includes("what would you like the note to contain") ||
+            content.includes("what information would you like to save") ||
+            content.includes("what should i save") ||
+            content.includes("what content")
+          )
+        }
+        return false
+      }
+    )
+
+    console.log(
+      `[Tool Selection] Is note creation follow-up: ${isNoteCreationFollowUp}`
+    )
+    console.log(`[Tool Selection] Query length: ${query.length} chars`)
+
+    // DIRECT FAILSAFE: If this is a note creation follow-up with substantial content,
+    // immediately return create_note_from_chat tool without asking the LLM
+    if (isNoteCreationFollowUp && query.length > 20) {
+      console.log(
+        `[Tool Selection] FAILSAFE TRIGGERED: Auto-selecting create_note_from_chat`
+      )
+      console.log(`[Tool Selection] Content to save: "${query}"`)
+
+      return [
+        {
+          name: "create_note_from_chat",
+          params: {
+            content: query, // Use the full query as content
+            title: undefined,
+            category: undefined,
+            skipClarification: false
+          }
+        }
+      ]
+    }
+
     const toolSelectionPrompt = `${toolDescriptions}
 
 RULES:
@@ -1373,6 +1420,18 @@ RULES:
 - User sends ACTUAL CONTENT after being asked "what to save" → "create_note_from_chat" (extract full content)
 - Greetings/small talk → "none"
 - **INTENT to create** (no actual content, just "I want to create a note") → "none" (let conversational AI ask for content)
+
+${
+  isNoteCreationFollowUp && query.length > 20
+    ? `
+SPECIAL CONTEXT:
+The assistant JUST ASKED the user what content to save for a note.
+The current query "${query}" is the user's response.
+Since it contains more than 20 characters, treat it as the content to save.
+→ Use "create_note_from_chat" with note_content set to the FULL query text.
+`
+    : ""
+}
 
 create_note_from_chat CRITICAL:
 - ONLY use if there's ACTUAL content to save (either in query or in conversation context)
@@ -1990,9 +2049,7 @@ Begin analysis. Respond ONLY with a complete JSON object with all 5 required fie
     console.log(
       ` [Persona Transform] Source notes: ${extracted.sourceNoteIds.length}`
     )
-    console.log(
-      ` [Persona Transform] Confidence: ${extracted.confidence}`
-    )
+    console.log(` [Persona Transform] Confidence: ${extracted.confidence}`)
 
     // Extract note content from tool results for cleaner presentation
     const notesContent = toolResults
@@ -2013,11 +2070,10 @@ ${note.category ? `Category: ${note.category}` : ""}`
       .join("\n\n---\n\n")
 
     // Check if we have relevant notes (confidence > 0.5 and notes exist)
-    const hasRelevantNotes = notesContent.length > 0 && extracted.confidence > 0.5
+    const hasRelevantNotes =
+      notesContent.length > 0 && extracted.confidence > 0.5
 
-    console.log(
-      ` [Persona Transform] Has relevant notes: ${hasRelevantNotes}`
-    )
+    console.log(` [Persona Transform] Has relevant notes: ${hasRelevantNotes}`)
 
     // Build persona transformation prompt
     const transformationPrompt = hasRelevantNotes
