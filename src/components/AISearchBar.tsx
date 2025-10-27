@@ -1555,19 +1555,21 @@ export function AISearchBar({
     <div className={`plasmo-flex plasmo-flex-col plasmo-h-full ${className}`}>
       {/* Header Section - Dynamic Greeting and Controls */}
       <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-py-2 plasmo-px-3 plasmo-border-b plasmo-border-slate-200">
-        {/* Left: MIND KEEP label and greeting */}
+        {/* Left: MIND KEEP label and greeting (hide greeting in insert mode) */}
         <div className="plasmo-flex plasmo-flex-col plasmo-gap-1">
           <span className="plasmo-text-[8px] plasmo-font-medium plasmo-text-slate-500 plasmo-uppercase plasmo-tracking-wider">
             Mind Keep
           </span>
-          <div className="plasmo-flex plasmo-flex-col plasmo-gap-0.5">
-            <span className="plasmo-text-base plasmo-font-light plasmo-text-slate-700">
-              {greeting}!
-            </span>
-            <span className="plasmo-text-base plasmo-font-normal plasmo-text-slate-800">
-              May I help you with anything?
-            </span>
-          </div>
+          {!enableInsertMode && (
+            <div className="plasmo-flex plasmo-flex-col plasmo-gap-0.5">
+              <span className="plasmo-text-base plasmo-font-light plasmo-text-slate-700">
+                {greeting}!
+              </span>
+              <span className="plasmo-text-base plasmo-font-normal plasmo-text-slate-800">
+                May I help you with anything?
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Right: Clear & Toggle buttons */}
@@ -1592,41 +1594,43 @@ export function AISearchBar({
               </svg>
             </button>
 
-            {/* Toggle chat history button */}
-            <button
-              onClick={() => setIsChatExpanded(!isChatExpanded)}
-              className="plasmo-p-1.5 plasmo-rounded-lg plasmo-text-slate-500 hover:plasmo-text-slate-700 hover:plasmo-bg-slate-100 plasmo-transition-colors"
-              title={
-                isChatExpanded ? "Hide chat history" : "Show chat history"
-              }>
-              {isChatExpanded ? (
-                <svg
-                  className="plasmo-w-4 plasmo-h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              ) : (
-                <svg
-                  className="plasmo-w-4 plasmo-h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 15l7-7 7 7"
-                  />
-                </svg>
-              )}
-            </button>
+            {/* Toggle chat history button - hide in insert mode */}
+            {!enableInsertMode && (
+              <button
+                onClick={() => setIsChatExpanded(!isChatExpanded)}
+                className="plasmo-p-1.5 plasmo-rounded-lg plasmo-text-slate-500 hover:plasmo-text-slate-700 hover:plasmo-bg-slate-100 plasmo-transition-colors"
+                title={
+                  isChatExpanded ? "Hide chat history" : "Show chat history"
+                }>
+                {isChatExpanded ? (
+                  <svg
+                    className="plasmo-w-4 plasmo-h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    className="plasmo-w-4 plasmo-h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 15l7-7 7 7"
+                    />
+                  </svg>
+                )}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -1664,6 +1668,17 @@ export function AISearchBar({
               // Filter out empty AI messages (streaming placeholders before content arrives)
               if (message.type === "ai" && !message.content.trim()) {
                 return false
+              }
+              return true
+            })
+            // In insert mode, only show the last AI message
+            .filter((_, index, arr) => {
+              if (enableInsertMode) {
+                // Find the last AI message
+                const lastAiIndex = arr.map((m, i) => ({ m, i }))
+                  .reverse()
+                  .find(({ m }) => m.type === "ai")?.i
+                return index === lastAiIndex
               }
               return true
             })

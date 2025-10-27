@@ -20,6 +20,14 @@ export class InputFieldManager {
   private blurListener: ((field: ManagedInputField) => void) | null = null
 
   /**
+   * Check if an element is contenteditable (handles all contenteditable variations)
+   */
+  private isContentEditable(element: HTMLElement): boolean {
+    const contenteditable = element.getAttribute("contenteditable")
+    return contenteditable !== null && contenteditable !== "false"
+  }
+
+  /**
    * Initialize the manager and start detecting input fields
    */
   initialize(options: {
@@ -49,7 +57,9 @@ export class InputFieldManager {
       "input:not([type])", // Input without type defaults to text
       'input[type="password"]', // Include password fields as per requirements
       "textarea",
-      '[contenteditable="true"]' // Rich text editors like Gmail
+      '[contenteditable="true"]', // Rich text editors like Gmail
+      '[contenteditable="plaintext-only"]', // Gmail compose box
+      '[contenteditable=""]' // Some editors set empty contenteditable
     ]
 
     const inputs = document.querySelectorAll(selectors.join(", "))
@@ -96,7 +106,7 @@ export class InputFieldManager {
 
             // Check for inputs within the added node
             const inputs = element.querySelectorAll(
-              'input[type="text"], input[type="email"], input[type="url"], input[type="password"], input:not([type]), textarea, [contenteditable="true"]'
+              'input[type="text"], input[type="email"], input[type="url"], input[type="password"], input:not([type]), textarea, [contenteditable="true"], [contenteditable="plaintext-only"], [contenteditable=""]'
             )
             inputs.forEach((input) => {
               if (this.isValidInputField(input as HTMLElement)) {
@@ -185,7 +195,8 @@ export class InputFieldManager {
     }
 
     // Allow contenteditable elements (like Gmail compose)
-    if (element.getAttribute("contenteditable") === "true") {
+    // Check for any contenteditable attribute (true, plaintext-only, etc.)
+    if (this.isContentEditable(element)) {
       return true
     }
 
@@ -298,7 +309,7 @@ export class InputFieldManager {
         element.selectionStart || 0,
         element.selectionEnd || 0
       )
-    } else if (element.getAttribute("contenteditable") === "true") {
+    } else if (this.isContentEditable(element)) {
       // For contenteditable, get selection
       const selection = window.getSelection()
       if (selection && selection.rangeCount > 0) {
@@ -333,7 +344,7 @@ export class InputFieldManager {
       element instanceof HTMLTextAreaElement
     ) {
       return element.value
-    } else if (element.getAttribute("contenteditable") === "true") {
+    } else if (this.isContentEditable(element)) {
       return element.textContent || ""
     }
 
@@ -369,24 +380,54 @@ export class InputFieldManager {
       element.dispatchEvent(inputEvent)
 
       console.log("✍️  [InputFieldManager] Inserted text at cursor position")
-    } else if (element.getAttribute("contenteditable") === "true") {
-      // For contenteditable, insert at selection
-      const selection = window.getSelection()
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0)
-        range.deleteContents()
-        const textNode = document.createTextNode(text)
-        range.insertNode(textNode)
+    } else if (this.isContentEditable(element)) {
+      // For contenteditable, use execCommand for better compatibility
+      // This works better with Gmail and other rich text editors
 
-        // Move cursor to end of inserted text
-        range.setStartAfter(textNode)
-        range.setEndAfter(textNode)
-        selection.removeAllRanges()
-        selection.addRange(range)
+      // First, focus the element to ensure it's active
+      element.focus()
 
-        console.log(
-          "✍️  [InputFieldManager] Inserted text into contenteditable"
-        )
+      // Try using execCommand first (works better with Gmail)
+      try {
+        // Use insertText command which properly triggers input events
+        const success = document.execCommand('insertText', false, text)
+
+        if (success) {
+          console.log(
+            "✍️  [InputFieldManager] Inserted text into contenteditable using execCommand"
+          )
+        } else {
+          throw new Error("execCommand failed")
+        }
+      } catch (error) {
+        // Fallback to manual insertion if execCommand doesn't work
+        console.log("⚠️ [InputFieldManager] execCommand failed, using fallback method")
+        const selection = window.getSelection()
+        if (selection && selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0)
+          range.deleteContents()
+          const textNode = document.createTextNode(text)
+          range.insertNode(textNode)
+
+          // Move cursor to end of inserted text
+          range.setStartAfter(textNode)
+          range.setEndAfter(textNode)
+          selection.removeAllRanges()
+          selection.addRange(range)
+
+          // Trigger input events manually for frameworks to detect changes
+          const inputEvent = new InputEvent('input', {
+            bubbles: true,
+            cancelable: true,
+            inputType: 'insertText',
+            data: text
+          })
+          element.dispatchEvent(inputEvent)
+
+          console.log(
+            "✍️  [InputFieldManager] Inserted text into contenteditable using fallback"
+          )
+        }
       }
     }
   }
@@ -439,9 +480,34 @@ export class InputFieldManager {
         "🔄 [InputFieldManager] Replaced text",
         replaceAll ? "(entire content)" : "(selection or cursor)"
       )
-    } else if (element.getAttribute("contenteditable") === "true") {
+    } else if (this.isContentEditable(element)) {
       if (replaceAll) {
-        element.textContent = text
+        // Focus first
+        element.focus()
+
+        // Select all content
+        const selection = window.getSelection()
+        const range = document.createRange()
+        range.selectNodeContents(element)
+        selection?.removeAllRanges()
+        selection?.addRange(range)
+
+        // Use execCommand to replace (better for Gmail)
+        try {
+          document.execCommand('insertText', false, text)
+        } catch (error) {
+          // Fallback
+          element.textContent = text
+
+          // Trigger input event
+          const inputEvent = new InputEvent('input', {
+            bubbles: true,
+            cancelable: true,
+            inputType: 'insertText',
+            data: text
+          })
+          element.dispatchEvent(inputEvent)
+        }
       } else {
         this.insertTextAtCursor(field, text)
       }
