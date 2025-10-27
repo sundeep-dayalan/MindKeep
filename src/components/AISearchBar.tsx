@@ -302,7 +302,9 @@ export function AISearchBar({
       const currentId = currentPersona?.id || null
       const newId = persona?.id || null
       if (currentId !== newId) {
-        console.log("🎭 [AISearchBar] Persona mismatch, calling setPersona()...")
+        console.log(
+          "🎭 [AISearchBar] Persona mismatch, calling setPersona()..."
+        )
         await agent.setPersona(persona)
       }
 
@@ -1944,7 +1946,7 @@ export function AISearchBar({
                     }
                   : undefined
               }
-              className={`plasmo-flex-shrink-0 plasmo-w-9 plasmo-h-9 plasmo-text-white plasmo-rounded-lg plasmo-flex plasmo-items-center plasmo-justify-center hover:plasmo-bg-slate-700 plasmo-transition-colors disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed ${
+              className={`plasmo-flex-shrink-0 plasmo-px-4 plasmo-py-2 plasmo-text-white plasmo-rounded-lg plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-justify-center hover:plasmo-bg-slate-700 plasmo-transition-colors disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed ${
                 showInsertButton && enableInsertMode
                   ? "plasmo-bg-purple-600 hover:plasmo-bg-purple-700"
                   : "plasmo-bg-slate-900"
@@ -1967,33 +1969,32 @@ export function AISearchBar({
                 currentInputLength > 8000
               }>
               {showInsertButton && enableInsertMode ? (
-                // Insert icon
-                <svg
-                  className="plasmo-w-4 plasmo-h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
+                // Insert button with text and Enter symbol
+                <>
+                  <span className="plasmo-text-sm plasmo-font-medium">
+                    Insert
+                  </span>
+                  <span className="plasmo-text-xs plasmo-opacity-80">↵</span>
+                </>
               ) : (
-                // Send icon
-                <svg
-                  className="plasmo-w-4 plasmo-h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M14 5l7 7m0 0l-7 7m7-7H3"
-                  />
-                </svg>
+                // Send button with text
+                <>
+                  <span className="plasmo-text-sm plasmo-font-medium">
+                    Send
+                  </span>
+                  <svg
+                    className="plasmo-w-4 plasmo-h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M14 5l7 7m0 0l-7 7m7-7H3"
+                    />
+                  </svg>
+                </>
               )}
             </button>
           </div>

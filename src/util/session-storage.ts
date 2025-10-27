@@ -10,6 +10,8 @@
  * so we detect the context and route through the background script when needed.
  */
 
+import { isExtensionContextValid, safeExtensionCall } from "./extension-context"
+
 const STORAGE_KEYS = {
   AI_CHAT_MESSAGES: "ai_chat_messages",
   AI_CHAT_METADATA: "ai_chat_metadata"
@@ -51,13 +53,21 @@ function isContentScript(): boolean {
  * Routes through background script if called from content script
  */
 export async function saveChatMessages(messages: ChatMessage[]): Promise<void> {
+  // Check if extension context is valid
+  if (!isExtensionContextValid()) {
+    console.warn("⚠️  [Session Storage] Extension context invalid - skipping save")
+    return
+  }
+
   try {
     if (isContentScript()) {
       // Route through background script
-      await chrome.runtime.sendMessage({
-        type: "SESSION_STORAGE_SAVE",
-        data: { messages }
-      })
+      await safeExtensionCall(
+        () => chrome.runtime.sendMessage({
+          type: "SESSION_STORAGE_SAVE",
+          data: { messages }
+        })
+      )
       console.log(
         `💾 [Session Storage] Saved ${messages.length} chat messages (via background)`
       )
@@ -83,12 +93,21 @@ export async function saveChatMessages(messages: ChatMessage[]): Promise<void> {
  * Routes through background script if called from content script
  */
 export async function loadChatMessages(): Promise<ChatMessage[]> {
+  // Check if extension context is valid
+  if (!isExtensionContextValid()) {
+    console.warn("⚠️  [Session Storage] Extension context invalid - returning empty messages")
+    return []
+  }
+
   try {
     if (isContentScript()) {
       // Route through background script
-      const response = await chrome.runtime.sendMessage({
-        type: "SESSION_STORAGE_LOAD"
-      })
+      const response = await safeExtensionCall(
+        () => chrome.runtime.sendMessage({
+          type: "SESSION_STORAGE_LOAD"
+        }),
+        { messages: [] }
+      )
       const messages = response?.messages || []
       console.log(
         `📥 [Session Storage] Loaded ${messages.length} chat messages (via background)`
@@ -116,12 +135,20 @@ export async function loadChatMessages(): Promise<ChatMessage[]> {
  * Routes through background script if called from content script
  */
 export async function clearChatMessages(): Promise<void> {
+  // Check if extension context is valid
+  if (!isExtensionContextValid()) {
+    console.warn("⚠️  [Session Storage] Extension context invalid - skipping clear")
+    return
+  }
+
   try {
     if (isContentScript()) {
       // Route through background script
-      await chrome.runtime.sendMessage({
-        type: "SESSION_STORAGE_CLEAR"
-      })
+      await safeExtensionCall(
+        () => chrome.runtime.sendMessage({
+          type: "SESSION_STORAGE_CLEAR"
+        })
+      )
       console.log("🗑️ [Session Storage] Cleared chat messages (via background)")
     } else {
       // Direct access from extension context
@@ -142,12 +169,21 @@ export async function clearChatMessages(): Promise<void> {
  * Routes through background script if called from content script
  */
 export async function getChatMetadata(): Promise<ChatMetadata | null> {
+  // Check if extension context is valid
+  if (!isExtensionContextValid()) {
+    console.warn("⚠️  [Session Storage] Extension context invalid - returning null metadata")
+    return null
+  }
+
   try {
     if (isContentScript()) {
       // Route through background script
-      const response = await chrome.runtime.sendMessage({
-        type: "SESSION_STORAGE_GET_METADATA"
-      })
+      const response = await safeExtensionCall(
+        () => chrome.runtime.sendMessage({
+          type: "SESSION_STORAGE_GET_METADATA"
+        }),
+        { metadata: null }
+      )
       return response?.metadata || null
     } else {
       // Direct access from extension context

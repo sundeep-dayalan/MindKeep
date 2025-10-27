@@ -8,7 +8,7 @@
 export interface Position {
   top: number
   left: number
-  placement: 'top' | 'bottom' | 'left' | 'right'
+  placement: "top" | "bottom" | "left" | "right"
 }
 
 export interface Dimensions {
@@ -39,28 +39,28 @@ export function calculateModalPosition(
   const spaceLeft = inputRect.left
   const spaceRight = viewport.width - inputRect.right
 
-  console.log('📐 [PositionCalculator] Available space:', {
-    above: spaceAbove,
-    below: spaceBelow,
-    left: spaceLeft,
-    right: spaceRight,
-    viewport,
-    inputRect: {
-      top: inputRect.top,
-      bottom: inputRect.bottom,
-      left: inputRect.left,
-      right: inputRect.right
-    }
-  })
+  // console.log('📐 [PositionCalculator] Available space:', {
+  //   above: spaceAbove,
+  //   below: spaceBelow,
+  //   left: spaceLeft,
+  //   right: spaceRight,
+  //   viewport,
+  //   inputRect: {
+  //     top: inputRect.top,
+  //     bottom: inputRect.bottom,
+  //     left: inputRect.left,
+  //     right: inputRect.right
+  //   }
+  // })
 
   // Determine primary placement (prefer right > bottom > left > top)
-  let placement: 'top' | 'bottom' | 'left' | 'right'
+  let placement: "top" | "bottom" | "left" | "right"
   let top: number
   let left: number
 
   // Priority 1: Try placing to the RIGHT of input
   if (spaceRight >= modalDimensions.width + SPACING + EDGE_PADDING) {
-    placement = 'right'
+    placement = "right"
     left = inputRect.right + SPACING
     top = inputRect.top
 
@@ -74,7 +74,7 @@ export function calculateModalPosition(
   }
   // Priority 2: Try placing BELOW input
   else if (spaceBelow >= modalDimensions.height + SPACING + EDGE_PADDING) {
-    placement = 'bottom'
+    placement = "bottom"
     top = inputRect.bottom + SPACING
     left = inputRect.left
 
@@ -88,7 +88,7 @@ export function calculateModalPosition(
   }
   // Priority 3: Try placing to the LEFT of input
   else if (spaceLeft >= modalDimensions.width + SPACING + EDGE_PADDING) {
-    placement = 'left'
+    placement = "left"
     left = inputRect.left - modalDimensions.width - SPACING
     top = inputRect.top
 
@@ -102,7 +102,7 @@ export function calculateModalPosition(
   }
   // Priority 4: Try placing ABOVE input
   else if (spaceAbove >= modalDimensions.height + SPACING + EDGE_PADDING) {
-    placement = 'top'
+    placement = "top"
     top = inputRect.top - modalDimensions.height - SPACING
     left = inputRect.left
 
@@ -116,15 +116,19 @@ export function calculateModalPosition(
   }
   // Fallback: Center modal on screen if no good placement found
   else {
-    console.warn(
-      '⚠️  [PositionCalculator] Insufficient space in all directions, centering modal'
-    )
-    placement = 'bottom' // Arbitrary
+    // console.warn(
+    //   "⚠️  [PositionCalculator] Insufficient space in all directions, centering modal"
+    // )
+    placement = "bottom" // Arbitrary
     left = Math.max(EDGE_PADDING, (viewport.width - modalDimensions.width) / 2)
     top = Math.max(EDGE_PADDING, (viewport.height - modalDimensions.height) / 2)
   }
 
-  console.log('✅ [PositionCalculator] Calculated position:', { placement, top, left })
+  // console.log("✅ [PositionCalculator] Calculated position:", {
+  //   placement,
+  //   top,
+  //   left
+  // })
 
   return { top, left, placement }
 }
@@ -133,14 +137,17 @@ export function calculateModalPosition(
  * Calculate position for the injected icon within an input field
  * Places icon in the bottom-right corner (like Grammarly)
  */
-export function calculateIconPosition(inputElement: HTMLElement): { top: string; right: string } {
+export function calculateIconPosition(inputElement: HTMLElement): {
+  top: string
+  right: string
+} {
   // For standard inputs, use absolute positioning within the input
   // Icon should be in bottom-right corner with some padding
 
   const PADDING = 8 // pixels from edge
 
   return {
-    top: 'auto',
+    top: "auto",
     right: `${PADDING}px`
   }
 }
@@ -160,15 +167,15 @@ export function setupPositionTracking(
   }
 
   // Update on scroll and resize
-  window.addEventListener('scroll', updatePosition, true) // Use capture for better tracking
-  window.addEventListener('resize', updatePosition)
+  window.addEventListener("scroll", updatePosition, true) // Use capture for better tracking
+  window.addEventListener("resize", updatePosition)
 
   // Initial position
   updatePosition()
 
   // Return cleanup function
   return () => {
-    window.removeEventListener('scroll', updatePosition, true)
-    window.removeEventListener('resize', updatePosition)
+    window.removeEventListener("scroll", updatePosition, true)
+    window.removeEventListener("resize", updatePosition)
   }
 }

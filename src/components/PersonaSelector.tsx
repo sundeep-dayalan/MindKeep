@@ -13,6 +13,12 @@ import {
 } from "~services/db-service"
 import { getSelectedPersonaId } from "~services/persona-settings"
 import type { Persona } from "~types/persona"
+import {
+  isExtensionContextValid,
+  safeAddStorageListener,
+  safeExtensionCall,
+  showExtensionReloadMessage
+} from "~util/extension-context"
 
 interface PersonaSelectorProps {
   onPersonaChange?: (persona: Persona | null, isManualChange?: boolean) => void
@@ -104,15 +110,29 @@ export function PersonaSelector({
       }
     }
 
-    chrome.storage.onChanged.addListener(handleStorageChange)
+    const cleanup = safeAddStorageListener(handleStorageChange)
 
     return () => {
-      chrome.storage.onChanged.removeListener(handleStorageChange)
+      if (cleanup) {
+        cleanup()
+      }
     }
   }, [onPersonaChange])
 
   const loadPersonas = async () => {
     console.log(" [PersonaSelector] loadPersonas called")
+
+    // Check if extension context is valid
+    if (!isExtensionContextValid()) {
+      console.error(" [PersonaSelector] Extension context is invalid - cannot load personas")
+      showExtensionReloadMessage()
+      setIsInitializing(false)
+      if (onInitializationChange) {
+        onInitializationChange(false)
+      }
+      return
+    }
+
     try {
       setIsInitializing(true) // Start initialization
       if (onInitializationChange) {
@@ -134,10 +154,14 @@ export function PersonaSelector({
           " [PersonaSelector] Running in content script, fetching via messaging"
         )
 
-        const [personasResponse, activeResponse] = await Promise.all([
-          chrome.runtime.sendMessage({ type: "GET_ALL_PERSONAS" }),
-          chrome.runtime.sendMessage({ type: "GET_ACTIVE_PERSONA" })
-        ])
+        const personasResponse = await safeExtensionCall(
+          () => chrome.runtime.sendMessage({ type: "GET_ALL_PERSONAS" }),
+          { personas: [] }
+        )
+        const activeResponse = await safeExtensionCall(
+          () => chrome.runtime.sendMessage({ type: "GET_ACTIVE_PERSONA" }),
+          { persona: null }
+        )
 
         allPersonas = personasResponse?.personas || []
         active = activeResponse?.persona || null
@@ -251,6 +275,14 @@ export function PersonaSelector({
       persona?.name || "None (default mode)"
     )
 
+    // Check if extension context is valid
+    if (!isExtensionContextValid()) {
+      console.error(" [PersonaSelector] Extension context is invalid - cannot change persona")
+      showExtensionReloadMessage()
+      alert("Extension needs to be reloaded. Please refresh the page.")
+      return
+    }
+
     setLoading(true)
     setIsOpen(false)
 
@@ -266,10 +298,13 @@ export function PersonaSelector({
         console.log(
           " [PersonaSelector] Running in content script, using messaging to set active persona"
         )
-        const response = await chrome.runtime.sendMessage({
-          type: "SET_ACTIVE_PERSONA",
-          data: { personaId: persona?.id || null }
-        })
+        const response = await safeExtensionCall(
+          () => chrome.runtime.sendMessage({
+            type: "SET_ACTIVE_PERSONA",
+            data: { personaId: persona?.id || null }
+          }),
+          { success: false }
+        )
 
         if (!response?.success) {
           throw new Error(response?.error || "Failed to set active persona")
