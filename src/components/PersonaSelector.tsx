@@ -13,17 +13,25 @@ import {
 } from "~services/db-service"
 import { getSelectedPersonaId } from "~services/persona-settings"
 import type { Persona } from "~types/persona"
+import {
+  isExtensionContextValid,
+  safeAddStorageListener,
+  safeExtensionCall,
+  showExtensionReloadMessage
+} from "~util/extension-context"
 
 interface PersonaSelectorProps {
   onPersonaChange?: (persona: Persona | null, isManualChange?: boolean) => void
   onInitializationChange?: (isInitializing: boolean) => void // Notify parent of initialization state
   onManageClick?: () => void // Callback to open Personas management page
+  openUpward?: boolean // Control dropdown direction (default: true for upward)
 }
 
 export function PersonaSelector({
   onPersonaChange,
   onInitializationChange,
-  onManageClick
+  onManageClick,
+  openUpward = true
 }: PersonaSelectorProps) {
   const [personas, setPersonas] = useState<Persona[]>([])
   const [activePersona, setActivePersonaState] = useState<Persona | null>(null)
@@ -32,22 +40,145 @@ export function PersonaSelector({
   const [isInitializing, setIsInitializing] = useState(true) // Start as true - we're loading
 
   useEffect(() => {
-    console.log(" [PersonaSelector] Component mounted, loading personas")
+    console.log("[PersonaSelector] Component mounted, loading personas")
+    console.log(
+      "[PersonaSelector] onPersonaChange callback exists?",
+      !!onPersonaChange
+    )
+    console.log("[PersonaSelector] Callback type:", typeof onPersonaChange)
     loadPersonas()
   }, [])
 
+  // Listen for persona changes from other contexts (in-page chat, other tabs)
+  useEffect(() => {
+    const handleStorageChange = async (
+      changes: { [key: string]: chrome.storage.StorageChange },
+      areaName: string
+    ) => {
+      // Listen for changes to persona settings in chrome.storage.local
+      if (areaName === "local" && changes["mindkeep_persona_settings"]) {
+        const newSettings = changes["mindkeep_persona_settings"].newValue
+        const oldSettings = changes["mindkeep_persona_settings"].oldValue
+
+        console.log(" [PersonaSelector] Persona settings changed:", {
+          old: oldSettings,
+          new: newSettings
+        })
+
+        // Check if selectedPersonaId changed
+        if (newSettings?.selectedPersonaId !== oldSettings?.selectedPersonaId) {
+          console.log(
+            " [PersonaSelector] Selected persona changed to:",
+            newSettings?.selectedPersonaId
+          )
+
+          // Load the new persona
+          if (newSettings?.selectedPersonaId) {
+            const allPersonas = await getAllPersonas()
+            const persona = allPersonas.find(
+              (p) => p.id === newSettings.selectedPersonaId
+            )
+            if (persona) {
+              console.log(
+                " [PersonaSelector] Syncing to persona from storage:",
+                persona.name
+              )
+              setActivePersonaState(persona)
+
+              // Notify parent to update agent (isManualChange = false for sync)
+              if (onPersonaChange) {
+                console.log(
+                  " [PersonaSelector] Notifying parent of synced persona"
+                )
+                onPersonaChange(persona, false)
+              }
+            }
+          } else {
+            // Switch to default mode
+            console.log(
+              " [PersonaSelector] Syncing to default mode from storage"
+            )
+            setActivePersonaState(null)
+
+            // Notify parent to update agent
+            if (onPersonaChange) {
+              console.log(" [PersonaSelector] Notifying parent of default mode")
+              onPersonaChange(null, false)
+            }
+          }
+        }
+      }
+    }
+
+    const cleanup = safeAddStorageListener(handleStorageChange)
+
+    return () => {
+      if (cleanup) {
+        cleanup()
+      }
+    }
+  }, [onPersonaChange])
+
   const loadPersonas = async () => {
     console.log(" [PersonaSelector] loadPersonas called")
+
+    // Check if extension context is valid
+    if (!isExtensionContextValid()) {
+      console.error(
+        " [PersonaSelector] Extension context is invalid - cannot load personas"
+      )
+      showExtensionReloadMessage()
+      setIsInitializing(false)
+      if (onInitializationChange) {
+        onInitializationChange(false)
+      }
+      return
+    }
+
     try {
       setIsInitializing(true) // Start initialization
       if (onInitializationChange) {
         onInitializationChange(true)
       }
 
-      const [allPersonas, active] = await Promise.all([
-        getAllPersonas(),
-        getActivePersona()
-      ])
+      // Check if we're in a content script context (cannot access extension IndexedDB directly)
+      const isContentScript =
+        typeof window !== "undefined" &&
+        (window.location.protocol === "http:" ||
+          window.location.protocol === "https:")
+
+      let allPersonas: Persona[]
+      let active: Persona | null
+
+      if (isContentScript) {
+        // In content script - fetch from background via messaging
+        console.log(
+          " [PersonaSelector] Running in content script, fetching via messaging"
+        )
+
+        const personasResponse = await safeExtensionCall(
+          () => chrome.runtime.sendMessage({ type: "GET_ALL_PERSONAS" }),
+          { personas: [] }
+        )
+        const activeResponse = await safeExtensionCall(
+          () => chrome.runtime.sendMessage({ type: "GET_ACTIVE_PERSONA" }),
+          { persona: null }
+        )
+
+        allPersonas = personasResponse?.personas || []
+        active = activeResponse?.persona || null
+      } else {
+        // In extension page - use direct DB access
+        console.log(
+          " [PersonaSelector] Running in extension page, using direct DB access"
+        )
+        const [personas, activePersona] = await Promise.all([
+          getAllPersonas(),
+          getActivePersona()
+        ])
+        allPersonas = personas
+        active = activePersona
+      }
 
       console.log(` [PersonaSelector] Loaded ${allPersonas.length} personas`)
       console.log(" [PersonaSelector] Active persona:", active?.name || "None")
@@ -79,27 +210,25 @@ export function PersonaSelector({
 
   const restoreSavedPersona = async (allPersonas: Persona[]) => {
     try {
+      console.log("[PersonaSelector] restoreSavedPersona called")
       const savedPersonaId = await getSelectedPersonaId()
 
       if (!savedPersonaId) {
         console.log(
-          " [PersonaSelector] No saved persona, staying in default mode"
+          "[PersonaSelector] No saved persona, staying in default mode"
         )
         return
       }
 
       console.log(
-        " [PersonaSelector] Restoring saved persona ID:",
+        "[PersonaSelector] Restoring saved persona ID:",
         savedPersonaId
       )
 
       const savedPersona = allPersonas.find((p) => p.id === savedPersonaId)
 
       if (savedPersona) {
-        console.log(
-          " [PersonaSelector] Found saved persona:",
-          savedPersona.name
-        )
+        console.log("[PersonaSelector] Found saved persona:", savedPersona.name)
 
         // Just update local state - don't call setActivePersona() to avoid triggering storage listener
         setActivePersonaState(savedPersona)
@@ -107,13 +236,23 @@ export function PersonaSelector({
         // Notify parent to update agent (isManualChange = false for restoration)
         if (onPersonaChange) {
           console.log(
-            " [PersonaSelector] Notifying parent of restored persona (silent)"
+            "[PersonaSelector] Calling onPersonaChange callback with restored persona"
           )
+          console.log("[PersonaSelector] Persona data:", {
+            id: savedPersona.id,
+            name: savedPersona.name,
+            isManualChange: false
+          })
           onPersonaChange(savedPersona, false) // false = don't show "Switched to..." message
+          console.log("[PersonaSelector] onPersonaChange callback completed")
+        } else {
+          console.warn(
+            "[PersonaSelector] No onPersonaChange callback provided!"
+          )
         }
       } else {
         console.log(
-          " [PersonaSelector] Saved persona not found in database, clearing selection"
+          "[PersonaSelector] Saved persona not found in database, clearing selection"
         )
         // Clear invalid saved persona from storage only
         const { setSelectedPersona } = await import(
@@ -122,7 +261,7 @@ export function PersonaSelector({
         await setSelectedPersona(null)
       }
     } catch (error) {
-      console.error(" [PersonaSelector] Error restoring saved persona:", error)
+      console.error("[PersonaSelector] Error restoring saved persona:", error)
     }
   }
 
@@ -132,11 +271,48 @@ export function PersonaSelector({
       persona?.name || "None (default mode)"
     )
 
+    // Check if extension context is valid
+    if (!isExtensionContextValid()) {
+      console.error(
+        " [PersonaSelector] Extension context is invalid - cannot change persona"
+      )
+      showExtensionReloadMessage()
+      alert("Extension needs to be reloaded. Please refresh the page.")
+      return
+    }
+
     setLoading(true)
     setIsOpen(false)
 
     try {
-      await setActivePersona(persona?.id || null)
+      // Check if we're in a content script context
+      const isContentScript =
+        typeof window !== "undefined" &&
+        (window.location.protocol === "http:" ||
+          window.location.protocol === "https:")
+
+      if (isContentScript) {
+        // In content script - use messaging to set active persona
+        console.log(
+          " [PersonaSelector] Running in content script, using messaging to set active persona"
+        )
+        const response = await safeExtensionCall(
+          () =>
+            chrome.runtime.sendMessage({
+              type: "SET_ACTIVE_PERSONA",
+              data: { personaId: persona?.id || null }
+            }),
+          { success: false }
+        )
+
+        if (!response?.success) {
+          throw new Error(response?.error || "Failed to set active persona")
+        }
+      } else {
+        // In extension page - use direct DB access
+        await setActivePersona(persona?.id || null)
+      }
+
       setActivePersonaState(persona)
 
       if (onPersonaChange) {
@@ -224,8 +400,13 @@ export function PersonaSelector({
             onClick={() => setIsOpen(false)}
           />
 
-          {/* Menu Panel - Opens UPWARD - Compact Style */}
-          <div className="plasmo-absolute plasmo-bottom-full plasmo-mb-2 plasmo-left-0 plasmo-w-[260px] plasmo-bg-white plasmo-border plasmo-border-slate-200 plasmo-rounded-lg plasmo-shadow-xl plasmo-z-[101] plasmo-max-h-[360px] plasmo-overflow-hidden plasmo-flex plasmo-flex-col">
+          {/* Menu Panel - Opens UPWARD or DOWNWARD - Compact Style */}
+          <div
+            className={`plasmo-absolute plasmo-left-0 plasmo-w-[260px] plasmo-bg-white plasmo-border plasmo-border-slate-200 plasmo-rounded-lg plasmo-shadow-xl plasmo-z-[101] plasmo-max-h-[500px] plasmo-overflow-hidden plasmo-flex plasmo-flex-col ${
+              openUpward
+                ? "plasmo-bottom-full plasmo-mb-2"
+                : "plasmo-top-full plasmo-mt-2"
+            }`}>
             {/* Header */}
             <div className="plasmo-px-3 plasmo-py-2.5 plasmo-border-b plasmo-border-slate-100 plasmo-bg-slate-50 plasmo-flex plasmo-items-center plasmo-justify-between">
               <h3 className="plasmo-text-xs plasmo-font-semibold plasmo-text-slate-700">
@@ -263,7 +444,9 @@ export function PersonaSelector({
             </div>
 
             {/* Scrollable Content */}
-            <div className="plasmo-overflow-y-auto plasmo-flex-1 plasmo-no-visible-scrollbar">
+            <div
+              className="plasmo-overflow-y-auto plasmo-flex-1 plasmo-max-h-[400px]"
+              style={{ overflowY: "auto" }}>
               {/* Default Mode Option */}
               <button
                 onClick={() => handleSelect(null)}

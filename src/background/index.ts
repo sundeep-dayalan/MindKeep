@@ -20,13 +20,72 @@
  */
 
 import { generateEmbedding } from "~services/ai-service"
-import { addNote, updateNote } from "~services/db-service"
+import {
+  addNote,
+  getActivePersona,
+  getAllPersonas,
+  getPersona,
+  setActivePersona,
+  updateNote
+} from "~services/db-service"
+import * as dbService from "~services/db-service"
+import { getGlobalAgent } from "~services/langchain-agent"
 import { encrypt } from "~util/crypto"
 
 export {}
 
 // Track side panel state per tab
 const sidePanelState = new Map<number, boolean>()
+
+// ==================== OFFSCREEN DOCUMENT MANAGEMENT ====================
+
+let creatingOffscreen: Promise<void> | null = null
+
+/**
+ * Ensure the offscreen document is created and ready
+ * This provides a shared context for database operations accessible from content scripts
+ */
+async function ensureOffscreenDocument() {
+  // Check if an offscreen document already exists
+  const existingContexts = await chrome.runtime.getContexts({
+    contextTypes: ["OFFSCREEN_DOCUMENT" as chrome.runtime.ContextType]
+  })
+
+  if (existingContexts.length > 0) {
+    console.log("🟢 [Background] Offscreen document already exists")
+    return
+  }
+
+  // If already in the process of creating, wait for that to finish
+  if (creatingOffscreen) {
+    console.log("⏳ [Background] Waiting for offscreen document creation...")
+    await creatingOffscreen
+    return
+  }
+
+  // Create the offscreen document
+  creatingOffscreen = chrome.offscreen.createDocument({
+    url: "offscreen/offscreen.html",
+    reasons: ["DOM_SCRAPING" as chrome.offscreen.Reason], // Required reason
+    justification:
+      "Provide shared IndexedDB access for database operations across extension contexts"
+  })
+
+  console.log("🔄 [Background] Creating offscreen document...")
+
+  await creatingOffscreen
+  creatingOffscreen = null
+
+  console.log("✅ [Background] Offscreen document created successfully")
+}
+
+/**
+ * Initialize offscreen document on extension startup
+ */
+chrome.runtime.onStartup.addListener(async () => {
+  console.log("🚀 [Background] Extension startup - initializing offscreen document")
+  await ensureOffscreenDocument()
+})
 
 // ==================== SIDE PANEL & UI MANAGEMENT ====================
 
@@ -68,14 +127,20 @@ chrome.runtime.onMessage.addListener((message, sender) => {
 // ==================== CONTEXT MENU ====================
 
 /**
- * Create context menu item for saving selected text
+ * Create context menu item for saving selected text and initialize offscreen document
  */
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener(async () => {
+  console.log("📦 [Background] Extension installed/updated")
+
+  // Create context menu
   chrome.contextMenus.create({
     id: "saveToMindKeep",
     title: "Save to MindKeep",
     contexts: ["selection"]
   })
+
+  // Initialize offscreen document
+  await ensureOffscreenDocument()
 })
 
 /**
@@ -132,6 +197,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
 /**
  * Message handler for processing note operations
+ * Also handles offscreen document database operations when running in offscreen context
  */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log(` [Background Listener] Received message type: ${message.type}`, {
@@ -143,11 +209,277 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   ;(async () => {
     try {
       switch (message.type) {
+        // ==================== OFFSCREEN DOCUMENT DATABASE OPERATIONS ====================
+        // These handlers are used when this same bundle runs in the offscreen document context
+
+        case "DB_SEARCH_BY_VECTOR": {
+          const { vector, limit } = message.payload
+          console.log(`🔍 [Offscreen] Searching by vector (limit: ${limit})`)
+          const results = await dbService.searchNotesByVector(vector, limit)
+          console.log(`✅ [Offscreen] Found ${results.length} results`)
+          return { success: true, data: results }
+        }
+
+        case "DB_SEARCH_BY_TITLE": {
+          const { query } = message.payload
+          console.log(`🔍 [Offscreen] Searching by title: "${query}"`)
+          const results = await dbService.searchNotesByTitle(query)
+          console.log(`✅ [Offscreen] Found ${results.length} results`)
+          return { success: true, data: results }
+        }
+
+        case "DB_GET_NOTE": {
+          const { id } = message.payload
+          console.log(`📄 [Offscreen] Getting note: ${id}`)
+          const note = await dbService.getNote(id)
+          return { success: true, data: note }
+        }
+
+        case "DB_GET_ALL_NOTES": {
+          console.log("📚 [Offscreen] Getting all notes")
+          const notes = await dbService.getAllNotes()
+          console.log(`✅ [Offscreen] Retrieved ${notes.length} notes`)
+          return { success: true, data: notes }
+        }
+
+        case "DB_ADD_NOTE": {
+          const { note } = message.payload
+          console.log(`➕ [Offscreen] Adding note: ${note.title}`)
+          const id = await dbService.addNote(note)
+          return { success: true, data: id }
+        }
+
+        case "DB_UPDATE_NOTE": {
+          const { note } = message.payload
+          console.log(`🔄 [Offscreen] Updating note: ${note.id}`)
+          const { id, ...updates } = note
+          await dbService.updateNote(id, updates)
+          return { success: true }
+        }
+
+        case "DB_DELETE_NOTE": {
+          const { id } = message.payload
+          console.log(`🗑️  [Offscreen] Deleting note: ${id}`)
+          await dbService.deleteNote(id)
+          return { success: true }
+        }
+
+        case "DB_GET_ALL_CATEGORIES": {
+          console.log("🏷️  [Offscreen] Getting all categories")
+          const categories = await dbService.getAllCategories()
+          return { success: true, data: categories }
+        }
+
+        case "DB_GET_PERSONA": {
+          const { id } = message.payload
+          console.log(`👤 [Offscreen] Getting persona: ${id}`)
+          const persona = await dbService.getPersona(id)
+          return { success: true, data: persona }
+        }
+
+        case "DB_GET_ALL_PERSONAS": {
+          console.log("👥 [Offscreen] Getting all personas")
+          const personas = await dbService.getAllPersonas()
+          return { success: true, data: personas }
+        }
+
+        case "DB_GET_ACTIVE_PERSONA": {
+          console.log("👤 [Offscreen] Getting active persona")
+          const persona = await dbService.getActivePersona()
+          return { success: true, data: persona }
+        }
+
+        case "DB_ADD_PERSONA": {
+          const { persona } = message.payload
+          console.log(`➕ [Offscreen] Adding persona: ${persona.name}`)
+          const id = await dbService.addPersona(persona)
+          return { success: true, data: id }
+        }
+
+        case "DB_UPDATE_PERSONA": {
+          const { persona } = message.payload
+          console.log(`🔄 [Offscreen] Updating persona: ${persona.id}`)
+          const { id, ...updates } = persona
+          await dbService.updatePersona(id, updates)
+          return { success: true }
+        }
+
+        case "DB_DELETE_PERSONA": {
+          const { id } = message.payload
+          console.log(`🗑️  [Offscreen] Deleting persona: ${id}`)
+          await dbService.deletePersona(id)
+          return { success: true }
+        }
+
+        case "DB_SET_ACTIVE_PERSONA": {
+          const { id } = message.payload
+          console.log(`✅ [Offscreen] Setting active persona: ${id}`)
+          await dbService.setActivePersona(id)
+          return { success: true }
+        }
+
+        case "AI_GENERATE_EMBEDDING": {
+          const { text } = message.payload
+          console.log(
+            `🤖 [Offscreen] Generating embedding for text (${text.length} chars)`
+          )
+          const embedding = await generateEmbedding(text)
+          console.log(
+            `✅ [Offscreen] Generated embedding (${embedding.length} dimensions)`
+          )
+          return { success: true, data: embedding }
+        }
+
+        // ==================== BACKGROUND SCRIPT OPERATIONS ====================
+
         case "SAVE_NOTE":
           return await handleSaveNote(message.data)
 
         case "UPDATE_NOTE":
           return await handleUpdateNote(message.data)
+
+        case "GET_ALL_PERSONAS":
+          console.log(" [Background] GET_ALL_PERSONAS request received")
+          const personas = await getAllPersonas()
+          console.log(` [Background] Returning ${personas.length} personas`)
+          return { success: true, personas }
+
+        case "GET_ACTIVE_PERSONA":
+          console.log(" [Background] GET_ACTIVE_PERSONA request received")
+          const activePersona = await getActivePersona()
+          console.log(
+            " [Background] Active persona:",
+            activePersona?.name || "None"
+          )
+          return { success: true, persona: activePersona }
+
+        case "SET_ACTIVE_PERSONA":
+          console.log(
+            " [Background] SET_ACTIVE_PERSONA request received for ID:",
+            message.data?.personaId
+          )
+          try {
+            // First, check if the persona exists (if ID is provided)
+            if (message.data?.personaId) {
+              console.log(
+                " [Background] Checking if persona exists:",
+                message.data.personaId
+              )
+              const persona = await getPersona(message.data.personaId)
+              if (!persona) {
+                console.error(
+                  " [Background] Persona not found for ID:",
+                  message.data.personaId
+                )
+                return { success: false, error: "Persona not found" }
+              }
+              console.log(" [Background] Persona found:", persona.name)
+            }
+
+            // Update the active persona in database
+            console.log(" [Background] Calling setActivePersona...")
+            const success = await setActivePersona(
+              message.data?.personaId || null
+            )
+
+            if (!success) {
+              console.error(" [Background] setActivePersona returned false")
+              return {
+                success: false,
+                error: "Failed to set active persona in database"
+              }
+            }
+
+            console.log(" [Background] Database updated successfully")
+
+            // Update the global agent in background context
+            console.log(" [Background] Updating global agent...")
+            const agent = await getGlobalAgent()
+
+            const persona = message.data?.personaId
+              ? await getPersona(message.data.personaId)
+              : null
+
+            await agent.setPersona(persona || null)
+            console.log(
+              " [Background] Persona updated successfully:",
+              persona?.name || "Default"
+            )
+
+            return { success: true, persona: persona || null }
+          } catch (error) {
+            console.error(" [Background] Error in SET_ACTIVE_PERSONA:", error)
+            console.error(" [Background] Error stack:", error?.stack)
+            return {
+              success: false,
+              error: error instanceof Error ? error.message : String(error)
+            }
+          }
+
+        case "SESSION_STORAGE_SAVE":
+          console.log(
+            " [Background] SESSION_STORAGE_SAVE request received",
+            message.data?.messages?.length || 0,
+            "messages"
+          )
+          try {
+            await chrome.storage.session.set({
+              ai_chat_messages: message.data.messages,
+              ai_chat_metadata: {
+                lastUpdated: Date.now(),
+                messageCount: message.data.messages.length
+              }
+            })
+            return { success: true }
+          } catch (error) {
+            console.error(" [Background] SESSION_STORAGE_SAVE error:", error)
+            return { success: false, error: String(error) }
+          }
+
+        case "SESSION_STORAGE_LOAD":
+          console.log(" [Background] SESSION_STORAGE_LOAD request received")
+          try {
+            const result = await chrome.storage.session.get("ai_chat_messages")
+            const messages = result.ai_chat_messages || []
+            console.log(
+              " [Background] Loaded",
+              messages.length,
+              "messages from session storage"
+            )
+            return { success: true, messages }
+          } catch (error) {
+            console.error(" [Background] SESSION_STORAGE_LOAD error:", error)
+            return { success: false, messages: [], error: String(error) }
+          }
+
+        case "SESSION_STORAGE_CLEAR":
+          console.log(" [Background] SESSION_STORAGE_CLEAR request received")
+          try {
+            await chrome.storage.session.remove([
+              "ai_chat_messages",
+              "ai_chat_metadata"
+            ])
+            return { success: true }
+          } catch (error) {
+            console.error(" [Background] SESSION_STORAGE_CLEAR error:", error)
+            return { success: false, error: String(error) }
+          }
+
+        case "SESSION_STORAGE_GET_METADATA":
+          console.log(
+            " [Background] SESSION_STORAGE_GET_METADATA request received"
+          )
+          try {
+            const result = await chrome.storage.session.get("ai_chat_metadata")
+            const metadata = result.ai_chat_metadata || null
+            return { success: true, metadata }
+          } catch (error) {
+            console.error(
+              " [Background] SESSION_STORAGE_GET_METADATA error:",
+              error
+            )
+            return { success: false, metadata: null, error: String(error) }
+          }
 
         default:
           return { success: false, error: "Unknown message type" }

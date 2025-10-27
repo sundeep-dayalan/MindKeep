@@ -229,7 +229,7 @@ export function PersonaManager({
   }
 
   const handleCancel = () => {
-    console.log("🎭 [PersonaManager] handleCancel - closing form")
+    console.log("[PersonaManager] handleCancel - closing form")
     setIsCreating(false)
     setEditingPersona(null)
   }

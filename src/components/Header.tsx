@@ -1,3 +1,4 @@
+import { DotLottieReact } from "@lottiefiles/dotlottie-react"
 import { useState } from "react"
 
 import { AnimatedShinyText } from "./ui/AnimatedShinyText"
@@ -44,10 +45,19 @@ export function Header({
   return (
     <div className="plasmo-bg-gradient-to-r plasmo-from-sky-100 plasmo-via-indigo-50 plasmo-to-white plasmo-border-b plasmo-border-slate-200 plasmo-p-4">
       <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-gap-2">
-        {/* Left: Logo */}
-        <AnimatedShinyText className="plasmo-text-xl plasmo-inline-flex plasmo-items-center plasmo-justify-center plasmo-px-4 plasmo-py-1 plasmo-transition plasmo-ease-out plasmo-hover:text-neutral-600 plasmo-hover:duration-300 plasmo-hover:dark:text-neutral-400">
-          MindKeep
-        </AnimatedShinyText>
+        {/* Left: Logo with Lottie Animation */}
+        <div className="plasmo-flex plasmo-items-center plasmo-gap-2">
+          <div className="plasmo-w-10 plasmo-h-10">
+            <DotLottieReact
+              src="https://lottie.host/523463c6-9440-4e42-bc0a-318978a9b8a2/S2YUnZFAfy.lottie"
+              loop
+              autoplay
+            />
+          </div>
+          <AnimatedShinyText className="plasmo-text-xl plasmo-inline-flex plasmo-items-center plasmo-justify-center  plasmo-py-1 plasmo-transition plasmo-ease-out plasmo-hover:text-neutral-600 plasmo-hover:duration-300 plasmo-hover:dark:text-neutral-400">
+            MindKeep
+          </AnimatedShinyText>
+        </div>
 
         {/* Center/Right: Search, Personas, Close */}
         <div className="plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-flex-1 plasmo-justify-end">

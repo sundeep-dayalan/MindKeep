@@ -7,9 +7,9 @@
 import { DynamicStructuredTool } from "@langchain/core/tools"
 import { z } from "zod"
 
-import * as aiService from "./ai-service"
-import type { Note } from "./db-service"
-import * as dbService from "./db-service"
+import * as aiService from "./ai-proxy"
+import type { Note } from "./db-proxy"
+import * as dbService from "./db-proxy"
 
 // ============================================================================
 // TOOL SCHEMAS (using Zod for validation)
@@ -120,16 +120,22 @@ export const searchNotesTool = new DynamicStructuredTool({
     try {
       console.log(`[Tool: search_notes] Hybrid search for: "${query}"`)
 
-      // --- Step 1: Semantic Vector Search ---
-      const embedding =
-        await aiService.EmbeddingPipeline.generateEmbedding(query)
-      const vectorResults = await dbService.searchNotesByVector(
-        embedding,
-        limit
-      )
+      let vectorResults = []
+      let embedding: number[] | null = null
+
+      // --- Step 1: Semantic Vector Search (with fallback) ---
+      try {
+        embedding = await aiService.EmbeddingPipeline.generateEmbedding(query)
+        vectorResults = await dbService.searchNotesByVector(embedding, limit)
+      } catch (embeddingError) {
+        console.warn(
+          `[Tool: search_notes] Vector search unavailable: ${embeddingError.message}`
+        )
+        console.warn(`[Tool: search_notes] Falling back to title-only search`)
+        // Vector search failed - will continue with title-only search below
+      }
 
       // --- Step 2: Keyword Title Search ---
-      // You already built this function, let's use it!
       const titleResults = await dbService.searchNotesByTitle(query)
 
       // --- Step 3: Merge and De-duplicate Results ---
@@ -139,16 +145,15 @@ export const searchNotesTool = new DynamicStructuredTool({
         `[Tool: search_notes] Found ${vectorResults.length} vector results and ${titleResults.length} title results`
       )
 
-      console.log("allResults before merging:", allResults)
-      console.log("vectorResults before merging:", vectorResults)
-
       // Add vector results first, respecting a proper threshold
-      const MIN_SIMILARITY_THRESHOLD = -0.2
-      vectorResults.forEach(({ note, score }) => {
-        if (score >= MIN_SIMILARITY_THRESHOLD) {
-          allResults.set(note.id, { ...note, similarity: score })
-        }
-      })
+      if (vectorResults.length > 0) {
+        const MIN_SIMILARITY_THRESHOLD = -0.2
+        vectorResults.forEach(({ note, score }) => {
+          if (score >= MIN_SIMILARITY_THRESHOLD) {
+            allResults.set(note.id, { ...note, similarity: score })
+          }
+        })
+      }
 
       // Add title matches, which might not have been caught by vector search
       titleResults.forEach((note) => {

@@ -6,12 +6,13 @@
   "author": "Sundeep Dayalan",
   "scripts": {
     "dev": "plasmo dev && node fix-manifest.js",
-    "build": "plasmo build && node fix-manifest.js",
-    "package": "plasmo package && node fix-manifest.js",
+    "build": "plasmo build && node fix-manifest.js && node setup-offscreen.js",
+    "package": "plasmo package && node fix-manifest.js && node setup-offscreen.js",
     "format": "prettier --write ."
   },
   "dependencies": {
     "@langchain/core": "^1.0.1",
+    "@lottiefiles/dotlottie-react": "^0.17.5",
     "@tiptap/extension-color": "^3.7.1",
     "@tiptap/extension-highlight": "^3.7.1",
     "@tiptap/extension-image": "^3.7.1",
@@ -70,9 +71,7 @@
       "sidePanel",
       "contextMenus",
       "storage",
-      "ai",
-      "rewriter",
-      "aiLanguageModelOriginTrial"
+      "offscreen"
     ],
     "side_panel": {
       "default_path": "sidepanel.html"

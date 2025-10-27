@@ -1,3 +1,4 @@
+import { DotLottieReact } from "@lottiefiles/dotlottie-react"
 import React from "react"
 
 import { MarkdownRenderer } from "~components/MarkdownRenderer"
@@ -34,7 +35,7 @@ function getTimeBasedGreeting(): string {
 
 interface Message {
   id: string
-  type: "user" | "ai"
+  type: "user" | "ai" | "system" // Added "system" for compaction notices
   content: string
   timestamp: number
   clarificationOptions?: AgentResponse["clarificationOptions"]
@@ -55,6 +56,10 @@ interface AISearchBarProps {
   onNoteClick?: (note: Note) => void // Callback when a reference note is clicked
   onManagePersonas?: () => void // Callback to open Personas management page
   className?: string
+  maxInputHeight?: string // Maximum height for the input area (default: "150px")
+  personaDropdownUpward?: boolean // Control persona dropdown direction (default: true)
+  enableInsertMode?: boolean // Enable insert button transformation (for in-page chat)
+  onInsert?: (text: string) => void // Callback when insert button is clicked
 }
 
 // Reference Notes Component - Collapsible chip design
@@ -138,7 +143,11 @@ export function AISearchBar({
   onMessagesChange,
   onNoteClick,
   onManagePersonas,
-  className = ""
+  className = "",
+  maxInputHeight = "150px",
+  personaDropdownUpward = true,
+  enableInsertMode = false,
+  onInsert
 }: AISearchBarProps) {
   const [messages, setMessages] = React.useState<Message[]>([])
   const [isSearching, setIsSearching] = React.useState(false)
@@ -148,6 +157,7 @@ export function AISearchBar({
   const [isPersonaInitializing, setIsPersonaInitializing] = React.useState(true) // Track persona loading
   const [greeting, setGreeting] = React.useState(getTimeBasedGreeting())
   const [isLoadingFromStorage, setIsLoadingFromStorage] = React.useState(true) // Track if we're loading from storage
+  const [showInsertButton, setShowInsertButton] = React.useState(false) // Track if insert button should be shown (for in-page chat)
 
   // Track which messages have had their clarifications handled (to hide buttons after click)
   const [handledClarifications, setHandledClarifications] = React.useState<
@@ -173,6 +183,11 @@ export function AISearchBar({
   // Track which user messages are expanded
   const [expandedMessages, setExpandedMessages] = React.useState<Set<string>>(
     new Set()
+  )
+
+  // Track copied message ID for visual feedback
+  const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(
+    null
   )
 
   // Store the rich content JSON when user submits (to preserve formatting)
@@ -240,21 +255,57 @@ export function AISearchBar({
     scrollToBottom()
   }, [messages])
 
+  // Handle copying AI message content
+  const handleCopyMessage = async (messageId: string, content: string) => {
+    try {
+      await navigator.clipboard.writeText(content)
+      setCopiedMessageId(messageId)
+
+      // Reset copied state after 2 seconds
+      setTimeout(() => {
+        setCopiedMessageId(null)
+      }, 2000)
+
+      console.log("📋 [AISearchBar] Message copied to clipboard")
+    } catch (error) {
+      console.error("❌ [AISearchBar] Failed to copy message:", error)
+    }
+  }
+
   // Handle persona changes
   const handlePersonaChange = async (
     persona: Persona | null,
     isManualChange: boolean = true
   ) => {
     console.log(
-      " [AISearchBar] Persona changed to:",
+      "[AISearchBar] handlePersonaChange called:",
       persona?.name || "Default Mode",
       isManualChange ? "(manual)" : "(auto-restored)"
     )
 
     try {
       // Update the global agent with the new persona
-      const agent = await getGlobalAgent()
-      await agent.setPersona(persona) // Now async - recreates session
+      // Pass the persona during agent creation to avoid double initialization
+      console.log("[AISearchBar] Getting global agent with persona...")
+      const agent = await getGlobalAgent(persona)
+
+      console.log("[AISearchBar] Verifying persona was set...")
+      const currentPersona = agent.getPersona()
+      const currentMode = agent.getMode()
+      console.log("[AISearchBar] Agent state after initialization:", {
+        personaName: currentPersona?.name || "None",
+        mode: currentMode,
+        sessionId: agent.getSessionId()
+      })
+
+      // If agent already existed and persona changed, update it
+      // Compare IDs, handling null/undefined cases
+      const currentId = currentPersona?.id || null
+      const newId = persona?.id || null
+      if (currentId !== newId) {
+        console.log("[AISearchBar] Persona mismatch, calling setPersona()...")
+        await agent.setPersona(persona)
+      }
 
       // Clear chat history when switching personas
       setMessages([])
@@ -268,16 +319,16 @@ export function AISearchBar({
           id: `system-${Date.now()}`,
           type: "ai",
           content: persona
-            ? ` Switched to ${persona.name} persona. Conversation history cleared.\n\n${persona.description}`
-            : " Switched to Default Mode. Full tool access restored.",
+            ? `Switched to ${persona.name} persona. Conversation history cleared.\n\n${persona.description}`
+            : "Switched to Default Mode. Full tool access restored.",
           timestamp: Date.now()
         }
         setMessages([systemMessage])
       }
 
-      console.log(" [AISearchBar] Agent persona updated successfully")
+      console.log("[AISearchBar] Agent persona updated successfully")
     } catch (error) {
-      console.error(" [AISearchBar] Error updating agent persona:", error)
+      console.error("[AISearchBar] Error updating agent persona:", error)
     }
   }
 
@@ -357,10 +408,15 @@ export function AISearchBar({
   // Validate if input would exceed safe token limits
   const validateInputSize = (
     inputText: string
-  ): { valid: boolean; reason?: string } => {
+  ): {
+    valid: boolean
+    reason?: string
+    needsCompaction?: boolean
+    compactionThreshold?: number
+  } => {
     const estimatedInputTokens = estimateTokens(inputText)
     const MAX_INPUT_TOKENS = 2000 // Safe threshold for single message (leaves room for response)
-    const SAFE_SESSION_THRESHOLD = 7000 // Don't allow new messages if session already at 7000 tokens
+    const COMPACTION_THRESHOLD = 0.7 // Auto-compact at 70% usage (before 80% critical threshold)
 
     // Check 1: Input itself is too large
     if (estimatedInputTokens > MAX_INPUT_TOKENS) {
@@ -370,21 +426,29 @@ export function AISearchBar({
       }
     }
 
-    // Check 2: Session already too full
-    if (tokenUsage && tokenUsage.usage >= SAFE_SESSION_THRESHOLD) {
-      return {
-        valid: false,
-        reason: `Session limit reached (${tokenUsage.usage}/${tokenUsage.quota} tokens). Please start a new chat.`
-      }
-    }
-
-    // Check 3: Combined would exceed quota
+    // Check 2: Session approaching limit - trigger auto-compaction instead of blocking
     if (tokenUsage) {
+      const currentUsagePercent = tokenUsage.usage / tokenUsage.quota
       const projectedTotal = tokenUsage.usage + estimatedInputTokens + 500 // +500 for response
-      if (projectedTotal > tokenUsage.quota) {
+
+      // If we're at 70%+ usage, suggest compaction (seamless, non-blocking)
+      if (currentUsagePercent >= COMPACTION_THRESHOLD) {
+        console.log(
+          `🔄 [Token Management] Session at ${(currentUsagePercent * 100).toFixed(1)}% - auto-compaction recommended`
+        )
+        return {
+          valid: true,
+          needsCompaction: true,
+          compactionThreshold: currentUsagePercent
+        }
+      }
+
+      // If input would exceed quota even after compaction, block it
+      if (projectedTotal > tokenUsage.quota * 1.2) {
+        // Allow 20% overshoot for safety
         return {
           valid: false,
-          reason: `Input would exceed token limit (~${estimatedInputTokens} tokens). ${Math.floor(tokenUsage.quota - tokenUsage.usage - 500)} tokens remaining.`
+          reason: `Input too large for current session. Try a shorter message or start a new chat.`
         }
       }
     }
@@ -418,6 +482,89 @@ export function AISearchBar({
       setCurrentInputLength(0)
 
       return // Block submission if validation fails
+    }
+
+    // Auto-compact session if approaching token limit
+    if (validation.needsCompaction) {
+      const compactionPercent = (
+        (validation.compactionThreshold || 0) * 100
+      ).toFixed(1)
+      console.log(
+        `🔄 [Auto-Compaction] Session at ${compactionPercent}% usage - compacting now...`
+      )
+
+      // Show compaction notice to user (non-blocking)
+      const compactionNotice: Message = {
+        id: `compaction-notice-${Date.now()}`,
+        type: "system",
+        content: `Optimizing conversation history (${compactionPercent}% capacity used)...`,
+        timestamp: Date.now()
+      }
+      setMessages((prev) => [...prev, compactionNotice])
+
+      try {
+        // Get agent instance and trigger session rotation with summary
+        const agent = await getGlobalAgent()
+        await agent.rotateSessionWithSummary()
+
+        // Update success message
+        const successMessage: Message = {
+          id: `compaction-success-${Date.now()}`,
+          type: "system",
+          content: `Session optimized! Your conversation context has been preserved. Continuing...`,
+          timestamp: Date.now()
+        }
+        setMessages((prev) => [...prev, successMessage])
+
+        console.log(
+          `✅ [Auto-Compaction] Session compacted successfully. Ready to continue.`
+        )
+
+        // Refresh token usage after compaction
+        const { getSessionTokenUsage } = await import(
+          "~services/gemini-nano-service"
+        )
+        const sessionId = agent.getSessionId()
+        if (sessionId) {
+          const newUsage = getSessionTokenUsage(sessionId)
+          if (newUsage) {
+            setTokenUsage(newUsage)
+            console.log(
+              ` [Token Usage] After compaction: ${newUsage.usage}/${newUsage.quota} tokens (${newUsage.percentage.toFixed(1)}%)`
+            )
+          }
+        }
+      } catch (error) {
+        console.error(`❌ [Auto-Compaction] Failed:`, error)
+
+        // Fallback to simple clear if compaction fails
+        const fallbackMessage: Message = {
+          id: `compaction-fallback-${Date.now()}`,
+          type: "system",
+          content: `Session reset to free up space. Previous context cleared.`,
+          timestamp: Date.now()
+        }
+        setMessages((prev) => [...prev, fallbackMessage])
+
+        try {
+          const agent = await getGlobalAgent()
+          await agent.clearSession()
+
+          // Refresh token usage after clear
+          const { getSessionTokenUsage } = await import(
+            "~services/gemini-nano-service"
+          )
+          const sessionId = agent.getSessionId()
+          if (sessionId) {
+            const newUsage = getSessionTokenUsage(sessionId)
+            if (newUsage) {
+              setTokenUsage(newUsage)
+            }
+          }
+        } catch (clearError) {
+          console.error(`❌ [Session Clear] Failed:`, clearError)
+        }
+      }
     }
 
     if (query && onSearch && !isSearching) {
@@ -581,6 +728,11 @@ export function AISearchBar({
             setIsInputDisabled(true)
           }
 
+          // Enable insert button for in-page chat after AI response
+          if (enableInsertMode && !aiResponse.needsClarification) {
+            setShowInsertButton(true)
+          }
+
           // If a note was created, refresh the notes list
           if (aiResponse.noteCreated && onNoteCreated) {
             console.log("Note created, calling onNoteCreated callback")
@@ -599,6 +751,11 @@ export function AISearchBar({
             timestamp: Date.now()
           }
           setMessages((prev) => [...prev, aiMessage])
+
+          // Enable insert button for in-page chat after AI response
+          if (enableInsertMode) {
+            setShowInsertButton(true)
+          }
 
           // Check token usage after AI response
           await checkTokenUsage()
@@ -1397,19 +1554,35 @@ export function AISearchBar({
     <div className={`plasmo-flex plasmo-flex-col plasmo-h-full ${className}`}>
       {/* Header Section - Dynamic Greeting and Controls */}
       <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-py-2 plasmo-px-3 plasmo-border-b plasmo-border-slate-200">
-        {/* Left: MIND KEEP label and greeting */}
-        <div className="plasmo-flex plasmo-flex-col plasmo-gap-1">
-          <span className="plasmo-text-[8px] plasmo-font-medium plasmo-text-slate-500 plasmo-uppercase plasmo-tracking-wider">
-            Mind Keep
-          </span>
-          <div className="plasmo-flex plasmo-flex-col plasmo-gap-0.5">
-            <span className="plasmo-text-base plasmo-font-light plasmo-text-slate-700">
-              {greeting}!
-            </span>
-            <span className="plasmo-text-base plasmo-font-normal plasmo-text-slate-800">
-              May I help you with anything?
+        {/* Left: MIND KEEP label with Lottie Logo and greeting (hide greeting in insert mode) */}
+        <div
+          className={`plasmo-flex ${enableInsertMode ? "plasmo-flex-row plasmo-items-center" : "plasmo-flex-col"} plasmo-gap-1`}>
+          {/* Logo + Mind Keep Label Row */}
+          <div className="plasmo-flex plasmo-items-center plasmo-gap-2">
+            <div className="plasmo-flex-shrink-0 plasmo-w-6 plasmo-h-6">
+              <DotLottieReact
+                src="https://lottie.host/523463c6-9440-4e42-bc0a-318978a9b8a2/S2YUnZFAfy.lottie"
+                loop
+                autoplay
+              />
+            </div>
+            <span
+              className={`${enableInsertMode ? "plasmo-text-xs" : "plasmo-text-[8px]"} plasmo-font-medium plasmo-text-slate-500 plasmo-uppercase plasmo-tracking-wider`}>
+              Mind Keep
             </span>
           </div>
+
+          {/* Greeting Text - Below Logo and Label (only in side panel mode) */}
+          {!enableInsertMode && (
+            <div className="plasmo-flex plasmo-flex-col plasmo-gap-0.5">
+              <span className="plasmo-text-base plasmo-font-light plasmo-text-slate-700">
+                {greeting}!
+              </span>
+              <span className="plasmo-text-base plasmo-font-normal plasmo-text-slate-800">
+                May I help you with anything?
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Right: Clear & Toggle buttons */}
@@ -1434,41 +1607,43 @@ export function AISearchBar({
               </svg>
             </button>
 
-            {/* Toggle chat history button */}
-            <button
-              onClick={() => setIsChatExpanded(!isChatExpanded)}
-              className="plasmo-p-1.5 plasmo-rounded-lg plasmo-text-slate-500 hover:plasmo-text-slate-700 hover:plasmo-bg-slate-100 plasmo-transition-colors"
-              title={
-                isChatExpanded ? "Hide chat history" : "Show chat history"
-              }>
-              {isChatExpanded ? (
-                <svg
-                  className="plasmo-w-4 plasmo-h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              ) : (
-                <svg
-                  className="plasmo-w-4 plasmo-h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 15l7-7 7 7"
-                  />
-                </svg>
-              )}
-            </button>
+            {/* Toggle chat history button - hide in insert mode */}
+            {!enableInsertMode && (
+              <button
+                onClick={() => setIsChatExpanded(!isChatExpanded)}
+                className="plasmo-p-1.5 plasmo-rounded-lg plasmo-text-slate-500 hover:plasmo-text-slate-700 hover:plasmo-bg-slate-100 plasmo-transition-colors"
+                title={
+                  isChatExpanded ? "Hide chat history" : "Show chat history"
+                }>
+                {isChatExpanded ? (
+                  <svg
+                    className="plasmo-w-4 plasmo-h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    className="plasmo-w-4 plasmo-h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 15l7-7 7 7"
+                    />
+                  </svg>
+                )}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -1500,7 +1675,7 @@ export function AISearchBar({
 
       {/* Chat Messages */}
       {messages.length > 0 && isChatExpanded && (
-        <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-overflow-x-hidden plasmo-space-y-4 plasmo-px-4 plasmo-py-4 plasmo-max-h-[500px] plasmo-bg-white/10 plasmo-backdrop-blur-lg plasmo-rounded-2xl plasmo-border plasmo-border-white/30 plasmo-mb-4">
+        <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-overflow-x-hidden plasmo-no-visible-scrollbar plasmo-space-y-4 plasmo-px-4 plasmo-py-4 plasmo-max-h-[500px] plasmo-bg-white/10 plasmo-backdrop-blur-lg plasmo-rounded-2xl plasmo-border plasmo-border-white/30 plasmo-mb-4">
           {messages
             .filter((message) => {
               // Filter out empty AI messages (streaming placeholders before content arrives)
@@ -1509,8 +1684,35 @@ export function AISearchBar({
               }
               return true
             })
+            // In insert mode, only show the last AI message
+            .filter((_, index, arr) => {
+              if (enableInsertMode) {
+                // Find the last AI message
+                const lastAiIndex = arr
+                  .map((m, i) => ({ m, i }))
+                  .reverse()
+                  .find(({ m }) => m.type === "ai")?.i
+                return index === lastAiIndex
+              }
+              return true
+            })
             .map((message) => {
               const isExpanded = expandedMessages.has(message.id)
+              const isSystemMessage = message.type === "system"
+
+              // System messages get special centered styling
+              if (isSystemMessage) {
+                return (
+                  <div
+                    key={message.id}
+                    className="plasmo-flex plasmo-justify-center plasmo-my-2">
+                    <div className="plasmo-px-4 plasmo-py-2 plasmo-rounded-full plasmo-bg-blue-50/80 plasmo-backdrop-blur-md plasmo-text-blue-700 plasmo-border plasmo-border-blue-200/50 plasmo-text-xs plasmo-font-medium plasmo-shadow-sm">
+                      {message.content}
+                    </div>
+                  </div>
+                )
+              }
+
               return (
                 <div key={message.id} className="plasmo-space-y-2">
                   <div
@@ -1561,71 +1763,115 @@ export function AISearchBar({
                           )}
                         </div>
                       ) : (
-                        <MarkdownRenderer content={message.content} />
+                        <div className="plasmo-relative plasmo-group">
+                          <MarkdownRenderer content={message.content} />
+
+                          {/* Copy Button - Appears on hover */}
+                          <button
+                            onClick={() =>
+                              handleCopyMessage(message.id, message.content)
+                            }
+                            className="plasmo-absolute plasmo-top-2 plasmo-right-2 plasmo-p-1.5 plasmo-rounded-md plasmo-bg-white/80 hover:plasmo-bg-white plasmo-border plasmo-border-slate-200 plasmo-shadow-sm plasmo-opacity-0 group-hover:plasmo-opacity-100 plasmo-transition-all plasmo-duration-200"
+                            title={
+                              copiedMessageId === message.id
+                                ? "Copied!"
+                                : "Copy response"
+                            }>
+                            {copiedMessageId === message.id ? (
+                              // Checkmark icon (copied state)
+                              <svg
+                                className="plasmo-w-3.5 plasmo-h-3.5 plasmo-text-green-600"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2.5}
+                                  d="M5 13l4 4L19 7"
+                                />
+                              </svg>
+                            ) : (
+                              // Copy icon (default state)
+                              <svg
+                                className="plasmo-w-3.5 plasmo-h-3.5 plasmo-text-slate-600"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                                />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
 
-                {/* Clarification Options - Only show if not handled */}
-                {message.clarificationOptions &&
-                  message.clarificationOptions.length > 0 &&
-                  !handledClarifications.has(message.id) && (
-                    <div className="plasmo-flex plasmo-justify-start">
-                      <div className="plasmo-max-w-[80%] plasmo-space-y-2">
-                        <div className="plasmo-text-xs plasmo-font-light plasmo-text-slate-600 plasmo-pl-2">
-                          Choose an option:
-                        </div>
-                        <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-2">
-                          {message.clarificationOptions.map((option, idx) => {
-                            // Debug logging
-                            if (idx === 0) {
-                              console.log(
-                                "🎨 [AISearchBar] Rendering clarification buttons for message:",
-                                {
-                                  messageId: message.id,
-                                  optionCount:
-                                    message.clarificationOptions.length,
-                                  isHandled: handledClarifications.has(
-                                    message.id
-                                  ),
-                                  options: message.clarificationOptions
-                                }
+                  {/* Clarification Options - Only show if not handled */}
+                  {message.clarificationOptions &&
+                    message.clarificationOptions.length > 0 &&
+                    !handledClarifications.has(message.id) && (
+                      <div className="plasmo-flex plasmo-justify-start">
+                        <div className="plasmo-max-w-[80%] plasmo-space-y-2">
+                          <div className="plasmo-text-xs plasmo-font-light plasmo-text-slate-600 plasmo-pl-2">
+                            Choose an option:
+                          </div>
+                          <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-2">
+                            {message.clarificationOptions.map((option, idx) => {
+                              // Debug logging
+                              if (idx === 0) {
+                                console.log(
+                                  "🎨 [AISearchBar] Rendering clarification buttons for message:",
+                                  {
+                                    messageId: message.id,
+                                    optionCount:
+                                      message.clarificationOptions.length,
+                                    isHandled: handledClarifications.has(
+                                      message.id
+                                    ),
+                                    options: message.clarificationOptions
+                                  }
+                                )
+                              }
+                              return (
+                                <button
+                                  key={idx}
+                                  disabled={isSearching}
+                                  onClick={() =>
+                                    handleClarificationOption(
+                                      option.action,
+                                      option.value,
+                                      message.pendingNoteData,
+                                      message.id
+                                    )
+                                  }
+                                  className={`${
+                                    option.type === "category_pill"
+                                      ? "plasmo-px-3 plasmo-py-1.5 plasmo-bg-blue-50 hover:plasmo-bg-blue-100 plasmo-text-blue-700 plasmo-border plasmo-border-blue-200 hover:plasmo-border-blue-300"
+                                      : "plasmo-px-4 plasmo-py-2 plasmo-bg-white/20 plasmo-backdrop-blur-sm hover:plasmo-bg-white/30 plasmo-text-slate-900 plasmo-border plasmo-border-white/40 hover:plasmo-border-white/50"
+                                  } plasmo-rounded-full plasmo-text-[12px] plasmo-font-normal plasmo-transition-all plasmo-cursor-pointer plasmo-shadow-sm hover:plasmo-shadow disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed`}>
+                                  {option.label}
+                                </button>
                               )
-                            }
-                            return (
-                              <button
-                                key={idx}
-                                disabled={isSearching}
-                                onClick={() =>
-                                  handleClarificationOption(
-                                    option.action,
-                                    option.value,
-                                    message.pendingNoteData,
-                                    message.id
-                                  )
-                                }
-                                className={`${
-                                  option.type === "category_pill"
-                                    ? "plasmo-px-3 plasmo-py-1.5 plasmo-bg-blue-50 hover:plasmo-bg-blue-100 plasmo-text-blue-700 plasmo-border plasmo-border-blue-200 hover:plasmo-border-blue-300"
-                                    : "plasmo-px-4 plasmo-py-2 plasmo-bg-white/20 plasmo-backdrop-blur-sm hover:plasmo-bg-white/30 plasmo-text-slate-900 plasmo-border plasmo-border-white/40 hover:plasmo-border-white/50"
-                                } plasmo-rounded-full plasmo-text-[12px] plasmo-font-normal plasmo-transition-all plasmo-cursor-pointer plasmo-shadow-sm hover:plasmo-shadow disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed`}>
-                                {option.label}
-                              </button>
-                            )
-                          })}
+                            })}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                {/* Reference Notes */}
-                {message.referenceNotes &&
-                  message.referenceNotes.length > 0 && (
-                    <ReferenceNotesSection
-                      notes={message.referenceNotes}
-                      onNoteClick={onNoteClick}
-                    />
-                  )}
+                  {/* Reference Notes */}
+                  {message.referenceNotes &&
+                    message.referenceNotes.length > 0 && (
+                      <ReferenceNotesSection
+                        notes={message.referenceNotes}
+                        onNoteClick={onNoteClick}
+                      />
+                    )}
                 </div>
               )
             })}
@@ -1672,7 +1918,7 @@ export function AISearchBar({
           {/* Rich Text Editor - Full Width on Top */}
           <div
             className="plasmo-w-full plasmo-overflow-y-auto plasmo-no-visible-scrollbar"
-            style={{ minHeight: "2.5em", maxHeight: "150px" }}>
+            style={{ minHeight: "2.5em", maxHeight: maxInputHeight }}>
             <RichTextEditor
               ref={editorRef}
               placeholder={
@@ -1687,6 +1933,15 @@ export function AISearchBar({
                 // Track input length for validation feedback
                 const currentText = editorRef.current?.getText() || ""
                 setCurrentInputLength(currentText.length)
+
+                // Reset insert button when user starts typing (back to send mode)
+                if (
+                  enableInsertMode &&
+                  showInsertButton &&
+                  currentText.length > 0
+                ) {
+                  setShowInsertButton(false)
+                }
               }}
             />
           </div>
@@ -1699,41 +1954,75 @@ export function AISearchBar({
                 onPersonaChange={handlePersonaChange}
                 onInitializationChange={setIsPersonaInitializing}
                 onManageClick={onManagePersonas}
+                openUpward={personaDropdownUpward}
               />
             </div>
 
-            {/* Submit Button - Right Side */}
+            {/* Submit Button - Right Side (transforms to Insert button in insert mode) */}
             <button
-              type="submit"
-              className="plasmo-flex-shrink-0 plasmo-w-9 plasmo-h-9 plasmo-bg-slate-900 plasmo-text-white plasmo-rounded-lg plasmo-flex plasmo-items-center plasmo-justify-center hover:plasmo-bg-slate-700 plasmo-transition-colors disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed"
+              type={showInsertButton && enableInsertMode ? "button" : "submit"}
+              onClick={
+                showInsertButton && enableInsertMode && onInsert
+                  ? () => {
+                      // Get last AI message
+                      const lastAiMessage = messages
+                        .slice()
+                        .reverse()
+                        .find((m) => m.type === "ai")
+                      if (lastAiMessage) {
+                        onInsert(lastAiMessage.content)
+                      }
+                    }
+                  : undefined
+              }
+              className="plasmo-flex-shrink-0 plasmo-px-3 plasmo-py-1.5 plasmo-text-white plasmo-rounded-lg plasmo-flex plasmo-items-center plasmo-gap-1.5 plasmo-justify-center plasmo-bg-slate-900 hover:plasmo-bg-slate-700 plasmo-transition-colors disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed"
               title={
-                isPersonaInitializing
-                  ? "Loading persona..."
-                  : currentInputLength > 8000
-                    ? "Input too large (max 8000 chars)"
-                    : tokenUsage && tokenUsage.usage >= 7000
-                      ? "Session limit reached - start new chat"
-                      : "Send (Enter)"
+                showInsertButton && enableInsertMode
+                  ? "Insert to page"
+                  : isPersonaInitializing
+                    ? "Loading persona..."
+                    : currentInputLength > 8000
+                      ? "Input too large (max 8000 chars)"
+                      : tokenUsage && tokenUsage.percentage >= 70
+                        ? `Session at ${tokenUsage.percentage.toFixed(0)}% capacity - will auto-optimize`
+                        : "Send (Enter)"
               }
               disabled={
                 isPersonaInitializing ||
                 isSearching ||
                 isInputDisabled ||
-                currentInputLength > 8000 ||
-                (tokenUsage !== null && tokenUsage.usage >= 7000)
+                currentInputLength > 8000
               }>
-              <svg
-                className="plasmo-w-4 plasmo-h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M14 5l7 7m0 0l-7 7m7-7H3"
-                />
-              </svg>
+              {showInsertButton && enableInsertMode ? (
+                // Insert button with text and Enter symbol
+                <>
+                  <span className="plasmo-text-xs plasmo-font-medium">
+                    Insert
+                  </span>
+                  <span className="plasmo-text-[10px] plasmo-opacity-80">
+                    ↵
+                  </span>
+                </>
+              ) : (
+                // Send button with text and arrow icon
+                <>
+                  <span className="plasmo-text-xs plasmo-font-medium">
+                    Send
+                  </span>
+                  <svg
+                    className="plasmo-w-3 plasmo-h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M14 5l7 7m0 0l-7 7m7-7H3"
+                    />
+                  </svg>
+                </>
+              )}
             </button>
           </div>
         </div>

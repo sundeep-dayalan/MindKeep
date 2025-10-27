@@ -388,30 +388,38 @@ export class MindKeepAgent {
    */
   async setPersona(persona: Persona | null): Promise<void> {
     console.log(
-      " [Agent] setPersona called with:",
+      "[Agent] setPersona called with:",
       persona?.name || "null (default mode)"
     )
+    console.log("[Agent] Current state before change:", {
+      currentPersona: this.activePersona?.name || "None",
+      currentMode: this.mode,
+      currentSessionId: this.sessionId
+    })
 
     this.activePersona = persona
     this.mode = persona ? AgentMode.PERSONA : AgentMode.DEFAULT
 
     // Destroy old session and create new one with updated system prompt
-    console.log(" [Agent] Recreating session due to persona change")
+    console.log("[Agent] Recreating session due to persona change")
 
     if (this.sessionId) {
+      console.log("[Agent] Destroying old session:", this.sessionId)
       await GeminiNanoService.destroySession(this.sessionId)
     }
 
     // Create new session with updated system prompt
+    console.log("[Agent] Creating new session...")
     this.sessionId = await GeminiNanoService.createSession({
       systemPrompt: this.buildSystemPrompt(),
       temperature: this.temperature,
       topK: this.topK
     })
 
-    console.log(` [Agent] Mode set to: ${this.mode}`)
-    console.log(` [Agent] Active persona: ${persona?.name || "None"}`)
-    console.log(` [Agent] New session: ${this.sessionId}`)
+    console.log(`[Agent] Mode set to: ${this.mode}`)
+    console.log(`[Agent] Active persona: ${persona?.name || "None"}`)
+    console.log(`[Agent] New session: ${this.sessionId}`)
+    console.log("[Agent] setPersona completed successfully")
   }
 
   /**
@@ -876,10 +884,31 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
 
         console.log("[Agent] Conversational response:", responseText)
 
+        // CRITICAL: Ensure response is clean text, not JSON
+        let cleanResponse = responseText?.trim() || ""
+
+        // If response accidentally contains JSON (starts with {), extract the actual message
+        if (cleanResponse.startsWith("{")) {
+          console.warn(
+            "[Agent] Response contains JSON, attempting to extract message"
+          )
+          try {
+            const parsed = JSON.parse(cleanResponse)
+            // Look for common response fields
+            cleanResponse =
+              parsed.aiResponse ||
+              parsed.message ||
+              parsed.note_content ||
+              cleanResponse
+          } catch (e) {
+            console.error("[Agent] Failed to parse JSON response:", e)
+          }
+        }
+
         return {
           extractedData: null,
           referenceNotes: [],
-          aiResponse: responseText?.trim(),
+          aiResponse: cleanResponse,
           dataType: "text",
           confidence: 1.0
         }
@@ -944,9 +973,10 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
 
             console.log("[Agent] Organize result:", organizeResult)
 
-            // Check if reorganization is needed
+            // Check if reorganization is needed and was successful
             const organizeData = organizeResult[0]?.result
             if (
+              organizeData?.success !== false &&
               organizeData?.needsReorganization &&
               organizeData?.suggestedCategory
             ) {
@@ -995,6 +1025,11 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
                   suggestedCategory: organizeData.suggestedCategory
                 }
               }
+            } else if (organizeData?.success === false) {
+              console.log(
+                "[Agent] Organize failed (likely embedding issue in content script), skipping:",
+                organizeData.error
+              )
             } else {
               console.log(
                 "[Agent] No reorganization needed or no similar notes found"
@@ -1125,13 +1160,34 @@ Your response (PLAIN TEXT ONLY, NO JSON):`
           yield { type: "chunk", data: chunk }
         }
 
+        // CRITICAL: Ensure response is clean text, not JSON
+        let cleanResponse = fullResponse.trim()
+
+        // If response accidentally contains JSON (starts with {), extract the actual message
+        if (cleanResponse.startsWith("{")) {
+          console.warn(
+            "[Agent Stream] Response contains JSON, attempting to extract message"
+          )
+          try {
+            const parsed = JSON.parse(cleanResponse)
+            // Look for common response fields
+            cleanResponse =
+              parsed.aiResponse ||
+              parsed.message ||
+              parsed.note_content ||
+              cleanResponse
+          } catch (e) {
+            console.error("[Agent Stream] Failed to parse JSON response:", e)
+          }
+        }
+
         // Yield complete response
         yield {
           type: "complete",
           data: {
             extractedData: null,
             referenceNotes: [],
-            aiResponse: fullResponse.trim(),
+            aiResponse: cleanResponse,
             dataType: "text",
             confidence: 1.0
           }
@@ -1335,7 +1391,9 @@ NOTE: You are in PERSONA mode. You can ONLY search and read notes. You CANNOT cr
       // to properly extract what the user wants to save as a note
       const recentMessages = this.rawConversationHistory.slice(-5)
 
-      console.log(`[Tool Selection] Building conversation context from ${recentMessages.length} recent messages`)
+      console.log(
+        `[Tool Selection] Building conversation context from ${recentMessages.length} recent messages`
+      )
 
       if (recentMessages.length > 0) {
         conversationContext =
@@ -1344,16 +1402,68 @@ NOTE: You are in PERSONA mode. You can ONLY search and read notes. You CANNOT cr
             .map((msg, idx) => {
               // Apply a reasonable per-message limit (2000 chars) to prevent token overflow
               // but keep enough content for proper extraction
-              const content = msg.content.length > 2000
-                ? msg.content.substring(0, 2000) + "... [truncated]"
-                : msg.content
-              console.log(`[Tool Selection] Message ${idx} (${msg.role}): ${content.substring(0, 100)}...`)
+              const content =
+                msg.content.length > 2000
+                  ? msg.content.substring(0, 2000) + "... [truncated]"
+                  : msg.content
+              console.log(
+                `[Tool Selection] Message ${idx} (${msg.role}): ${content.substring(0, 100)}...`
+              )
               return `${msg.role === "user" ? "User" : "Assistant"}: ${content}`
             })
             .join("\n")
 
-        console.log(`[Tool Selection] Conversation context length: ${conversationContext.length} chars`)
+        console.log(
+          `[Tool Selection] Conversation context length: ${conversationContext.length} chars`
+        )
       }
+    }
+
+    // Check if this is a follow-up to a note creation request
+    const isNoteCreationFollowUp = this.rawConversationHistory.some(
+      (msg, idx) => {
+        // Check if any recent assistant message asked for note content
+        if (
+          msg.role === "assistant" &&
+          idx >= this.rawConversationHistory.length - 3
+        ) {
+          const content = msg.content.toLowerCase()
+          return (
+            content.includes("what would you like to save") ||
+            content.includes("what would you like the note to contain") ||
+            content.includes("what information would you like to save") ||
+            content.includes("what should i save") ||
+            content.includes("what content")
+          )
+        }
+        return false
+      }
+    )
+
+    console.log(
+      `[Tool Selection] Is note creation follow-up: ${isNoteCreationFollowUp}`
+    )
+    console.log(`[Tool Selection] Query length: ${query.length} chars`)
+
+    // DIRECT FAILSAFE: If this is a note creation follow-up with substantial content,
+    // immediately return create_note_from_chat tool without asking the LLM
+    if (isNoteCreationFollowUp && query.length > 20) {
+      console.log(
+        `[Tool Selection] FAILSAFE TRIGGERED: Auto-selecting create_note_from_chat`
+      )
+      console.log(`[Tool Selection] Content to save: "${query}"`)
+
+      return [
+        {
+          name: "create_note_from_chat",
+          params: {
+            content: query, // Use the full query as content
+            title: undefined,
+            category: undefined,
+            skipClarification: false
+          }
+        }
+      ]
     }
 
     const toolSelectionPrompt = `${toolDescriptions}
@@ -1366,6 +1476,18 @@ RULES:
 - User sends ACTUAL CONTENT after being asked "what to save" → "create_note_from_chat" (extract full content)
 - Greetings/small talk → "none"
 - **INTENT to create** (no actual content, just "I want to create a note") → "none" (let conversational AI ask for content)
+
+${
+  isNoteCreationFollowUp && query.length > 20
+    ? `
+SPECIAL CONTEXT:
+The assistant JUST ASKED the user what content to save for a note.
+The current query "${query}" is the user's response.
+Since it contains more than 20 characters, treat it as the content to save.
+→ Use "create_note_from_chat" with note_content set to the FULL query text.
+`
+    : ""
+}
 
 create_note_from_chat CRITICAL:
 - ONLY use if there's ACTUAL content to save (either in query or in conversation context)
@@ -1428,7 +1550,10 @@ Respond ONLY with JSON.`
       console.log(" [Agent] Using executePrompt (no session history)")
 
       // Convert Zod schema to JSON Schema for the API
-      const toolSelectionJsonSchema = zodToJsonSchema(ToolSelectionSchema, "ToolSelectionSchema")
+      const toolSelectionJsonSchema = zodToJsonSchema(
+        ToolSelectionSchema,
+        "ToolSelectionSchema"
+      )
 
       const response = await GeminiNanoService.promptWithSession(
         sessionId,
@@ -1526,11 +1651,20 @@ Respond ONLY with JSON.`
           }
 
           // Debug logging for content extraction
-          console.log("[Agent] create_note_from_chat - parsed.note_content:", parsed.note_content)
-          console.log("[Agent] create_note_from_chat - this.lastUserMessage:", this.lastUserMessage)
+          console.log(
+            "[Agent] create_note_from_chat - parsed.note_content:",
+            parsed.note_content
+          )
+          console.log(
+            "[Agent] create_note_from_chat - this.lastUserMessage:",
+            this.lastUserMessage
+          )
 
           const noteContent = parsed.note_content || this.lastUserMessage
-          console.log("[Agent] create_note_from_chat - final content:", noteContent)
+          console.log(
+            "[Agent] create_note_from_chat - final content:",
+            noteContent
+          )
 
           return [
             {
@@ -1809,6 +1943,18 @@ Begin analysis. Respond ONLY with a complete JSON object with all 5 required fie
       // The API guarantees the output is a valid JSON string matching the schema
       const parsedResponse = JSON.parse(jsonStringResponse)
 
+      // Check if parsedResponse is actually an object, not a primitive (like number 0)
+      if (typeof parsedResponse !== 'object' || parsedResponse === null || Array.isArray(parsedResponse)) {
+        console.error("[Stage 1] AI returned non-object response:", parsedResponse)
+        return {
+          data: null,
+          type: "other",
+          confidence: 0.1,
+          aiResponse: "I'm sorry, I had trouble processing that information.",
+          sourceNoteIds: []
+        }
+      }
+
       // Provide robust defaults for missing fields
       if (
         parsedResponse.dataType &&
@@ -1971,9 +2117,35 @@ Begin analysis. Respond ONLY with a complete JSON object with all 5 required fie
     console.log(
       ` [Persona Transform] Source notes: ${extracted.sourceNoteIds.length}`
     )
+    console.log(` [Persona Transform] Confidence: ${extracted.confidence}`)
+
+    // Extract note content from tool results for cleaner presentation
+    const notesContent = toolResults
+      .map((result) => {
+        if (result.result?.notes) {
+          // Handle search_notes results
+          return result.result.notes
+            .map((note: any, noteIdx: number) => {
+              return `Note ${noteIdx + 1}: ${note.title || "Untitled"}
+${note.content}
+${note.category ? `Category: ${note.category}` : ""}`
+            })
+            .join("\n\n---\n\n")
+        }
+        return null
+      })
+      .filter(Boolean)
+      .join("\n\n---\n\n")
+
+    // Check if we have relevant notes (confidence > 0.5 and notes exist)
+    const hasRelevantNotes =
+      notesContent.length > 0 && extracted.confidence > 0.5
+
+    console.log(` [Persona Transform] Has relevant notes: ${hasRelevantNotes}`)
 
     // Build persona transformation prompt
-    const transformationPrompt = `You are MindKeep AI, operating as "${this.activePersona.name}".
+    const transformationPrompt = hasRelevantNotes
+      ? `You are MindKeep AI, operating as "${this.activePersona.name}".
 
 === YOUR ROLE ===
 ${this.activePersona.description}
@@ -1992,11 +2164,8 @@ ${this.activePersona.outputTemplate}
 === USER REQUEST ===
 "${query}"
 
-=== RETRIEVED DATA ===
-The system found ${extracted.sourceNoteIds.length} relevant note(s):
-\`\`\`json
-${JSON.stringify(toolResults, null, 2)}
-\`\`\`
+=== RETRIEVED NOTES ===
+${notesContent}
 
 === YOUR TASK ===
 Based on the user's request and the retrieved notes, generate a response that:
@@ -2006,17 +2175,70 @@ Based on the user's request and the retrieved notes, generate a response that:
 4. **Addresses the user directly** with the requested content
 
 CRITICAL RULES:
+- DO NOT show raw JSON or technical data - present information naturally
 - DO NOT just say "I found a note" - actually PRODUCE the content the user requested
 - If the user asks you to write something, WRITE IT using the information from the notes
 - If the user asks for a specific format (email, letter, summary), PROVIDE IT in that format
 - Use ALL relevant information from the retrieved notes
 - Stay completely in character as "${this.activePersona.name}"
+- Extract and present the actual note content, not metadata
 
 ${
   this.activePersona.outputTemplate
     ? `
 REMEMBER: Follow your output template structure:
 ${this.activePersona.outputTemplate}
+`
+    : ""
+}
+
+Now generate your response:`
+      : `You are MindKeep AI, operating as "${this.activePersona.name}".
+
+=== YOUR ROLE ===
+${this.activePersona.description}
+
+=== PERSONA CONTEXT ===
+${this.activePersona.context}
+
+${
+  this.activePersona.outputTemplate
+    ? `=== OUTPUT TEMPLATE ===
+${this.activePersona.outputTemplate}
+`
+    : ""
+}
+
+=== USER REQUEST ===
+"${query}"
+
+=== SITUATION ===
+The search did not find any relevant notes containing information needed for this request.
+However, you can still fulfill the user's request by extracting information DIRECTLY from their query.
+
+=== YOUR TASK ===
+Based ONLY on the user's request (the query above), generate a response that:
+1. **Stays in character** as "${this.activePersona.name}"
+2. **Extracts any required information directly from the user's query** (e.g., amounts, dates, names)
+3. **Follows your output template** if one is provided
+4. **Addresses the user directly** with the requested content
+
+CRITICAL RULES:
+- EXTRACT information from the user query itself (e.g., "loan email 5 lakhs" → extract "5 lakhs" or "INR 500000")
+- DO NOT say "I couldn't find notes" - instead, GENERATE the content they requested using info from their query
+- If the user asks you to write something (email, letter, document), WRITE IT using the query information
+- If the query contains amounts, dates, or specific values, USE THEM in your output
+- Follow your output template structure strictly
+- Stay completely in character as "${this.activePersona.name}"
+- Be helpful and productive - don't refuse the task just because notes weren't found
+
+${
+  this.activePersona.outputTemplate
+    ? `
+REMEMBER: Follow your output template structure:
+${this.activePersona.outputTemplate}
+
+Replace <amount from user query> or similar placeholders with the actual values extracted from the user query.
 `
     : ""
 }
@@ -2472,10 +2694,18 @@ let globalAgent: MindKeepAgent | null = null
 
 /**
  * Get or create the global agent instance
+ * @param initialPersona - Optional persona to set during initial creation
  */
-export async function getGlobalAgent(): Promise<MindKeepAgent> {
+export async function getGlobalAgent(
+  initialPersona?: Persona | null
+): Promise<MindKeepAgent> {
   if (!globalAgent) {
     globalAgent = await createAgent({ verbose: true })
+
+    // If an initial persona is provided, set it immediately
+    if (initialPersona !== undefined) {
+      await globalAgent.setPersona(initialPersona)
+    }
   }
   return globalAgent
 }

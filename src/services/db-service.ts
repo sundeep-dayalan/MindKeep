@@ -14,6 +14,7 @@
 import Dexie, { type Table } from "dexie"
 
 import type { Persona, PersonaInput } from "~types/persona"
+import { setSelectedPersona } from "~services/persona-settings"
 import { decrypt } from "~util/crypto"
 
 // Note interface (decrypted, user-facing format)
@@ -1015,21 +1016,34 @@ export async function setActivePersona(id: string | null): Promise<boolean> {
 
   try {
     // Deactivate all personas first
+    console.log(" [DB] Fetching all personas...")
     const allPersonas = await db.personas.toArray()
-    console.log(` [DB] Deactivating ${allPersonas.length} personas`)
+    console.log(` [DB] Found ${allPersonas.length} personas in database`)
+    console.log(
+      " [DB] Persona IDs:",
+      allPersonas.map((p) => p.id)
+    )
 
+    console.log(" [DB] Deactivating all personas...")
     await Promise.all(
       allPersonas.map((p) => db.personas.update(p.id, { isActive: false }))
     )
+    console.log(" [DB] All personas deactivated")
 
     // Activate the specified persona if ID provided
     if (id) {
+      console.log(" [DB] Looking for persona with ID:", id)
       const persona = await db.personas.get(id)
       if (!persona) {
-        console.log(" [DB] Persona not found for activation:", id)
+        console.error(" [DB] Persona not found for activation:", id)
+        console.error(
+          " [DB] Available persona IDs:",
+          allPersonas.map((p) => p.id)
+        )
         return false
       }
 
+      console.log(" [DB] Found persona:", persona.name, "- Activating...")
       await db.personas.update(id, { isActive: true })
       console.log(" [DB] Activated persona:", persona.name)
     } else {
@@ -1037,13 +1051,14 @@ export async function setActivePersona(id: string | null): Promise<boolean> {
     }
 
     // Persist selection to chrome.storage for restoration on next load
-    const { setSelectedPersona } = await import("./persona-settings")
+    console.log(" [DB] Persisting selection to chrome.storage...")
     await setSelectedPersona(id)
     console.log(" [DB] Saved persona selection to chrome.storage")
 
     return true
   } catch (error) {
     console.error(" [DB] Error setting active persona:", error)
+    console.error(" [DB] Error stack:", error?.stack)
     return false
   }
 }

@@ -11,6 +11,9 @@ importers:
       '@langchain/core':
         specifier: ^1.0.1
         version: 1.0.1
+      '@lottiefiles/dotlottie-react':
+        specifier: ^0.17.5
+        version: 0.17.5(react@18.2.0)
       '@tiptap/extension-color':
         specifier: ^3.7.1
         version: 3.7.1(@tiptap/extension-text-style@3.7.1(@tiptap/core@3.7.1(@tiptap/pm@3.7.1)))
@@ -770,6 +773,14 @@ packages:
     resolution: {integrity: sha512-BJwkHlSUgtB+Ei52Ai32M1AOMerSlzyIGA/KC4dAGL+GGwVMdwG8HGCOA2TxP3KjhbgDPMYkv7bt/NmOmRIFng==}
     cpu: [x64]
     os: [win32]
+
+  '@lottiefiles/dotlottie-react@0.17.5':
+    resolution: {integrity: sha512-7CRfJOvA5EjPgiQok972Tg9zCY0/XsIhagiDCdb4zlywExmwYZoN4KOjf4KvwJVMRCrYtHp/txoXPG7se9ijfA==}
+    peerDependencies:
+      react: ^17 || ^18 || ^19
+
+  '@lottiefiles/dotlottie-web@0.54.1':
+    resolution: {integrity: sha512-Xq6wKvQ1hJUAalctrrVSZNIPStJBEAzSsQl4rtinPEfl6LBZdos0GGfVLdyGjZZYODzoG28SMN09YKAC9Kz6RQ==}
 
   '@mischnic/json-sourcemap@0.1.0':
     resolution: {integrity: sha512-dQb3QnfNqmQNYA4nFSN/uLaByIic58gOXq4Y4XqLOWmOrw73KmJPt/HLyG0wvn1bnR6mBKs/Uwvkh+Hns1T0XA==}
@@ -5325,6 +5336,13 @@ snapshots:
 
   '@lmdb/lmdb-win32-x64@2.7.11':
     optional: true
+
+  '@lottiefiles/dotlottie-react@0.17.5(react@18.2.0)':
+    dependencies:
+      '@lottiefiles/dotlottie-web': 0.54.1
+      react: 18.2.0
+
+  '@lottiefiles/dotlottie-web@0.54.1': {}
 
   '@mischnic/json-sourcemap@0.1.0':
     dependencies:
