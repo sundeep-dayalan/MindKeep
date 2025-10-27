@@ -16,6 +16,10 @@ import {
   searchNotesByTitle,
   type Note
 } from "~services/db-service"
+import {
+  checkAllAIServices,
+  type HealthCheckStatus
+} from "~services/ai-service"
 import { getGlobalAgent } from "~services/langchain-agent"
 import { initializeDefaultPersonas } from "~services/persona-defaults"
 import type { Persona } from "~types/persona"
@@ -29,6 +33,7 @@ function SidePanel() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [loading, setLoading] = useState(false)
+  const [aiStatus, setAiStatus] = useState<HealthCheckStatus[]>([])
 
   // Editor state
   const [editingNote, setEditingNote] = useState<Note | null>(null)
@@ -42,6 +47,9 @@ function SidePanel() {
   // Load notes and categories
   useEffect(() => {
     loadData()
+
+    // Check AI availability on mount
+    checkAllAIServices().then(setAiStatus)
 
     // Initialize default personas on first load
     initializeDefaultPersonas().catch((error) => {
@@ -496,19 +504,22 @@ function SidePanel() {
             </div>
           )}
 
-          {/* Fixed Bottom Search Bar - hide in personas view and editor view */}
-          {view !== "personas" && view !== "editor" && (
-            <div className="plasmo-fixed plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-bg-transparent plasmo-backdrop-blur-xl plasmo-border-t plasmo-border-white/20 plasmo-shadow-lg plasmo-p-3 plasmo-z-50">
-              <AISearchBar
-                placeholder="Ask me anything..."
-                onSearch={handleAISearch}
-                onNoteCreated={loadData}
-                onNotesChange={loadData}
-                onNoteClick={handleEditNote}
-                onManagePersonas={handlePersonasClick}
-              />
-            </div>
-          )}
+          {/* Fixed Bottom Search Bar - hide in personas view, editor view, and when AI is not available */}
+          {view !== "personas" &&
+            view !== "editor" &&
+            aiStatus.length > 0 &&
+            aiStatus.every((service) => service.available) && (
+              <div className="plasmo-fixed plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-bg-transparent plasmo-backdrop-blur-xl plasmo-border-t plasmo-border-white/20 plasmo-shadow-lg plasmo-p-3 plasmo-z-50">
+                <AISearchBar
+                  placeholder="Ask me anything..."
+                  onSearch={handleAISearch}
+                  onNoteCreated={loadData}
+                  onNotesChange={loadData}
+                  onNoteClick={handleEditNote}
+                  onManagePersonas={handlePersonasClick}
+                />
+              </div>
+            )}
         </div>
       </div>
     </div>

@@ -69,19 +69,108 @@ export function AIStatusBanner() {
             {aiStatus[0].message}
           </p>
           {aiStatus[0].status === "not-supported" && (
-            <div className="plasmo-mt-2 plasmo-p-2 plasmo-bg-blue-50 plasmo-border plasmo-border-blue-200 plasmo-rounded plasmo-text-xs">
-              <p className="plasmo-text-blue-900 plasmo-font-medium plasmo-mb-1">
-                Chrome AI may not be available on your platform yet
-              </p>
-              <p className="plasmo-text-blue-700">
-                Try <strong>Chrome Dev</strong> or{" "}
-                <strong>Chrome Canary</strong> which have better AI support.
-                MindKeep will work fine without AI features - you'll just need
-                to write titles and summaries manually.
-                <pre className="plasmo-mt-2 plasmo-text-xs plasmo-text-blue-900 plasmo-bg-blue-100 plasmo-rounded plasmo-p-2 plasmo-overflow-x-auto">
-                  {JSON.stringify(aiStatus, null, 2)}
-                </pre>
-              </p>
+            <div className="plasmo-mt-3 plasmo-p-4 plasmo-bg-gradient-to-br plasmo-from-blue-50 plasmo-to-indigo-50 plasmo-border plasmo-border-blue-200 plasmo-rounded-lg plasmo-shadow-sm">
+              <div className="plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-mb-3">
+                <svg
+                  className="plasmo-w-5 plasmo-h-5 plasmo-text-blue-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <h4 className="plasmo-text-sm plasmo-font-semibold plasmo-text-blue-900">
+                  Enable Chrome AI Features
+                </h4>
+              </div>
+
+              <div className="plasmo-space-y-3 plasmo-text-xs plasmo-text-blue-800">
+                <div className="plasmo-bg-white plasmo-rounded-md plasmo-p-3 plasmo-border plasmo-border-blue-100">
+                  <p className="plasmo-font-medium plasmo-mb-2 plasmo-text-blue-900">
+                    📋 Step 1: Enable Required Flags
+                  </p>
+                  <p className="plasmo-mb-2 plasmo-text-blue-700">
+                    Copy and paste these URLs into your Chrome address bar:
+                  </p>
+                  <div className="plasmo-space-y-1.5">
+                    <div className="plasmo-bg-blue-50 plasmo-p-2 plasmo-rounded plasmo-border plasmo-border-blue-200">
+                      <code className="plasmo-text-xs plasmo-font-mono plasmo-text-blue-900">
+                        chrome://flags/#optimization-guide-on-device-model
+                      </code>
+                      <p className="plasmo-text-[10px] plasmo-text-blue-600 plasmo-mt-1">
+                        Set to "Enabled BypassPerfRequirement"
+                      </p>
+                    </div>
+                    <div className="plasmo-bg-blue-50 plasmo-p-2 plasmo-rounded plasmo-border plasmo-border-blue-200">
+                      <code className="plasmo-text-xs plasmo-font-mono plasmo-text-blue-900">
+                        chrome://flags/#prompt-api-for-gemini-nano
+                      </code>
+                      <p className="plasmo-text-[10px] plasmo-text-blue-600 plasmo-mt-1">
+                        Set to "Enabled"
+                      </p>
+                    </div>
+                    <div className="plasmo-bg-blue-50 plasmo-p-2 plasmo-rounded plasmo-border plasmo-border-blue-200">
+                      <code className="plasmo-text-xs plasmo-font-mono plasmo-text-blue-900">
+                        chrome://flags/#summarization-api-for-gemini-nano
+                      </code>
+                      <p className="plasmo-text-[10px] plasmo-text-blue-600 plasmo-mt-1">
+                        Set to "Enabled"
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="plasmo-bg-white plasmo-rounded-md plasmo-p-3 plasmo-border plasmo-border-blue-100">
+                  <p className="plasmo-font-medium plasmo-mb-2 plasmo-text-blue-900">
+                    🔄 Step 2: Restart Chrome
+                  </p>
+                  <p className="plasmo-text-blue-700">
+                    After enabling flags, click "Relaunch" button in Chrome or
+                    restart your browser completely.
+                  </p>
+                </div>
+
+                <div className="plasmo-bg-white plasmo-rounded-md plasmo-p-3 plasmo-border plasmo-border-blue-100">
+                  <p className="plasmo-font-medium plasmo-mb-2 plasmo-text-blue-900">
+                    ⬇️ Step 3: Download AI Model
+                  </p>
+                  <p className="plasmo-text-blue-700 plasmo-mb-2">
+                    After restart, Chrome will download the AI model
+                    automatically. This may take a few minutes.
+                  </p>
+                  <button
+                    onClick={handleCheckComponents}
+                    className="plasmo-text-xs plasmo-px-2.5 plasmo-py-1.5 plasmo-bg-blue-100 plasmo-text-blue-800 plasmo-rounded plasmo-border plasmo-border-blue-200 hover:plasmo-bg-blue-200 plasmo-transition-colors plasmo-font-medium">
+                    Check Download Status →
+                  </button>
+                  <p className="plasmo-text-[10px] plasmo-text-blue-600 plasmo-mt-2">
+                    Look for "Optimization Guide On Device Model" component
+                  </p>
+                </div>
+
+                <div className="plasmo-bg-amber-50 plasmo-rounded-md plasmo-p-3 plasmo-border plasmo-border-amber-200">
+                  <p className="plasmo-font-medium plasmo-mb-1 plasmo-text-amber-900 plasmo-flex plasmo-items-center plasmo-gap-1.5">
+                    <span>💡</span>
+                    <span>Alternative: Use Chrome Dev/Canary</span>
+                  </p>
+                  <p className="plasmo-text-amber-800 plasmo-text-[11px]">
+                    Chrome Dev and Canary have better AI support and may work
+                    without additional configuration.
+                  </p>
+                </div>
+
+                <div className="plasmo-bg-green-50 plasmo-rounded-md plasmo-p-2.5 plasmo-border plasmo-border-green-200">
+                  <p className="plasmo-text-green-800 plasmo-text-[11px] plasmo-leading-relaxed">
+                    <strong>Note:</strong> MindKeep works fine without AI - you
+                    can manually write titles and summaries. AI features are
+                    optional enhancements.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
           {showDebug && (
