@@ -1,12 +1,12 @@
 /**
  * Dedicated Offscreen Document Entry Point
- * 
+ *
  * This is a SEPARATE build from the background script, designed to run
  * in a full DOM environment with access to:
  * - URL.createObjectURL (for WASM loading)
  * - Web Workers
  * - IndexedDB
- * 
+ *
  * DO NOT import background script code here - it's built for service workers!
  */
 

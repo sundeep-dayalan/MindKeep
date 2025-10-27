@@ -11,7 +11,6 @@
  * and the extension's shared IndexedDB containing all notes.
  */
 
-import { generateEmbedding } from "~services/ai-service"
 import * as dbService from "~services/db-service"
 
 console.log("🟢 [Offscreen] Offscreen document initialized")

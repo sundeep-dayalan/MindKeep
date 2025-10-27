@@ -30,16 +30,20 @@ function isContentScript(): boolean {
 
 /**
  * Generate embedding for text
- * 
+ *
  * NOTE: This will throw an error if called from a content script context
  * because embeddings require full DOM environment (URL.createObjectURL)
  * which is not available in service workers or their offscreen documents.
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
   if (isContentScript()) {
-    console.warn("⚠️  [AI Proxy] Embedding generation not supported in content scripts due to Chrome MV3 limitations")
+    console.warn(
+      "⚠️  [AI Proxy] Embedding generation not supported in content scripts due to Chrome MV3 limitations"
+    )
     console.warn("⚠️  [AI Proxy] Use title-only search instead")
-    throw new Error("Embedding generation not available in content script context. Use title-only search instead.")
+    throw new Error(
+      "Embedding generation not available in content script context. Use title-only search instead."
+    )
   }
   return await aiService.generateEmbedding(text)
 }
