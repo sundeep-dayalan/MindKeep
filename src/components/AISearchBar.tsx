@@ -1,5 +1,5 @@
-import React from "react"
 import { DotLottieReact } from "@lottiefiles/dotlottie-react"
+import React from "react"
 
 import { MarkdownRenderer } from "~components/MarkdownRenderer"
 import { PersonaSelector } from "~components/PersonaSelector"
@@ -278,7 +278,7 @@ export function AISearchBar({
     isManualChange: boolean = true
   ) => {
     console.log(
-      "🎭 [AISearchBar] handlePersonaChange called:",
+      "[AISearchBar] handlePersonaChange called:",
       persona?.name || "Default Mode",
       isManualChange ? "(manual)" : "(auto-restored)"
     )
@@ -286,13 +286,13 @@ export function AISearchBar({
     try {
       // Update the global agent with the new persona
       // Pass the persona during agent creation to avoid double initialization
-      console.log("🎭 [AISearchBar] Getting global agent with persona...")
+      console.log("[AISearchBar] Getting global agent with persona...")
       const agent = await getGlobalAgent(persona)
 
-      console.log("🎭 [AISearchBar] Verifying persona was set...")
+      console.log("[AISearchBar] Verifying persona was set...")
       const currentPersona = agent.getPersona()
       const currentMode = agent.getMode()
-      console.log("🎭 [AISearchBar] Agent state after initialization:", {
+      console.log("[AISearchBar] Agent state after initialization:", {
         personaName: currentPersona?.name || "None",
         mode: currentMode,
         sessionId: agent.getSessionId()
@@ -303,9 +303,7 @@ export function AISearchBar({
       const currentId = currentPersona?.id || null
       const newId = persona?.id || null
       if (currentId !== newId) {
-        console.log(
-          "🎭 [AISearchBar] Persona mismatch, calling setPersona()..."
-        )
+        console.log("[AISearchBar] Persona mismatch, calling setPersona()...")
         await agent.setPersona(persona)
       }
 
@@ -321,16 +319,16 @@ export function AISearchBar({
           id: `system-${Date.now()}`,
           type: "ai",
           content: persona
-            ? `🎭 Switched to ${persona.name} persona. Conversation history cleared.\n\n${persona.description}`
-            : "🎭 Switched to Default Mode. Full tool access restored.",
+            ? `Switched to ${persona.name} persona. Conversation history cleared.\n\n${persona.description}`
+            : "Switched to Default Mode. Full tool access restored.",
           timestamp: Date.now()
         }
         setMessages([systemMessage])
       }
 
-      console.log("🎭 [AISearchBar] Agent persona updated successfully")
+      console.log("[AISearchBar] Agent persona updated successfully")
     } catch (error) {
-      console.error("🎭 [AISearchBar] Error updating agent persona:", error)
+      console.error("[AISearchBar] Error updating agent persona:", error)
     }
   }
 
@@ -1557,7 +1555,8 @@ export function AISearchBar({
       {/* Header Section - Dynamic Greeting and Controls */}
       <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-py-2 plasmo-px-3 plasmo-border-b plasmo-border-slate-200">
         {/* Left: MIND KEEP label with Lottie Logo and greeting (hide greeting in insert mode) */}
-        <div className={`plasmo-flex ${enableInsertMode ? 'plasmo-flex-row plasmo-items-center' : 'plasmo-flex-col'} plasmo-gap-1`}>
+        <div
+          className={`plasmo-flex ${enableInsertMode ? "plasmo-flex-row plasmo-items-center" : "plasmo-flex-col"} plasmo-gap-1`}>
           {/* Logo + Mind Keep Label Row */}
           <div className="plasmo-flex plasmo-items-center plasmo-gap-2">
             <div className="plasmo-flex-shrink-0 plasmo-w-6 plasmo-h-6">
@@ -1567,7 +1566,8 @@ export function AISearchBar({
                 autoplay
               />
             </div>
-            <span className={`${enableInsertMode ? 'plasmo-text-xs' : 'plasmo-text-[8px]'} plasmo-font-medium plasmo-text-slate-500 plasmo-uppercase plasmo-tracking-wider`}>
+            <span
+              className={`${enableInsertMode ? "plasmo-text-xs" : "plasmo-text-[8px]"} plasmo-font-medium plasmo-text-slate-500 plasmo-uppercase plasmo-tracking-wider`}>
               Mind Keep
             </span>
           </div>
@@ -1688,7 +1688,8 @@ export function AISearchBar({
             .filter((_, index, arr) => {
               if (enableInsertMode) {
                 // Find the last AI message
-                const lastAiIndex = arr.map((m, i) => ({ m, i }))
+                const lastAiIndex = arr
+                  .map((m, i) => ({ m, i }))
                   .reverse()
                   .find(({ m }) => m.type === "ai")?.i
                 return index === lastAiIndex
@@ -1998,7 +1999,9 @@ export function AISearchBar({
                   <span className="plasmo-text-xs plasmo-font-medium">
                     Insert
                   </span>
-                  <span className="plasmo-text-[10px] plasmo-opacity-80">↵</span>
+                  <span className="plasmo-text-[10px] plasmo-opacity-80">
+                    ↵
+                  </span>
                 </>
               ) : (
                 // Send button with text and arrow icon

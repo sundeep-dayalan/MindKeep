@@ -388,10 +388,10 @@ export class MindKeepAgent {
    */
   async setPersona(persona: Persona | null): Promise<void> {
     console.log(
-      "🎭 [Agent] setPersona called with:",
+      "[Agent] setPersona called with:",
       persona?.name || "null (default mode)"
     )
-    console.log("🎭 [Agent] Current state before change:", {
+    console.log("[Agent] Current state before change:", {
       currentPersona: this.activePersona?.name || "None",
       currentMode: this.mode,
       currentSessionId: this.sessionId
@@ -401,25 +401,25 @@ export class MindKeepAgent {
     this.mode = persona ? AgentMode.PERSONA : AgentMode.DEFAULT
 
     // Destroy old session and create new one with updated system prompt
-    console.log("🎭 [Agent] Recreating session due to persona change")
+    console.log("[Agent] Recreating session due to persona change")
 
     if (this.sessionId) {
-      console.log("🎭 [Agent] Destroying old session:", this.sessionId)
+      console.log("[Agent] Destroying old session:", this.sessionId)
       await GeminiNanoService.destroySession(this.sessionId)
     }
 
     // Create new session with updated system prompt
-    console.log("🎭 [Agent] Creating new session...")
+    console.log("[Agent] Creating new session...")
     this.sessionId = await GeminiNanoService.createSession({
       systemPrompt: this.buildSystemPrompt(),
       temperature: this.temperature,
       topK: this.topK
     })
 
-    console.log(`🎭 [Agent] Mode set to: ${this.mode}`)
-    console.log(`🎭 [Agent] Active persona: ${persona?.name || "None"}`)
-    console.log(`🎭 [Agent] New session: ${this.sessionId}`)
-    console.log("🎭 [Agent] setPersona completed successfully")
+    console.log(`[Agent] Mode set to: ${this.mode}`)
+    console.log(`[Agent] Active persona: ${persona?.name || "None"}`)
+    console.log(`[Agent] New session: ${this.sessionId}`)
+    console.log("[Agent] setPersona completed successfully")
   }
 
   /**

@@ -71,10 +71,7 @@
       "sidePanel",
       "contextMenus",
       "storage",
-      "offscreen",
-      "ai",
-      "rewriter",
-      "aiLanguageModelOriginTrial"
+      "offscreen"
     ],
     "side_panel": {
       "default_path": "sidepanel.html"

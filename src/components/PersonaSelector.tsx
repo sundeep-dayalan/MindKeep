@@ -40,12 +40,12 @@ export function PersonaSelector({
   const [isInitializing, setIsInitializing] = useState(true) // Start as true - we're loading
 
   useEffect(() => {
-    console.log("🎭 [PersonaSelector] Component mounted, loading personas")
+    console.log("[PersonaSelector] Component mounted, loading personas")
     console.log(
-      "🎭 [PersonaSelector] onPersonaChange callback exists?",
+      "[PersonaSelector] onPersonaChange callback exists?",
       !!onPersonaChange
     )
-    console.log("🎭 [PersonaSelector] Callback type:", typeof onPersonaChange)
+    console.log("[PersonaSelector] Callback type:", typeof onPersonaChange)
     loadPersonas()
   }, [])
 
@@ -124,7 +124,9 @@ export function PersonaSelector({
 
     // Check if extension context is valid
     if (!isExtensionContextValid()) {
-      console.error(" [PersonaSelector] Extension context is invalid - cannot load personas")
+      console.error(
+        " [PersonaSelector] Extension context is invalid - cannot load personas"
+      )
       showExtensionReloadMessage()
       setIsInitializing(false)
       if (onInitializationChange) {
@@ -208,28 +210,25 @@ export function PersonaSelector({
 
   const restoreSavedPersona = async (allPersonas: Persona[]) => {
     try {
-      console.log("🎭 [PersonaSelector] restoreSavedPersona called")
+      console.log("[PersonaSelector] restoreSavedPersona called")
       const savedPersonaId = await getSelectedPersonaId()
 
       if (!savedPersonaId) {
         console.log(
-          "🎭 [PersonaSelector] No saved persona, staying in default mode"
+          "[PersonaSelector] No saved persona, staying in default mode"
         )
         return
       }
 
       console.log(
-        "🎭 [PersonaSelector] Restoring saved persona ID:",
+        "[PersonaSelector] Restoring saved persona ID:",
         savedPersonaId
       )
 
       const savedPersona = allPersonas.find((p) => p.id === savedPersonaId)
 
       if (savedPersona) {
-        console.log(
-          "🎭 [PersonaSelector] Found saved persona:",
-          savedPersona.name
-        )
+        console.log("[PersonaSelector] Found saved persona:", savedPersona.name)
 
         // Just update local state - don't call setActivePersona() to avoid triggering storage listener
         setActivePersonaState(savedPersona)
@@ -237,23 +236,23 @@ export function PersonaSelector({
         // Notify parent to update agent (isManualChange = false for restoration)
         if (onPersonaChange) {
           console.log(
-            "🎭 [PersonaSelector] Calling onPersonaChange callback with restored persona"
+            "[PersonaSelector] Calling onPersonaChange callback with restored persona"
           )
-          console.log("🎭 [PersonaSelector] Persona data:", {
+          console.log("[PersonaSelector] Persona data:", {
             id: savedPersona.id,
             name: savedPersona.name,
             isManualChange: false
           })
           onPersonaChange(savedPersona, false) // false = don't show "Switched to..." message
-          console.log("🎭 [PersonaSelector] onPersonaChange callback completed")
+          console.log("[PersonaSelector] onPersonaChange callback completed")
         } else {
           console.warn(
-            "🎭 [PersonaSelector] No onPersonaChange callback provided!"
+            "[PersonaSelector] No onPersonaChange callback provided!"
           )
         }
       } else {
         console.log(
-          "🎭 [PersonaSelector] Saved persona not found in database, clearing selection"
+          "[PersonaSelector] Saved persona not found in database, clearing selection"
         )
         // Clear invalid saved persona from storage only
         const { setSelectedPersona } = await import(
@@ -262,10 +261,7 @@ export function PersonaSelector({
         await setSelectedPersona(null)
       }
     } catch (error) {
-      console.error(
-        "🎭 [PersonaSelector] Error restoring saved persona:",
-        error
-      )
+      console.error("[PersonaSelector] Error restoring saved persona:", error)
     }
   }
 
@@ -277,7 +273,9 @@ export function PersonaSelector({
 
     // Check if extension context is valid
     if (!isExtensionContextValid()) {
-      console.error(" [PersonaSelector] Extension context is invalid - cannot change persona")
+      console.error(
+        " [PersonaSelector] Extension context is invalid - cannot change persona"
+      )
       showExtensionReloadMessage()
       alert("Extension needs to be reloaded. Please refresh the page.")
       return
@@ -299,10 +297,11 @@ export function PersonaSelector({
           " [PersonaSelector] Running in content script, using messaging to set active persona"
         )
         const response = await safeExtensionCall(
-          () => chrome.runtime.sendMessage({
-            type: "SET_ACTIVE_PERSONA",
-            data: { personaId: persona?.id || null }
-          }),
+          () =>
+            chrome.runtime.sendMessage({
+              type: "SET_ACTIVE_PERSONA",
+              data: { personaId: persona?.id || null }
+            }),
           { success: false }
         )
 

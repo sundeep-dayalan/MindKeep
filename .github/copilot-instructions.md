@@ -591,7 +591,7 @@ Five pre-built personas for common use cases:
 ### 🐛 **Debugging & Logging**
 
 - **Comprehensive Console Logs:** Every operation logged with emoji prefixes
-  - 🎭 = Persona operations
+  - = Persona operations
   - ⚙️ = Settings operations
   - 🔧 = Tool selection/execution
   - 🤖 = Agent operations
