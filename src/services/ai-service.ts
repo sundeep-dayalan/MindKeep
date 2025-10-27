@@ -22,6 +22,10 @@ import { executePrompt, type PromptOptions } from "./gemini-nano-service"
 env.allowLocalModels = false
 env.useBrowserCache = true
 
+// CRITICAL: Service workers don't support blob URLs
+// We need to use remote models only
+env.backends.onnx.wasm.proxy = false
+
 // Embedding model
 const EMBEDDING_MODEL = "Xenova/all-MiniLM-L6-v2"
 

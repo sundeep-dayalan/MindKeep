@@ -1,30 +1,28 @@
 /**
- * Offscreen Document Script for MindKeep
- *
- * This script runs in an offscreen document context which provides:
- * 1. Access to the extension's IndexedDB (shared with side panel)
- * 2. Ability to respond to messages from content scripts
- * 3. Long-lived context for database operations
- * 4. Full DOM environment for WASM/Worker operations (transformers.js)
- *
- * Purpose: Bridge the gap between content scripts (which have isolated IndexedDB)
- * and the extension's shared IndexedDB containing all notes.
+ * Dedicated Offscreen Document Entry Point
+ * 
+ * This is a SEPARATE build from the background script, designed to run
+ * in a full DOM environment with access to:
+ * - URL.createObjectURL (for WASM loading)
+ * - Web Workers
+ * - IndexedDB
+ * 
+ * DO NOT import background script code here - it's built for service workers!
  */
 
 import { generateEmbedding } from "~services/ai-service"
 import * as dbService from "~services/db-service"
 
-console.log("🟢 [Offscreen] Offscreen document initialized")
+console.log("🟢 [Offscreen] Dedicated offscreen document initialized")
 
 /**
- * Message handler for database operations
- * Routes requests from content scripts to the appropriate db-service functions
+ * Message handler for database and AI operations
  */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log("📨 [Offscreen] Received message:", message.type)
 
-  // All async operations need to return true to keep the message channel open
-  const handleAsync = async () => {
+  // Handle async operations
+  ;(async () => {
     try {
       switch (message.type) {
         // ==================== SEARCH OPERATIONS ====================
@@ -168,6 +166,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           break
         }
 
+        // ==================== AI OPERATIONS ====================
+
+        case "AI_GENERATE_EMBEDDING": {
+          const { text } = message.payload
+          console.log(
+            `🤖 [Offscreen] Generating embedding for text (${text.length} chars)`
+          )
+          const embedding = await generateEmbedding(text)
+          console.log(
+            `✅ [Offscreen] Generated embedding (${embedding.length} dimensions)`
+          )
+          sendResponse({ success: true, data: embedding })
+          break
+        }
+
         default:
           console.warn(`⚠️  [Offscreen] Unknown message type: ${message.type}`)
           sendResponse({ success: false, error: "Unknown message type" })
@@ -179,10 +192,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         error: error instanceof Error ? error.message : String(error)
       })
     }
-  }
-
-  // Execute async handler
-  handleAsync()
+  })()
 
   // Return true to indicate we'll respond asynchronously
   return true

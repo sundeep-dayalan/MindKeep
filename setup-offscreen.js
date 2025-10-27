@@ -2,18 +2,22 @@
  * Post-build script to set up the offscreen document
  *
  * This script:
- * 1. Creates the offscreen directory
- * 2. Creates a standalone offscreen.js that loads the background bundle
- * 3. Creates the offscreen.html file
+ * 1. Checks if Plasmo built an offscreen bundle
+ * 2. If not, copies the background bundle (which includes offscreen code)
+ * 3. Creates the offscreen.html file with proper CSP
+ * 
+ * Supports both dev and prod builds
  */
 
 const fs = require('fs');
 const path = require('path');
 
-const BUILD_DIR = path.join(__dirname, 'build', 'chrome-mv3-prod');
+// Detect if we're in dev or prod mode
+const buildMode = process.argv[2] || 'prod'; // Can be 'dev' or 'prod'
+const BUILD_DIR = path.join(__dirname, 'build', `chrome-mv3-${buildMode}`);
 const OFFSCREEN_DIR = path.join(BUILD_DIR, 'offscreen');
 
-console.log('📦 Setting up offscreen document...');
+console.log(`📦 Setting up offscreen document for ${buildMode} build...`);
 
 // Create offscreen directory
 if (!fs.existsSync(OFFSCREEN_DIR)) {
@@ -21,17 +25,27 @@ if (!fs.existsSync(OFFSCREEN_DIR)) {
   console.log('✅ Created offscreen directory');
 }
 
-// Copy the entire background bundle to make it accessible to the offscreen document
-// The offscreen document will share the same code as the background script
+// Look for a dedicated offscreen build or fall back to background bundle
+const offscreenBuildPath = path.join(BUILD_DIR, 'static', 'offscreen', 'index.js');
 const backgroundIndexPath = path.join(BUILD_DIR, 'static', 'background', 'index.js');
-if (fs.existsSync(backgroundIndexPath)) {
-  const offscreenJsPath = path.join(OFFSCREEN_DIR, 'offscreen.js');
-  fs.copyFileSync(backgroundIndexPath, offscreenJsPath);
-  console.log('✅ Copied background bundle to offscreen/offscreen.js');
+
+let sourcePath;
+if (fs.existsSync(offscreenBuildPath)) {
+  sourcePath = offscreenBuildPath;
+  console.log('📄 Found dedicated offscreen build');
+} else if (fs.existsSync(backgroundIndexPath)) {
+  sourcePath = backgroundIndexPath;
+  console.log('📄 Using background bundle (includes offscreen code)');
 } else {
-  console.error('❌ Background bundle not found at:', backgroundIndexPath);
+  console.error('❌ No offscreen or background bundle found');
+  console.error('  Looked for:', offscreenBuildPath);
+  console.error('  Looked for:', backgroundIndexPath);
   process.exit(1);
 }
+
+const offscreenJsPath = path.join(OFFSCREEN_DIR, 'offscreen.js');
+fs.copyFileSync(sourcePath, offscreenJsPath);
+console.log('✅ Copied bundle to offscreen/offscreen.js');
 
 // Create offscreen.html with proper CSP for WASM
 const offscreenHtml = `<!DOCTYPE html>

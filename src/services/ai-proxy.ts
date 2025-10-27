@@ -4,8 +4,12 @@
  * This service provides a unified interface for AI operations that works
  * across different Chrome extension contexts:
  *
- * - Extension Pages: Direct access to AI service
- * - Content Scripts: Proxies requests to offscreen document via message passing
+ * - Extension Pages (sidepanel, popup): Direct access to AI service with full WASM support
+ * - Content Scripts: Falls back to title-only search (no embeddings due to MV3 limitations)
+ *
+ * IMPORTANT: Transformers.js (for embeddings) requires URL.createObjectURL which is NOT
+ * available in Chrome MV3 service workers or offscreen documents that load service worker code.
+ * Therefore, embedding generation only works in full DOM contexts (sidepanel, popup).
  */
 
 import * as aiService from "~services/ai-service"
@@ -25,36 +29,17 @@ function isContentScript(): boolean {
 }
 
 /**
- * Send a message to the offscreen document and wait for response
- */
-async function sendToOffscreen<T>(
-  type: string,
-  payload: any = {}
-): Promise<T> {
-  try {
-    const response = await chrome.runtime.sendMessage({
-      type,
-      payload
-    })
-
-    if (!response.success) {
-      throw new Error(response.error || "Operation failed")
-    }
-
-    return response.data
-  } catch (error) {
-    console.error(`[AI Proxy] Error sending message ${type}:`, error)
-    throw error
-  }
-}
-
-/**
  * Generate embedding for text
+ * 
+ * NOTE: This will throw an error if called from a content script context
+ * because embeddings require full DOM environment (URL.createObjectURL)
+ * which is not available in service workers or their offscreen documents.
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
   if (isContentScript()) {
-    console.log("📡 [AI Proxy] Routing generateEmbedding to offscreen")
-    return await sendToOffscreen("AI_GENERATE_EMBEDDING", { text })
+    console.warn("⚠️  [AI Proxy] Embedding generation not supported in content scripts due to Chrome MV3 limitations")
+    console.warn("⚠️  [AI Proxy] Use title-only search instead")
+    throw new Error("Embedding generation not available in content script context. Use title-only search instead.")
   }
   return await aiService.generateEmbedding(text)
 }
