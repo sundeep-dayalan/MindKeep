@@ -75,10 +75,10 @@ export function createInjectedIcon(
   // Position the container relative to the input's position on screen
   const inputRect = inputElement.getBoundingClientRect()
 
-  // Position badge perfectly in top-left corner (Dropbox style)
-  // The badge should overlap the corner slightly for perfect alignment
-  iconContainer.style.top = `${inputRect.top - 10}px`
-  iconContainer.style.left = `${inputRect.left - 10}px`
+  // Position badge below the text box in bottom-right corner (Grammarly style)
+  // The badge should be positioned outside and below the input field
+  iconContainer.style.top = `${inputRect.bottom + 4}px` // 4px gap below the input
+  iconContainer.style.left = `${inputRect.right - 34}px` // Aligned to right edge with 10px padding
 
   // Store original input styles to restore later
   const originalBorder = inputElement.style.border || ""
@@ -152,8 +152,8 @@ export function createInjectedIcon(
   // Update icon position on scroll/resize
   const updatePosition = () => {
     const rect = inputElement.getBoundingClientRect()
-    iconContainer.style.top = `${rect.top - 10}px`
-    iconContainer.style.left = `${rect.left - 10}px`
+    iconContainer.style.top = `${rect.bottom + 4}px`
+    iconContainer.style.left = `${rect.right - 34}px`
   }
 
   window.addEventListener("scroll", updatePosition, true)

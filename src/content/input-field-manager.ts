@@ -140,6 +140,28 @@ export class InputFieldManager {
       return false
     }
 
+    // Skip MindKeep's own UI elements
+    // Check if element or any parent has MindKeep-specific identifiers
+    let currentElement: HTMLElement | null = element
+    while (currentElement) {
+      // Check for MindKeep modal
+      if (currentElement.id === "mindkeep-in-page-chat") {
+        return false
+      }
+
+      // Check for MindKeep class names
+      if (currentElement.className && typeof currentElement.className === "string") {
+        if (
+          currentElement.className.includes("mindkeep-") ||
+          currentElement.className.includes("plasmo-")
+        ) {
+          return false
+        }
+      }
+
+      currentElement = currentElement.parentElement
+    }
+
     // Check if it's a valid input type
     if (element instanceof HTMLInputElement) {
       const type = element.type.toLowerCase()
