@@ -1,4 +1,5 @@
 import React from "react"
+import { DotLottieReact } from "@lottiefiles/dotlottie-react"
 
 import { MarkdownRenderer } from "~components/MarkdownRenderer"
 import { PersonaSelector } from "~components/PersonaSelector"
@@ -1555,11 +1556,23 @@ export function AISearchBar({
     <div className={`plasmo-flex plasmo-flex-col plasmo-h-full ${className}`}>
       {/* Header Section - Dynamic Greeting and Controls */}
       <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-py-2 plasmo-px-3 plasmo-border-b plasmo-border-slate-200">
-        {/* Left: MIND KEEP label and greeting (hide greeting in insert mode) */}
-        <div className="plasmo-flex plasmo-flex-col plasmo-gap-1">
-          <span className="plasmo-text-[8px] plasmo-font-medium plasmo-text-slate-500 plasmo-uppercase plasmo-tracking-wider">
-            Mind Keep
-          </span>
+        {/* Left: MIND KEEP label with Lottie Logo and greeting (hide greeting in insert mode) */}
+        <div className={`plasmo-flex ${enableInsertMode ? 'plasmo-flex-row plasmo-items-center' : 'plasmo-flex-col'} plasmo-gap-1`}>
+          {/* Logo + Mind Keep Label Row */}
+          <div className="plasmo-flex plasmo-items-center plasmo-gap-2">
+            <div className="plasmo-flex-shrink-0 plasmo-w-6 plasmo-h-6">
+              <DotLottieReact
+                src="https://lottie.host/523463c6-9440-4e42-bc0a-318978a9b8a2/S2YUnZFAfy.lottie"
+                loop
+                autoplay
+              />
+            </div>
+            <span className={`${enableInsertMode ? 'plasmo-text-xs' : 'plasmo-text-[8px]'} plasmo-font-medium plasmo-text-slate-500 plasmo-uppercase plasmo-tracking-wider`}>
+              Mind Keep
+            </span>
+          </div>
+
+          {/* Greeting Text - Below Logo and Label (only in side panel mode) */}
           {!enableInsertMode && (
             <div className="plasmo-flex plasmo-flex-col plasmo-gap-0.5">
               <span className="plasmo-text-base plasmo-font-light plasmo-text-slate-700">

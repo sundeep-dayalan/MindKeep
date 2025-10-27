@@ -95,43 +95,66 @@ export function createInjectedIcon(
   // Append to document body
   document.body.appendChild(iconContainer)
 
-  // Create the corner badge button (Dropbox style - small and subtle)
+  // Create the button with transparent background - just the Lottie logo
   const button = document.createElement("button")
   button.type = "button"
   button.style.cssText = `
-    width: 24px !important;
-    height: 24px !important;
-    border-radius: 6px 6px 6px 2px !important;
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 50% !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%) !important;
+    background: transparent !important;
     color: white !important;
-    border: 2px solid white !important;
+    border: none !important;
     cursor: pointer !important;
     transition: all 0.2s ease !important;
-    box-shadow: 0 2px 6px rgba(139, 92, 246, 0.4) !important;
     padding: 0 !important;
     margin: 0 !important;
     z-index: 999999 !important;
   `
   button.title = "Ask MindKeep AI"
 
-  // Smaller, cleaner icon
-  button.innerHTML = `
-    <svg style="width: 14px; height: 14px;" fill="currentColor" viewBox="0 0 24 24">
-      <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
-    </svg>
+  // Create container for Lottie animation
+  const lottieContainer = document.createElement("div")
+  lottieContainer.style.cssText = `
+    width: 28px !important;
+    height: 28px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
   `
 
-  // Add hover effect - subtle lift
+  // Create dotlottie-player element
+  const lottiePlayer = document.createElement("dotlottie-player")
+  lottiePlayer.setAttribute("src", "https://lottie.host/523463c6-9440-4e42-bc0a-318978a9b8a2/S2YUnZFAfy.lottie")
+  lottiePlayer.setAttribute("background", "transparent")
+  lottiePlayer.setAttribute("speed", "1")
+  lottiePlayer.setAttribute("loop", "true")
+  lottiePlayer.setAttribute("autoplay", "true")
+  lottiePlayer.style.cssText = `
+    width: 100% !important;
+    height: 100% !important;
+  `
+
+  lottieContainer.appendChild(lottiePlayer)
+  button.appendChild(lottieContainer)
+
+  // Load dotlottie-player script if not already loaded
+  if (!document.querySelector('script[src*="dotlottie-player"]')) {
+    const script = document.createElement("script")
+    script.src = "https://unpkg.com/@dotlottie/player-component@latest/dist/dotlottie-player.mjs"
+    script.type = "module"
+    document.head.appendChild(script)
+  }
+
+  // Add hover effect - subtle scale
   button.addEventListener("mouseenter", () => {
-    button.style.transform = "scale(1.1)"
-    button.style.boxShadow = "0 4px 10px rgba(139, 92, 246, 0.5) !important"
+    button.style.transform = "scale(1.15)"
   })
   button.addEventListener("mouseleave", () => {
     button.style.transform = "scale(1)"
-    button.style.boxShadow = "0 2px 6px rgba(139, 92, 246, 0.4) !important"
   })
 
   button.addEventListener("click", (e) => {
