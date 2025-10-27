@@ -1961,11 +1961,7 @@ export function AISearchBar({
                     }
                   : undefined
               }
-              className={`plasmo-flex-shrink-0 plasmo-px-4 plasmo-py-2 plasmo-text-white plasmo-rounded-lg plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-justify-center hover:plasmo-bg-slate-700 plasmo-transition-colors disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed ${
-                showInsertButton && enableInsertMode
-                  ? "plasmo-bg-purple-600 hover:plasmo-bg-purple-700"
-                  : "plasmo-bg-slate-900"
-              }`}
+              className="plasmo-flex-shrink-0 plasmo-px-3 plasmo-py-1.5 plasmo-text-white plasmo-rounded-lg plasmo-flex plasmo-items-center plasmo-gap-1.5 plasmo-justify-center plasmo-bg-slate-900 hover:plasmo-bg-slate-700 plasmo-transition-colors disabled:plasmo-opacity-50 disabled:plasmo-cursor-not-allowed"
               title={
                 showInsertButton && enableInsertMode
                   ? "Insert to page"
@@ -1986,19 +1982,19 @@ export function AISearchBar({
               {showInsertButton && enableInsertMode ? (
                 // Insert button with text and Enter symbol
                 <>
-                  <span className="plasmo-text-sm plasmo-font-medium">
+                  <span className="plasmo-text-xs plasmo-font-medium">
                     Insert
                   </span>
-                  <span className="plasmo-text-xs plasmo-opacity-80">↵</span>
+                  <span className="plasmo-text-[10px] plasmo-opacity-80">↵</span>
                 </>
               ) : (
-                // Send button with text
+                // Send button with text and arrow icon
                 <>
-                  <span className="plasmo-text-sm plasmo-font-medium">
+                  <span className="plasmo-text-xs plasmo-font-medium">
                     Send
                   </span>
                   <svg
-                    className="plasmo-w-4 plasmo-h-4"
+                    className="plasmo-w-3 plasmo-h-3"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24">
