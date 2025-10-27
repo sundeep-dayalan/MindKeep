@@ -93,23 +93,28 @@ MindKeep uses a sophisticated local-first architecture:
 graph TB
     subgraph "Your Browser (100% Local)"
         A[You Create/Save Note] --> B[Extract Plain Text]
-        B --> C[Generate Embedding Vector<br/>Gemini Nano]
+        B --> C[Generate Embedding Vector<br/>Transformers.js]
         C --> D[Encrypt Content<br/>Browser Crypto API]
         D --> E[Store in IndexedDB]
 
-        F[You Ask Question] --> G[Generate Query Embedding<br/>Gemini Nano]
+        F[You Ask Question] --> G[Generate Query Embedding<br/>Transformers.js]
         G --> H[Vector Similarity Search<br/>IndexedDB]
         H --> I[Decrypt Matching Notes]
         I --> J[AI Generates Response<br/>Gemini Nano]
         J --> K[Display Answer + References]
     end
 
-    style A fill:#e3f2fd
-    style F fill:#e3f2fd
-    style K fill:#c8e6c9
-    style C fill:#fff9c4
-    style G fill:#fff9c4
-    style J fill:#fff9c4
+    style A fill:#bbdefb,stroke:#1976d2,stroke-width:2px,color:#000
+    style F fill:#bbdefb,stroke:#1976d2,stroke-width:2px,color:#000
+    style K fill:#a5d6a7,stroke:#388e3c,stroke-width:2px,color:#000
+    style C fill:#fff59d,stroke:#f57f17,stroke-width:2px,color:#000
+    style G fill:#fff59d,stroke:#f57f17,stroke-width:2px,color:#000
+    style J fill:#fff59d,stroke:#f57f17,stroke-width:2px,color:#000
+    style B fill:#e0e0e0,stroke:#616161,stroke-width:1px,color:#000
+    style D fill:#e0e0e0,stroke:#616161,stroke-width:1px,color:#000
+    style E fill:#e0e0e0,stroke:#616161,stroke-width:1px,color:#000
+    style H fill:#e0e0e0,stroke:#616161,stroke-width:1px,color:#000
+    style I fill:#e0e0e0,stroke:#616161,stroke-width:1px,color:#000
 ```
 
 ### The Technology Stack
@@ -463,32 +468,40 @@ Finds:
 ### Data Flow Architecture
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#bbdefb', 'primaryTextColor': '#000', 'primaryBorderColor': '#1976d2', 'lineColor': '#1976d2', 'secondaryColor': '#fff59d', 'tertiaryColor': '#a5d6a7', 'noteBkgColor': '#fff', 'noteTextColor': '#000', 'noteBorderColor': '#616161'}}}%%
 sequenceDiagram
     participant User
     participant UI as Side Panel UI
     participant BG as Background Script
-    participant AI as Gemini Nano (Local)
-    participant DB as IndexedDB (Encrypted)
+    participant Embed as Transformers.js
+    participant AI as Gemini Nano
+    participant DB as IndexedDB
 
+    rect rgb(227, 242, 253)
+    Note over User,DB: Creating a Note
     User->>UI: Creates note with text
     UI->>BG: Send note content
-    BG->>AI: Generate embedding vector
-    AI-->>BG: Return 768-dim vector
+    BG->>Embed: Generate embedding vector
+    Embed-->>BG: Return 384-dim vector
     BG->>BG: Encrypt content (AES-GCM)
     BG->>DB: Store encrypted note + vector
     DB-->>BG: Confirm save
     BG-->>UI: Success
+    end
 
+    rect rgb(200, 230, 201)
+    Note over User,DB: Asking a Question
     User->>UI: Ask question
     UI->>BG: Send query
-    BG->>AI: Generate query embedding
-    AI-->>BG: Return query vector
+    BG->>Embed: Generate query embedding
+    Embed-->>BG: Return query vector
     BG->>DB: Vector similarity search
     DB-->>BG: Matching notes (encrypted)
     BG->>BG: Decrypt top results
     BG->>AI: Generate response with context
     AI-->>BG: AI response
     BG-->>UI: Display answer + references
+    end
 ```
 
 ### Privacy Guarantees
