@@ -1943,6 +1943,18 @@ Begin analysis. Respond ONLY with a complete JSON object with all 5 required fie
       // The API guarantees the output is a valid JSON string matching the schema
       const parsedResponse = JSON.parse(jsonStringResponse)
 
+      // Check if parsedResponse is actually an object, not a primitive (like number 0)
+      if (typeof parsedResponse !== 'object' || parsedResponse === null || Array.isArray(parsedResponse)) {
+        console.error("[Stage 1] AI returned non-object response:", parsedResponse)
+        return {
+          data: null,
+          type: "other",
+          confidence: 0.1,
+          aiResponse: "I'm sorry, I had trouble processing that information.",
+          sourceNoteIds: []
+        }
+      }
+
       // Provide robust defaults for missing fields
       if (
         parsedResponse.dataType &&
