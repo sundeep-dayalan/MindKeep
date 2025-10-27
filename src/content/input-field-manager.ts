@@ -59,7 +59,9 @@ export class InputFieldManager {
       "textarea",
       '[contenteditable="true"]', // Rich text editors like Gmail
       '[contenteditable="plaintext-only"]', // Gmail compose box
-      '[contenteditable=""]' // Some editors set empty contenteditable
+      '[contenteditable=""]', // Some editors set empty contenteditable
+      'div[role="textbox"]', // ARIA textbox (used by many modern apps including Gemini)
+      '[contenteditable]' // Any contenteditable element (catch-all)
     ]
 
     const inputs = document.querySelectorAll(selectors.join(", "))
@@ -92,6 +94,22 @@ export class InputFieldManager {
   private setupMutationObserver() {
     this.observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
+        // Check for attribute changes (contenteditable, type)
+        if (mutation.type === "attributes" && mutation.target) {
+          const element = mutation.target as HTMLElement
+
+          // If element became a valid input field, register it
+          if (this.isValidInputField(element)) {
+            this.registerField(
+              element as HTMLInputElement | HTMLTextAreaElement | HTMLElement
+            )
+          }
+          // If element is no longer a valid input field, unregister it
+          else if (this.fields.has(element)) {
+            this.unregisterField(element)
+          }
+        }
+
         // Check added nodes
         mutation.addedNodes.forEach((node) => {
           if (node.nodeType === Node.ELEMENT_NODE) {
@@ -106,7 +124,7 @@ export class InputFieldManager {
 
             // Check for inputs within the added node
             const inputs = element.querySelectorAll(
-              'input[type="text"], input[type="email"], input[type="url"], input[type="password"], input:not([type]), textarea, [contenteditable="true"], [contenteditable="plaintext-only"], [contenteditable=""]'
+              'input[type="text"], input[type="email"], input[type="url"], input[type="password"], input:not([type]), textarea, [contenteditable="true"], [contenteditable="plaintext-only"], [contenteditable=""], div[role="textbox"], [contenteditable]'
             )
             inputs.forEach((input) => {
               if (this.isValidInputField(input as HTMLElement)) {
@@ -130,11 +148,12 @@ export class InputFieldManager {
       }
     })
 
-    // Observe the entire document, but with optimized configuration
+    // Observe the entire document, including attribute changes for contenteditable
     this.observer.observe(document.body, {
       childList: true, // Watch for added/removed nodes
       subtree: true, // Watch the entire tree
-      attributes: false, // Don't watch attribute changes (performance optimization)
+      attributes: true, // Watch attribute changes (needed for contenteditable detection)
+      attributeFilter: ["contenteditable", "type", "role"], // Watch for input-related attributes
       characterData: false // Don't watch text content changes
     })
 
@@ -200,6 +219,11 @@ export class InputFieldManager {
       return true
     }
 
+    // Allow ARIA textbox role (used by modern apps like Gemini)
+    if (element.getAttribute("role") === "textbox") {
+      return true
+    }
+
     return false
   }
 
@@ -210,6 +234,10 @@ export class InputFieldManager {
     element: HTMLInputElement | HTMLTextAreaElement | HTMLElement
   ) {
     if (this.fields.has(element)) {
+      console.log(
+        "⏭️  [InputFieldManager] Field already registered, skipping:",
+        element.tagName
+      )
       return // Already registered
     }
 
@@ -223,23 +251,35 @@ export class InputFieldManager {
 
     this.fields.set(element, field)
 
-    // Add event listeners
-    element.addEventListener("focus", () => {
+    // Add event listeners - use a bound function to maintain the field reference
+    const focusHandler = () => {
       console.log(
         "🔔 [InputFieldManager] FOCUS EVENT FIRED for:",
         element.tagName,
         element.getAttribute("type")
       )
-      this.handleFieldFocus(field)
-    })
-    element.addEventListener("blur", () => {
+      // Get the current field state from the map to ensure we have the latest reference
+      const currentField = this.fields.get(element)
+      if (currentField) {
+        this.handleFieldFocus(currentField)
+      }
+    }
+
+    const blurHandler = () => {
       console.log(
         "🔔 [InputFieldManager] BLUR EVENT FIRED for:",
         element.tagName,
         element.getAttribute("type")
       )
-      this.handleFieldBlur(field)
-    })
+      // Get the current field state from the map to ensure we have the latest reference
+      const currentField = this.fields.get(element)
+      if (currentField) {
+        this.handleFieldBlur(currentField)
+      }
+    }
+
+    element.addEventListener("focus", focusHandler)
+    element.addEventListener("blur", blurHandler)
 
     console.log(
       "➕ [InputFieldManager] Registered field:",

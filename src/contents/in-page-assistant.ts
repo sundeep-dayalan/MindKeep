@@ -41,19 +41,45 @@ let activeChatModal: {
  * Handle when an input field receives focus
  */
 const handleFieldFocus = (field: ManagedInputField) => {
-  console.log("🎯🎯🎯 [InPageAssistant] handleFieldFocus called!")
+  console.log("🎯 [InPageAssistant] handleFieldFocus called!")
   console.log("🎯 [InPageAssistant] Field element:", field.element)
   console.log("🎯 [InPageAssistant] Field has icon?", !!field.iconElement)
+  console.log("🎯 [InPageAssistant] Icon element:", field.iconElement)
 
   // Create and attach icon if not already present
   if (!field.iconElement) {
     console.log("🎯 [InPageAssistant] Creating icon...")
     const icon = createInjectedIcon(field.element, () => openChatModal(field))
     console.log("🎯 [InPageAssistant] Icon created:", icon)
-    fieldManager?.attachIcon(field, icon)
-    console.log("🎯 [InPageAssistant] Icon attached to field")
+    console.log("🎯 [InPageAssistant] Icon display style:", icon.style.display)
+    console.log("🎯 [InPageAssistant] Icon parent:", icon.parentElement)
+
+    // Check if icon is a placeholder (element not visible)
+    if (icon.style.display === "none") {
+      console.log("🎯 [InPageAssistant] Icon placeholder created, retrying after delay...")
+      // Retry after element has settled into position
+      setTimeout(() => {
+        if (field.isActive && !field.iconElement) {
+          console.log("🎯 [InPageAssistant] Retrying icon creation...")
+          const retryIcon = createInjectedIcon(field.element, () => openChatModal(field))
+          if (retryIcon.style.display !== "none") {
+            fieldManager?.attachIcon(field, retryIcon)
+            console.log("🎯 [InPageAssistant] Icon created on retry")
+          }
+        }
+      }, 100)
+    } else {
+      fieldManager?.attachIcon(field, icon)
+      console.log("🎯 [InPageAssistant] Icon attached to field")
+      console.log("🎯 [InPageAssistant] Field icon element after attach:", field.iconElement)
+    }
   } else {
     console.log("🎯 [InPageAssistant] Icon already exists, skipping creation")
+    console.log("🎯 [InPageAssistant] Existing icon visibility:", {
+      display: field.iconElement.style.display,
+      opacity: field.iconElement.style.opacity,
+      parent: field.iconElement.parentElement
+    })
   }
 }
 

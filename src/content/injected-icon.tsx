@@ -57,6 +57,27 @@ export function createInjectedIcon(
   inputElement: HTMLInputElement | HTMLTextAreaElement | HTMLElement,
   onClick: () => void
 ): HTMLElement {
+  // Check if element is visible before creating icon
+  const isVisible = (element: HTMLElement): boolean => {
+    const rect = element.getBoundingClientRect()
+    const style = window.getComputedStyle(element)
+    return (
+      rect.width > 0 &&
+      rect.height > 0 &&
+      style.display !== "none" &&
+      style.visibility !== "hidden" &&
+      style.opacity !== "0"
+    )
+  }
+
+  if (!isVisible(inputElement)) {
+    console.log("⚠️ [InjectedIcon] Input field not visible, delaying icon creation")
+    // Return a placeholder that will be replaced when the field becomes visible
+    const placeholder = document.createElement("div")
+    placeholder.style.display = "none"
+    return placeholder
+  }
+
   // Create a container for the corner badge
   const iconContainer = document.createElement("div")
   iconContainer.className = "mindkeep-icon-container"
@@ -67,18 +88,45 @@ export function createInjectedIcon(
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    opacity: 0 !important;
-    transition: opacity 0.2s ease, transform 0.2s ease !important;
-    transform: translateY(-2px) !important;
+    opacity: 0;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    transform: translateY(-2px);
   `
 
   // Position the container relative to the input's position on screen
-  const inputRect = inputElement.getBoundingClientRect()
+  // Use a small delay to ensure the element is in its final position
+  const updateInitialPosition = () => {
+    const inputRect = inputElement.getBoundingClientRect()
 
-  // Position badge below the text box in bottom-right corner (Grammarly style)
-  // The badge should be positioned outside and below the input field
-  iconContainer.style.top = `${inputRect.bottom + 4}px` // 4px gap below the input
-  iconContainer.style.left = `${inputRect.right - 34}px` // Aligned to right edge with 10px padding
+    console.log("[InjectedIcon] Input rect:", {
+      top: inputRect.top,
+      bottom: inputRect.bottom,
+      left: inputRect.left,
+      right: inputRect.right,
+      width: inputRect.width,
+      height: inputRect.height
+    })
+
+    // Position badge below the text box in bottom-right corner (Grammarly style)
+    // The badge should be positioned outside and below the input field
+    const iconTop = inputRect.bottom + 4
+    const iconLeft = inputRect.right - 34
+
+    iconContainer.style.top = `${iconTop}px` // 4px gap below the input
+    iconContainer.style.left = `${iconLeft}px` // Aligned to right edge with 10px padding
+
+    console.log("[InjectedIcon] Icon position set to:", {
+      top: iconTop,
+      left: iconLeft,
+      viewport: { width: window.innerWidth, height: window.innerHeight }
+    })
+  }
+
+  // Initial position
+  updateInitialPosition()
+
+  // Update position after a small delay to handle dynamic layouts
+  setTimeout(updateInitialPosition, 50)
 
   // Store original input styles to restore later
   const originalBorder = inputElement.style.border || ""
@@ -95,66 +143,86 @@ export function createInjectedIcon(
   // Append to document body
   document.body.appendChild(iconContainer)
 
-  // Create the button with transparent background - just the Lottie logo
+  // Create the button with MindKeep logo (matching assets/icon.png)
   const button = document.createElement("button")
   button.type = "button"
   button.style.cssText = `
-    width: 28px !important;
-    height: 28px !important;
+    width: 24px !important;
+    height: 24px !important;
     border-radius: 50% !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    background: transparent !important;
-    color: white !important;
+    background: #F59E0B !important;
     border: none !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12) !important;
     cursor: pointer !important;
     transition: all 0.2s ease !important;
-    padding: 0 !important;
+    padding: 5px !important;
     margin: 0 !important;
     z-index: 999999 !important;
   `
-  button.title = "Ask MindKeep AI"
 
-  // Create container for Lottie animation
-  const lottieContainer = document.createElement("div")
-  lottieContainer.style.cssText = `
-    width: 28px !important;
-    height: 28px !important;
+  // Create SVG pencil icon that matches the logo
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg")
+  svg.setAttribute("viewBox", "0 0 24 24")
+  svg.setAttribute("fill", "white")
+  svg.style.cssText = `
+    width: 14px !important;
+    height: 14px !important;
+    display: block !important;
+    pointer-events: none !important;
+  `
+
+  // Pencil path that matches your logo design
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path")
+  path.setAttribute("d", "M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z")
+
+  svg.appendChild(path)
+  button.appendChild(svg)
+
+  // Create tooltip
+  const tooltip = document.createElement("div")
+  tooltip.className = "mindkeep-tooltip"
+  tooltip.style.cssText = `
+    position: absolute !important;
+    right: 100% !important;
+    top: 50% !important;
+    transform: translateY(-50%) translateX(-8px) !important;
+    background: #1F2937 !important;
+    color: white !important;
+    padding: 6px 12px !important;
+    border-radius: 6px !important;
+    font-size: 13px !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    white-space: nowrap !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transition: opacity 0.2s ease, transform 0.2s ease !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    z-index: 999999 !important;
     display: flex !important;
     align-items: center !important;
-    justify-content: center !important;
+    gap: 6px !important;
   `
 
-  // Create dotlottie-player element
-  const lottiePlayer = document.createElement("dotlottie-player")
-  lottiePlayer.setAttribute("src", "https://lottie.host/523463c6-9440-4e42-bc0a-318978a9b8a2/S2YUnZFAfy.lottie")
-  lottiePlayer.setAttribute("background", "transparent")
-  lottiePlayer.setAttribute("speed", "1")
-  lottiePlayer.setAttribute("loop", "true")
-  lottiePlayer.setAttribute("autoplay", "true")
-  lottiePlayer.style.cssText = `
-    width: 100% !important;
-    height: 100% !important;
-  `
+  // Add text content
+  tooltip.textContent = "Search your notes"
 
-  lottieContainer.appendChild(lottiePlayer)
-  button.appendChild(lottieContainer)
+  iconContainer.appendChild(tooltip)
 
-  // Load dotlottie-player script if not already loaded
-  if (!document.querySelector('script[src*="dotlottie-player"]')) {
-    const script = document.createElement("script")
-    script.src = "https://unpkg.com/@dotlottie/player-component@latest/dist/dotlottie-player.mjs"
-    script.type = "module"
-    document.head.appendChild(script)
-  }
-
-  // Add hover effect - subtle scale
+  // Add hover effect - scale, glow, and show tooltip
   button.addEventListener("mouseenter", () => {
     button.style.transform = "scale(1.15)"
+    button.style.boxShadow = "0 4px 14px rgba(245, 158, 11, 0.5)"
+    tooltip.style.opacity = "1"
+    tooltip.style.transform = "translateY(-50%) translateX(-4px)"
   })
   button.addEventListener("mouseleave", () => {
     button.style.transform = "scale(1)"
+    button.style.boxShadow = "0 2px 6px rgba(0, 0, 0, 0.12)"
+    tooltip.style.opacity = "0"
+    tooltip.style.transform = "translateY(-50%) translateX(-8px)"
   })
 
   button.addEventListener("click", (e) => {
@@ -167,9 +235,12 @@ export function createInjectedIcon(
   iconContainer.appendChild(button)
 
   // Show icon with fade-in and slide-down animation
+  console.log("[InjectedIcon] Preparing to show icon with animation")
   requestAnimationFrame(() => {
+    console.log("[InjectedIcon] Setting opacity to 1 and transform to translateY(0)")
     iconContainer.style.opacity = "1"
     iconContainer.style.transform = "translateY(0)"
+    console.log("[InjectedIcon] Icon should now be visible, opacity:", iconContainer.style.opacity)
   })
 
   // Update icon position on scroll/resize
@@ -195,7 +266,7 @@ export function createInjectedIcon(
   }
 
   console.log(
-    "✨ [InjectedIcon] Dropbox-style corner badge created"
+    "✨ [InjectedIcon] MindKeep icon badge created and attached to DOM"
   )
 
   return iconContainer
