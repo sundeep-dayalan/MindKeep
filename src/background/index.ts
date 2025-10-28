@@ -1,4 +1,5 @@
 import { generateEmbedding } from "~services/ai-service"
+import * as dbService from "~services/db-service"
 import {
   addNote,
   getActivePersona,
@@ -7,7 +8,6 @@ import {
   setActivePersona,
   updateNote
 } from "~services/db-service"
-import * as dbService from "~services/db-service"
 import { getGlobalAgent } from "~services/langchain-agent"
 import { encrypt } from "~util/crypto"
 
@@ -49,7 +49,9 @@ async function ensureOffscreenDocument() {
 }
 
 chrome.runtime.onStartup.addListener(async () => {
-  console.log("🚀 [Background] Extension startup - initializing offscreen document")
+  console.log(
+    "🚀 [Background] Extension startup - initializing offscreen document"
+  )
   await ensureOffscreenDocument()
 })
 
@@ -134,7 +136,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     saveId: message.data?._debugSaveId || "N/A",
     timestamp: Date.now()
   })
-
   ;(async () => {
     try {
       switch (message.type) {
