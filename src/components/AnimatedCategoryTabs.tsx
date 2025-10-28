@@ -24,7 +24,7 @@ export function AnimatedCategoryTabs({
   onDelete,
   loading
 }: AnimatedCategoryTabsProps) {
-  // Filter notes for each category
+
   const getNotesForCategory = (category: string) => {
     if (category === "all") {
       return notes
@@ -32,7 +32,6 @@ export function AnimatedCategoryTabs({
     return notes.filter((note) => note.category === category)
   }
 
-  // Build tabs array with count badges
   const allNotesCount = notes.length
   const tabs = [
     {
@@ -86,7 +85,6 @@ export function AnimatedCategoryTabs({
   )
 }
 
-// Separate component for notes content
 function NotesContent({
   notes,
   loading,
@@ -138,26 +136,22 @@ function NotesContent({
     )
   }
 
-  // Transform notes into BentoItem format
   const bentoItems: BentoItem[] = notes.map((note, index) => {
-    // Calculate dynamic dimensions based on content
+
     const contentLength = note.contentPlaintext?.length || 0
     const hasImage = note.content?.includes('"type":"image"') || false
 
-    // All cards are 1 column wide (2 column grid total)
     const width = 1
 
-    // Dynamic height based on content length
-    // More granular height distribution for better visual variety
-    let height = 3 // Default: 2 rows (300px)
+    let height = 3
 
     if (hasImage) {
-      // Images need more vertical space
+
       if (contentLength < 100) height = 3
       else if (contentLength < 300) height = 3
       else height = 4
     } else {
-      // Text-only content
+
       if (contentLength < 150) height = 3
       else if (contentLength < 350) height = 3
       else if (contentLength < 600) height = 4

@@ -1,30 +1,13 @@
-/**
- * Crypto utilities for MindKeep
- * Handles encryption and decryption of note content using SubtleCrypto API
- * All operations happen client-side to ensure 100% privacy
- *
- * CRITICAL: This service only encrypts/decrypts the content field.
- * It does NOT handle embeddings - that is done by ai-service.ts
- * It does NOT handle storage - that is done by db-service.ts
- *
- * Pipeline position:
- * - Encryption: Step 3 (after embedding generation, before storage)
- * - Decryption: Step 3 of retrieval (after database fetch, before display)
- */
 
-// Constants
+
 const ALGORITHM = "AES-GCM"
 const KEY_LENGTH = 256
-const IV_LENGTH = 12 // 96 bits recommended for AES-GCM
+const IV_LENGTH = 12
 const SALT_LENGTH = 16
 const PBKDF2_ITERATIONS = 100000
 
-// Storage key for the encryption key
 const ENCRYPTION_KEY_STORAGE_KEY = "mindkeep_encryption_key"
 
-/**
- * Derives a cryptographic key from a password using PBKDF2
- */
 async function deriveKey(
   password: string,
   salt: Uint8Array
@@ -32,7 +15,6 @@ async function deriveKey(
   const encoder = new TextEncoder()
   const passwordBuffer = encoder.encode(password)
 
-  // Import the password as a key
   const baseKey = await crypto.subtle.importKey(
     "raw",
     passwordBuffer,
@@ -41,7 +23,6 @@ async function deriveKey(
     ["deriveBits", "deriveKey"]
   )
 
-  // Derive the encryption key
   return crypto.subtle.deriveKey(
     {
       name: "PBKDF2",
@@ -56,28 +37,18 @@ async function deriveKey(
   )
 }
 
-/**
- * Generates a random salt
- */
 function generateSalt(): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(SALT_LENGTH))
 }
 
-/**
- * Generates a random IV (Initialization Vector)
- */
 function generateIV(): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(IV_LENGTH))
 }
 
-/**
- * Gets or creates the master encryption key
- * The key is stored in Chrome's local storage and derived from a random password
- */
 async function getMasterKey(): Promise<CryptoKey> {
   try {
     console.log(" Getting master key...")
-    // Try to get existing key from storage
+
     const stored = await new Promise<any>((resolve) => {
       chrome.storage.local.get(ENCRYPTION_KEY_STORAGE_KEY, resolve)
     })
@@ -86,7 +57,6 @@ async function getMasterKey(): Promise<CryptoKey> {
       console.log(" Found existing key in storage, importing...")
       const keyData = stored[ENCRYPTION_KEY_STORAGE_KEY]
 
-      // Import the stored key
       const importedKey = await crypto.subtle.importKey(
         "jwk",
         keyData,
@@ -100,7 +70,6 @@ async function getMasterKey(): Promise<CryptoKey> {
 
     console.log(" No existing key found, generating new one...")
 
-    // Generate a new key if none exists
     const salt = generateSalt()
     const randomPassword = crypto.getRandomValues(new Uint8Array(32))
     const passwordString = Array.from(randomPassword)
@@ -111,7 +80,6 @@ async function getMasterKey(): Promise<CryptoKey> {
     const key = await deriveKey(passwordString, salt)
     console.log(" Key derived successfully:", key.type)
 
-    // Export and store the key
     console.log(" Exporting and storing key...")
     const exportedKey = await crypto.subtle.exportKey("jwk", key)
     await new Promise<void>((resolve) => {
@@ -134,9 +102,6 @@ async function getMasterKey(): Promise<CryptoKey> {
   }
 }
 
-/**
- * Converts an ArrayBuffer to a base64 string
- */
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer)
   let binary = ""
@@ -146,9 +111,6 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary)
 }
 
-/**
- * Converts a base64 string to an ArrayBuffer
- */
 function base64ToArrayBuffer(base64: string): ArrayBuffer {
   const binary = atob(base64)
   const bytes = new Uint8Array(binary.length)
@@ -158,16 +120,6 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
   return bytes.buffer
 }
 
-/**
- * Encrypts a plaintext string
- *
- * IMPORTANT: This function should be called AFTER embedding generation
- * in the save pipeline. Only the content field is encrypted, not the
- * title, category, or embedding vector.
- *
- * @param text - The plaintext content to encrypt
- * @returns A base64-encoded string containing the IV and encrypted data
- */
 export async function encrypt(text: string): Promise<string> {
   try {
     const encoder = new TextEncoder()
@@ -182,7 +134,6 @@ export async function encrypt(text: string): Promise<string> {
     console.log(" Key obtained:", key.type, key.algorithm)
     const iv = generateIV()
 
-    // Encrypt the data
     const encryptedData = await crypto.subtle.encrypt(
       {
         name: ALGORITHM,
@@ -192,12 +143,10 @@ export async function encrypt(text: string): Promise<string> {
       data
     )
 
-    // Combine IV and encrypted data
     const combined = new Uint8Array(iv.length + encryptedData.byteLength)
     combined.set(iv, 0)
     combined.set(new Uint8Array(encryptedData), iv.length)
 
-    // Convert to base64 for storage
     return arrayBufferToBase64(combined.buffer)
   } catch (error) {
     console.error("Encryption error:", error)
@@ -205,27 +154,16 @@ export async function encrypt(text: string): Promise<string> {
   }
 }
 
-/**
- * Decrypts an encrypted string back to plaintext
- *
- * IMPORTANT: This function should be called AFTER database retrieval
- * in the search pipeline. It only decrypts the content field.
- *
- * @param encryptedText - The base64-encoded encrypted string
- * @returns The decrypted plaintext content
- */
 export async function decrypt(encryptedText: string): Promise<string> {
   try {
-    // Convert from base64
+
     const combined = new Uint8Array(base64ToArrayBuffer(encryptedText))
 
-    // Extract IV and encrypted data
     const iv = combined.slice(0, IV_LENGTH)
     const encryptedData = combined.slice(IV_LENGTH)
 
     const key = await getMasterKey()
 
-    // Decrypt the data
     const decryptedData = await crypto.subtle.decrypt(
       {
         name: ALGORITHM,
@@ -235,7 +173,6 @@ export async function decrypt(encryptedText: string): Promise<string> {
       encryptedData
     )
 
-    // Convert back to string
     const decoder = new TextDecoder()
     return decoder.decode(decryptedData)
   } catch (error) {
@@ -244,10 +181,6 @@ export async function decrypt(encryptedText: string): Promise<string> {
   }
 }
 
-/**
- * Tests the encryption and decryption functionality
- * Useful for debugging
- */
 export async function testCrypto(): Promise<boolean> {
   try {
     const testString = "Hello, MindKeep! "
@@ -267,10 +200,6 @@ export async function testCrypto(): Promise<boolean> {
   }
 }
 
-/**
- * Clears the stored encryption key (use with caution!)
- * This will make all encrypted data unrecoverable
- */
 export async function clearEncryptionKey(): Promise<void> {
   await chrome.storage.local.remove(ENCRYPTION_KEY_STORAGE_KEY)
   console.warn(

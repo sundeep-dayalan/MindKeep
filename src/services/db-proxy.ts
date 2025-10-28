@@ -1,25 +1,10 @@
-/**
- * Database Proxy Service
- *
- * This service provides a unified interface for database operations that works
- * across different Chrome extension contexts:
- *
- * - Extension Pages (side panel, popup, etc.): Direct access to IndexedDB
- * - Content Scripts: Proxies requests to offscreen document via message passing
- *
- * The proxy automatically detects the current context and routes requests appropriately.
- */
+
 
 import type { Note, Persona } from "~services/db-service"
 import * as dbService from "~services/db-service"
 
-/**
- * Detect if we're running in a content script context
- */
 function isContentScript(): boolean {
-  // Content scripts don't have access to chrome.runtime.getContexts
-  // and window.location.protocol will be the webpage's protocol (http/https)
-  // Extension pages will have chrome-extension:// protocol
+
   try {
     return (
       typeof window !== "undefined" &&
@@ -30,9 +15,6 @@ function isContentScript(): boolean {
   }
 }
 
-/**
- * Send a message to the offscreen document and wait for response
- */
 async function sendToOffscreen<T>(type: string, payload: any = {}): Promise<T> {
   try {
     const response = await chrome.runtime.sendMessage({
@@ -51,11 +33,6 @@ async function sendToOffscreen<T>(type: string, payload: any = {}): Promise<T> {
   }
 }
 
-// ==================== SEARCH OPERATIONS ====================
-
-/**
- * Search notes by vector similarity
- */
 export async function searchNotesByVector(
   vector: number[],
   limit: number = 5
@@ -67,9 +44,6 @@ export async function searchNotesByVector(
   return await dbService.searchNotesByVector(vector, limit)
 }
 
-/**
- * Search notes by title
- */
 export async function searchNotesByTitle(query: string): Promise<Note[]> {
   if (isContentScript()) {
     console.log("📡 [DB Proxy] Routing searchNotesByTitle to offscreen")
@@ -78,11 +52,6 @@ export async function searchNotesByTitle(query: string): Promise<Note[]> {
   return await dbService.searchNotesByTitle(query)
 }
 
-// ==================== NOTE OPERATIONS ====================
-
-/**
- * Get a specific note by ID
- */
 export async function getNote(id: string): Promise<Note | undefined> {
   if (isContentScript()) {
     console.log("📡 [DB Proxy] Routing getNote to offscreen")
@@ -91,9 +60,6 @@ export async function getNote(id: string): Promise<Note | undefined> {
   return await dbService.getNote(id)
 }
 
-/**
- * Get all notes
- */
 export async function getAllNotes(): Promise<Note[]> {
   if (isContentScript()) {
     console.log("📡 [DB Proxy] Routing getAllNotes to offscreen")
@@ -102,9 +68,6 @@ export async function getAllNotes(): Promise<Note[]> {
   return await dbService.getAllNotes()
 }
 
-/**
- * Add a new note
- */
 export async function addNote(
   note: Omit<Note, "id" | "createdAt" | "updatedAt">
 ): Promise<string> {
@@ -115,9 +78,6 @@ export async function addNote(
   return await dbService.addNote(note)
 }
 
-/**
- * Update an existing note
- */
 export async function updateNote(
   id: string,
   updates: Partial<Omit<Note, "id" | "createdAt" | "updatedAt">>
@@ -129,9 +89,6 @@ export async function updateNote(
   return await dbService.updateNote(id, updates)
 }
 
-/**
- * Delete a note
- */
 export async function deleteNote(id: string): Promise<void> {
   if (isContentScript()) {
     console.log("📡 [DB Proxy] Routing deleteNote to offscreen")
@@ -141,11 +98,6 @@ export async function deleteNote(id: string): Promise<void> {
   return await dbService.deleteNote(id)
 }
 
-// ==================== CATEGORY OPERATIONS ====================
-
-/**
- * Get all unique categories
- */
 export async function getAllCategories(): Promise<string[]> {
   if (isContentScript()) {
     console.log("📡 [DB Proxy] Routing getAllCategories to offscreen")
@@ -154,11 +106,6 @@ export async function getAllCategories(): Promise<string[]> {
   return await dbService.getAllCategories()
 }
 
-// ==================== STATISTICS OPERATIONS ====================
-
-/**
- * Get database statistics
- */
 export async function getDatabaseStatistics(): Promise<{
   totalNotes: number
   categories: Array<{ category: string; count: number; lastUpdated: number }>
@@ -173,11 +120,6 @@ export async function getDatabaseStatistics(): Promise<{
   return await dbService.getDatabaseStatistics()
 }
 
-// ==================== PERSONA OPERATIONS ====================
-
-/**
- * Get a specific persona by ID
- */
 export async function getPersona(id: string): Promise<Persona | undefined> {
   if (isContentScript()) {
     console.log("📡 [DB Proxy] Routing getPersona to offscreen")
@@ -186,9 +128,6 @@ export async function getPersona(id: string): Promise<Persona | undefined> {
   return await dbService.getPersona(id)
 }
 
-/**
- * Get all personas
- */
 export async function getAllPersonas(): Promise<Persona[]> {
   if (isContentScript()) {
     console.log("📡 [DB Proxy] Routing getAllPersonas to offscreen")
@@ -197,9 +136,6 @@ export async function getAllPersonas(): Promise<Persona[]> {
   return await dbService.getAllPersonas()
 }
 
-/**
- * Get the currently active persona
- */
 export async function getActivePersona(): Promise<Persona | null> {
   if (isContentScript()) {
     console.log("📡 [DB Proxy] Routing getActivePersona to offscreen")
@@ -208,9 +144,6 @@ export async function getActivePersona(): Promise<Persona | null> {
   return await dbService.getActivePersona()
 }
 
-/**
- * Add a new persona
- */
 export async function addPersona(
   persona: Omit<Persona, "id">
 ): Promise<string> {
@@ -221,9 +154,6 @@ export async function addPersona(
   return await dbService.addPersona(persona)
 }
 
-/**
- * Update an existing persona
- */
 export async function updatePersona(persona: Persona): Promise<void> {
   if (isContentScript()) {
     console.log("📡 [DB Proxy] Routing updatePersona to offscreen")
@@ -233,9 +163,6 @@ export async function updatePersona(persona: Persona): Promise<void> {
   return await dbService.updatePersona(persona)
 }
 
-/**
- * Delete a persona
- */
 export async function deletePersona(id: string): Promise<void> {
   if (isContentScript()) {
     console.log("📡 [DB Proxy] Routing deletePersona to offscreen")
@@ -245,9 +172,6 @@ export async function deletePersona(id: string): Promise<void> {
   return await dbService.deletePersona(id)
 }
 
-/**
- * Set the active persona
- */
 export async function setActivePersona(id: string | null): Promise<boolean> {
   if (isContentScript()) {
     console.log("📡 [DB Proxy] Routing setActivePersona to offscreen")
@@ -257,5 +181,4 @@ export async function setActivePersona(id: string | null): Promise<boolean> {
   return await dbService.setActivePersona(id)
 }
 
-// Export type from db-service for convenience
 export type { Note, Persona }

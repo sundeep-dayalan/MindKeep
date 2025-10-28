@@ -1,8 +1,4 @@
-/**
- * PersonaManager Component
- *
- * Manages user personas - create, edit, delete, and activate personas
- */
+
 
 import { useEffect, useState } from "react"
 
@@ -30,20 +26,17 @@ export function PersonaManager({
   const [editingPersona, setEditingPersona] = useState<Persona | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // AI generation loading states
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false)
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false)
   const [isGeneratingContext, setIsGeneratingContext] = useState(false)
 
-  // Character/Token limits
   const LIMITS = {
-    name: 25, // characters
-    description: 200, // characters
-    context: 8000, // characters (~2000 tokens, 1 token ≈ 4 chars)
-    outputTemplate: 2000 // characters (~500 tokens)
+    name: 25,
+    description: 200,
+    context: 8000,
+    outputTemplate: 2000
   }
 
-  // Form state
   const [formData, setFormData] = useState<PersonaInput>({
     name: "",
     description: "",
@@ -63,7 +56,6 @@ export function PersonaManager({
       const allPersonas = await getAllPersonas()
       console.log(` [PersonaManager] Loaded ${allPersonas.length} personas`)
 
-      // Sort personas by createdAt: newest first (descending order)
       const sortedPersonas = allPersonas.sort(
         (a, b) => b.createdAt - a.createdAt
       )
@@ -103,7 +95,6 @@ export function PersonaManager({
   const handleSave = async () => {
     console.log(" [PersonaManager] handleSave called with data:", formData)
 
-    // Validate required fields
     if (!formData.name.trim()) {
       alert("Please enter a persona name")
       return
@@ -117,7 +108,6 @@ export function PersonaManager({
       return
     }
 
-    // Validate character limits
     if (formData.name.length > LIMITS.name) {
       alert(`Name is too long. Maximum ${LIMITS.name} characters allowed.`)
       return
@@ -188,7 +178,6 @@ export function PersonaManager({
         console.log(" [PersonaManager] Persona deleted successfully")
         await loadPersonas()
 
-        // If this was the active persona, notify parent
         if (persona.isActive && onPersonaActivated) {
           onPersonaActivated(null)
         }
@@ -234,14 +223,9 @@ export function PersonaManager({
     setEditingPersona(null)
   }
 
-  /**
-   * AI Generation Handlers
-   */
-
   const handleGenerateTitle = async () => {
     console.log("🤖 [PersonaManager] handleGenerateTitle called")
 
-    // Check if we have any input to work with
     if (!formData.context.trim() && !formData.description.trim()) {
       alert(
         "Please enter either Context/Instructions or Description first to generate a title"
@@ -253,10 +237,9 @@ export function PersonaManager({
     setIsGeneratingTitle(true)
 
     try {
-      // Build prompt based on available input
+
       const inputSource = formData.context.trim() || formData.description.trim()
 
-      // Limit input length to avoid token overflow
       const truncatedInput =
         inputSource.length > 500
           ? inputSource.substring(0, 500) + "..."
@@ -271,7 +254,6 @@ Return only the name. Examples: "Email Writer", "Movie Critic", "Code Helper"`
       console.log("🤖 [PersonaManager] Generating title with prompt:", prompt)
       const generatedTitle = await executePrompt(prompt)
 
-      // Clean up the response (remove quotes, extra whitespace)
       const cleanTitle = generatedTitle.trim().replace(/^["']|["']$/g, "")
       // Use functional update to avoid overwriting other concurrent generations
       setFormData((prev) => ({ ...prev, name: cleanTitle }))

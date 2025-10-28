@@ -24,15 +24,15 @@ import {
 import { tiptapToMarkdown } from "~util/tiptap-to-markdown"
 
 interface RichTextEditorProps {
-  initialContent?: string // JSON string or plain text
+  initialContent?: string
   placeholder?: string
   onUpdate?: (plainText: string, json: any) => void
-  onSubmit?: () => void // New prop to handle Enter key press
+  onSubmit?: () => void
   onSummarize?: () => void
   isSummarizing?: boolean
-  showToolbar?: boolean // New prop to control toolbar visibility
-  compact?: boolean // New prop for compact mode (smaller padding, simpler styling)
-  onToolbarVisibilityChange?: (isVisible: boolean) => void // Callback when toolbar shows/hides
+  showToolbar?: boolean
+  compact?: boolean
+  onToolbarVisibilityChange?: (isVisible: boolean) => void
 }
 
 export interface RichTextEditorRef {
@@ -107,7 +107,7 @@ export const RichTextEditor = forwardRef<
             "plasmo-prose plasmo-prose-sm plasmo-max-w-none plasmo-min-h-[240px] plasmo-px-3 plasmo-py-2 plasmo-text-slate-900 focus:plasmo-outline-none"
         },
         handleKeyDown: (view, event) => {
-          // Handle Enter key to submit
+
           if (event.key === "Enter" && !event.shiftKey && onSubmit) {
             event.preventDefault()
             onSubmit()
@@ -119,7 +119,7 @@ export const RichTextEditor = forwardRef<
       onUpdate: ({ editor }) => {
         if (onUpdate) {
           const json = editor.getJSON()
-          // Convert TipTap JSON to Markdown for better AI readability
+
           const markdown = tiptapToMarkdown(json)
           onUpdate(markdown, json)
         }
@@ -132,7 +132,6 @@ export const RichTextEditor = forwardRef<
       }
     })
 
-    // Notify parent when toolbar visibility changes
     useEffect(() => {
       if (onToolbarVisibilityChange && showToolbar) {
         onToolbarVisibilityChange(isEditorFocused)
@@ -160,24 +159,23 @@ export const RichTextEditor = forwardRef<
       }
     }, [editor, imageUrl])
 
-    // Expose methods to parent via ref
     useImperativeHandle(ref, () => ({
       getText: () => {
         if (!editor) return ""
-        // Return markdown instead of plain text for better context preservation
+
         return tiptapToMarkdown(editor.getJSON())
       },
       getJSON: () => editor?.getJSON() || null,
       setContent: (content: string | any) => {
         if (editor) {
           try {
-            // Try to parse as JSON first
+
             if (typeof content === "string") {
               try {
                 const parsed = JSON.parse(content)
                 editor.commands.setContent(parsed)
               } catch {
-                // If not JSON, treat as plain text or HTML
+
                 editor.commands.setContent(content)
               }
             } else {
@@ -191,7 +189,6 @@ export const RichTextEditor = forwardRef<
       focus: () => editor?.commands.focus()
     }))
 
-    // Update content when initialContent changes
     useEffect(() => {
       if (editor && initialContent) {
         try {
@@ -217,7 +214,7 @@ export const RichTextEditor = forwardRef<
 
     return (
       <div className="plasmo-relative plasmo-h-full plasmo-flex plasmo-flex-col plasmo-bg-transparent">
-        {/* Summarize Button - Top Right Corner */}
+        {}
         {onSummarize && (
           <button
             onClick={onSummarize}
@@ -266,7 +263,7 @@ export const RichTextEditor = forwardRef<
           </button>
         )}
 
-        {/* Editor Content - Fills available space */}
+        {}
         <div
           className={`plasmo-flex-1 plasmo-overflow-y-auto plasmo-no-visible-scrollbar plasmo-bg-transparent ${compact ? "" : "plasmo-py-3"}`}>
           <EditorContent
@@ -275,15 +272,15 @@ export const RichTextEditor = forwardRef<
           />
         </div>
 
-        {/* Toolbar - Slides in from bottom when focused with blur overlay */}
+        {}
         {showToolbar && isEditorFocused && (
           <div className="plasmo-fixed plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-z-40 plasmo-animate-slide-up">
-            {/* Toolbar Container with blur background */}
+            {}
             <div
               className="plasmo-backdrop-blur-md plasmo-bg-white/90 plasmo-border-t plasmo-border-slate-200 plasmo-shadow-lg"
               onMouseDown={(e) => e.preventDefault()}>
               <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-1 plasmo-p-3 plasmo-max-w-full plasmo-overflow-x-auto plasmo-no-visible-scrollbar">
-                {/* Undo */}
+                {}
                 <button
                   onClick={() => editor.chain().focus().undo().run()}
                   disabled={!editor.can().chain().focus().undo().run()}
@@ -303,7 +300,7 @@ export const RichTextEditor = forwardRef<
                   </svg>
                 </button>
 
-                {/* Redo */}
+                {}
                 <button
                   onClick={() => editor.chain().focus().redo().run()}
                   disabled={!editor.can().chain().focus().redo().run()}
@@ -325,7 +322,7 @@ export const RichTextEditor = forwardRef<
 
                 <div className="plasmo-w-px plasmo-bg-slate-300 plasmo-mx-1" />
 
-                {/* Heading Dropdown */}
+                {}
                 <select
                   onChange={(e) => {
                     const level = e.target.value
@@ -358,7 +355,7 @@ export const RichTextEditor = forwardRef<
 
                 <div className="plasmo-w-px plasmo-bg-slate-300 plasmo-mx-1" />
 
-                {/* Bold */}
+                {}
                 <button
                   onClick={() => editor.chain().focus().toggleBold().run()}
                   disabled={!editor.can().chain().focus().toggleBold().run()}
@@ -376,7 +373,7 @@ export const RichTextEditor = forwardRef<
                   </svg>
                 </button>
 
-                {/* Italic */}
+                {}
                 <button
                   onClick={() => editor.chain().focus().toggleItalic().run()}
                   disabled={!editor.can().chain().focus().toggleItalic().run()}
@@ -394,7 +391,7 @@ export const RichTextEditor = forwardRef<
                   </svg>
                 </button>
 
-                {/* Underline */}
+                {}
                 <button
                   onClick={() => editor.chain().focus().toggleUnderline().run()}
                   className={`plasmo-p-2 plasmo-rounded plasmo-transition-colors ${
@@ -411,7 +408,7 @@ export const RichTextEditor = forwardRef<
                   </svg>
                 </button>
 
-                {/* Strike */}
+                {}
                 <button
                   onClick={() => editor.chain().focus().toggleStrike().run()}
                   disabled={!editor.can().chain().focus().toggleStrike().run()}
@@ -429,7 +426,7 @@ export const RichTextEditor = forwardRef<
                   </svg>
                 </button>
 
-                {/* Code */}
+                {}
                 <button
                   onClick={() => editor.chain().focus().toggleCode().run()}
                   className={`plasmo-p-2 plasmo-rounded plasmo-transition-colors ${
@@ -448,7 +445,7 @@ export const RichTextEditor = forwardRef<
 
                 <div className="plasmo-w-px plasmo-bg-slate-300 plasmo-mx-1" />
 
-                {/* Link */}
+                {}
                 <button
                   onClick={() => {
                     if (editor.isActive("link")) {
@@ -471,7 +468,7 @@ export const RichTextEditor = forwardRef<
                   </svg>
                 </button>
 
-                {/* Image */}
+                {}
                 <button
                   onClick={() => setShowImageInput(!showImageInput)}
                   className="plasmo-p-2 plasmo-rounded plasmo-text-slate-700 hover:plasmo-bg-slate-200 plasmo-transition-colors"
@@ -486,7 +483,7 @@ export const RichTextEditor = forwardRef<
 
                 <div className="plasmo-w-px plasmo-bg-slate-300 plasmo-mx-1" />
 
-                {/* Bullet List */}
+                {}
                 <button
                   onClick={() =>
                     editor.chain().focus().toggleBulletList().run()
@@ -505,7 +502,7 @@ export const RichTextEditor = forwardRef<
                   </svg>
                 </button>
 
-                {/* Ordered List */}
+                {}
                 <button
                   onClick={() =>
                     editor.chain().focus().toggleOrderedList().run()
@@ -526,7 +523,7 @@ export const RichTextEditor = forwardRef<
 
                 <div className="plasmo-w-px plasmo-bg-slate-300 plasmo-mx-1" />
 
-                {/* Text Align Left */}
+                {}
                 <button
                   onClick={() =>
                     editor.chain().focus().setTextAlign("left").run()
@@ -545,7 +542,7 @@ export const RichTextEditor = forwardRef<
                   </svg>
                 </button>
 
-                {/* Text Align Center */}
+                {}
                 <button
                   onClick={() =>
                     editor.chain().focus().setTextAlign("center").run()
@@ -564,7 +561,7 @@ export const RichTextEditor = forwardRef<
                   </svg>
                 </button>
 
-                {/* Text Align Right */}
+                {}
                 <button
                   onClick={() =>
                     editor.chain().focus().setTextAlign("right").run()
@@ -583,7 +580,7 @@ export const RichTextEditor = forwardRef<
                   </svg>
                 </button>
 
-                {/* Text Align Justify */}
+                {}
                 <button
                   onClick={() =>
                     editor.chain().focus().setTextAlign("justify").run()
@@ -604,7 +601,7 @@ export const RichTextEditor = forwardRef<
 
                 <div className="plasmo-w-px plasmo-bg-slate-300 plasmo-mx-1" />
 
-                {/* Superscript */}
+                {}
                 <button
                   onClick={() =>
                     editor.chain().focus().toggleSuperscript().run()
@@ -620,7 +617,7 @@ export const RichTextEditor = forwardRef<
                   </span>
                 </button>
 
-                {/* Subscript */}
+                {}
                 <button
                   onClick={() => editor.chain().focus().toggleSubscript().run()}
                   className={`plasmo-p-2 plasmo-rounded plasmo-transition-colors ${
@@ -636,7 +633,7 @@ export const RichTextEditor = forwardRef<
 
                 <div className="plasmo-w-px plasmo-bg-slate-300 plasmo-mx-1" />
 
-                {/* Code Block */}
+                {}
                 <button
                   onClick={() => editor.chain().focus().toggleCodeBlock().run()}
                   className={`plasmo-p-2 plasmo-rounded plasmo-transition-colors ${
@@ -653,7 +650,7 @@ export const RichTextEditor = forwardRef<
                   </svg>
                 </button>
 
-                {/* Blockquote */}
+                {}
                 <button
                   onClick={() =>
                     editor.chain().focus().toggleBlockquote().run()
@@ -672,7 +669,7 @@ export const RichTextEditor = forwardRef<
                   </svg>
                 </button>
 
-                {/* Horizontal Rule */}
+                {}
                 <button
                   onClick={() =>
                     editor.chain().focus().setHorizontalRule().run()
@@ -689,7 +686,7 @@ export const RichTextEditor = forwardRef<
 
                 <div className="plasmo-w-px plasmo-bg-slate-300 plasmo-mx-1" />
 
-                {/* Insert Table */}
+                {}
                 <button
                   onClick={() =>
                     editor
@@ -708,7 +705,7 @@ export const RichTextEditor = forwardRef<
                   </svg>
                 </button>
 
-                {/* Table Controls - Only show when inside a table */}
+                {}
                 {editor.isActive("table") && (
                   <>
                     <button
@@ -785,7 +782,7 @@ export const RichTextEditor = forwardRef<
                 )}
               </div>
 
-              {/* Link Input Dialog */}
+              {}
               {showLinkInput && (
                 <div className="plasmo-p-3 plasmo-bg-blue-50 plasmo-border-t plasmo-border-slate-200 plasmo-flex plasmo-gap-2 plasmo-items-center">
                   <input
@@ -821,7 +818,7 @@ export const RichTextEditor = forwardRef<
                 </div>
               )}
 
-              {/* Image Input Dialog */}
+              {}
               {showImageInput && (
                 <div className="plasmo-p-3 plasmo-bg-green-50 plasmo-border-t plasmo-border-slate-200 plasmo-flex plasmo-gap-2 plasmo-items-center">
                   <input

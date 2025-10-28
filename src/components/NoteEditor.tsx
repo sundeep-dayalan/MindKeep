@@ -40,14 +40,13 @@ export function NoteEditor({
   const [hasEditorContent, setHasEditorContent] = useState(false)
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false)
   const [isSummarizing, setIsSummarizing] = useState(false)
-  const [currentContent, setCurrentContent] = useState(content) // Track content for suggestions
+  const [currentContent, setCurrentContent] = useState(content)
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false)
   const [isToolbarVisible, setIsToolbarVisible] = useState(false)
 
   const internalEditorRef = useRef<RichTextEditorRef>(null)
   const editorRef = externalEditorRef || internalEditorRef
 
-  // Update content when it changes from outside
   useEffect(() => {
     if (content && editorRef.current) {
       editorRef.current.setContent(content)
@@ -106,13 +105,11 @@ export function NoteEditor({
 
     setIsSummarizing(true)
     try {
-      // Get markdown summary from AI
+
       const markdownSummary = await summarizeText(contentPlaintext)
 
-      // Convert markdown to HTML for TipTap
       const richHTML = await markdownToTipTapHTML(markdownSummary)
 
-      // Set the rich HTML content in the editor
       editorRef.current?.setContent(richHTML)
 
       const totalTime = performance.now() - startTime
@@ -137,7 +134,6 @@ export function NoteEditor({
       return
     }
 
-    // Check for duplicate category
     const existingCategories = categories.map((cat) => cat.toLowerCase())
     if (existingCategories.includes(finalCategory)) {
       alert(
@@ -146,7 +142,6 @@ export function NoteEditor({
       return
     }
 
-    // Update parent component's category state
     onCategoryChange(finalCategory)
     setShowNewCategory(false)
     setNewCategoryName("")
@@ -162,7 +157,6 @@ export function NoteEditor({
         return
       }
 
-      // Check for duplicate category
       const existingCategories = categories.map((cat) => cat.toLowerCase())
       if (existingCategories.includes(finalCategory)) {
         alert(
@@ -171,17 +165,15 @@ export function NoteEditor({
         return
       }
 
-      // Update parent component's category state for UI consistency
       onCategoryChange(finalCategory)
     }
 
-    // Pass the final category to the save handler
     onSave(editorRef.current, finalCategory)
   }
 
   return (
     <div className="plasmo-flex plasmo-flex-col plasmo-h-full plasmo-relative">
-      {/* Header with Back Button + Inline Title + AI Button */}
+      {}
       <div className="plasmo-flex plasmo-items-center plasmo-gap-3 plasmo-border-b plasmo-border-slate-200 plasmo-pb-3">
         <button
           onClick={onCancel}
@@ -247,9 +239,9 @@ export function NoteEditor({
         </button>
       </div>
 
-      {/* Category Row: Dropdown + Plus/Tick Icon + Suggested Categories */}
+      {}
       <div className="plasmo-flex plasmo-items-center plasmo-gap-3 plasmo-px-3 plasmo-py-3 plasmo-border-b plasmo-border-slate-200">
-        {/* Dropdown or Input */}
+        {}
         <div className="plasmo-flex-shrink-0 plasmo-relative plasmo-z-10">
           {showNewCategory ? (
             <input
@@ -290,15 +282,15 @@ export function NoteEditor({
                 </svg>
               </div>
 
-              {/* Dropdown Menu */}
+              {}
               {showCategoryDropdown && (
                 <>
-                  {/* Backdrop */}
+                  {}
                   <div
                     className="plasmo-fixed plasmo-inset-0 plasmo-z-10"
                     onClick={() => setShowCategoryDropdown(false)}
                   />
-                  {/* Menu */}
+                  {}
                   <div className="plasmo-absolute plasmo-top-full plasmo-left-0 plasmo-w-64 plasmo-mt-1 plasmo-bg-white plasmo-border plasmo-border-slate-200 plasmo-rounded-lg plasmo-shadow-xl plasmo-z-20 plasmo-max-h-80 plasmo-overflow-y-auto plasmo-no-visible-scrollbar plasmo-py-1">
                     {categories.length === 0 ? (
                       <button
@@ -333,7 +325,7 @@ export function NoteEditor({
           )}
         </div>
 
-        {/* Plus or Tick Icon */}
+        {}
         <div className="plasmo-flex-shrink-0 plasmo-relative plasmo-z-10">
           {showNewCategory ? (
             <button
@@ -374,7 +366,7 @@ export function NoteEditor({
           )}
         </div>
 
-        {/* Suggested Categories - Takes remaining space */}
+        {}
         <div className="plasmo-flex-1 plasmo-min-w-0 plasmo-overflow-hidden">
           <CategorySuggestions
             noteTitle={title}
@@ -391,7 +383,7 @@ export function NoteEditor({
         </div>
       </div>
 
-      {/* Rich Text Editor - Takes remaining space */}
+      {}
       <div className="plasmo-flex-1 plasmo-overflow-hidden plasmo-relative">
         <RichTextEditor
           ref={editorRef}
@@ -407,7 +399,7 @@ export function NoteEditor({
         />
       </div>
 
-      {/* Floating Action Button (FAB) for Save/Update - Moves up when toolbar is visible */}
+      {}
       <button
         onClick={handleSave}
         disabled={loading}

@@ -99,7 +99,7 @@ export function AIStatusBanner() {
                   <div className="plasmo-space-y-1.5">
                     <div className="plasmo-bg-blue-50 plasmo-p-2 plasmo-rounded plasmo-border plasmo-border-blue-200">
                       <code className="plasmo-text-xs plasmo-font-mono plasmo-text-blue-900">
-                        chrome://flags/#optimization-guide-on-device-model
+                        chrome:
                       </code>
                       <p className="plasmo-text-[10px] plasmo-text-blue-600 plasmo-mt-1">
                         Set to "Enabled BypassPerfRequirement"
@@ -107,7 +107,7 @@ export function AIStatusBanner() {
                     </div>
                     <div className="plasmo-bg-blue-50 plasmo-p-2 plasmo-rounded plasmo-border plasmo-border-blue-200">
                       <code className="plasmo-text-xs plasmo-font-mono plasmo-text-blue-900">
-                        chrome://flags/#prompt-api-for-gemini-nano
+                        chrome:
                       </code>
                       <p className="plasmo-text-[10px] plasmo-text-blue-600 plasmo-mt-1">
                         Set to "Enabled"
@@ -115,7 +115,7 @@ export function AIStatusBanner() {
                     </div>
                     <div className="plasmo-bg-blue-50 plasmo-p-2 plasmo-rounded plasmo-border plasmo-border-blue-200">
                       <code className="plasmo-text-xs plasmo-font-mono plasmo-text-blue-900">
-                        chrome://flags/#summarization-api-for-gemini-nano
+                        chrome:
                       </code>
                       <p className="plasmo-text-[10px] plasmo-text-blue-600 plasmo-mt-1">
                         Set to "Enabled"

@@ -1,16 +1,4 @@
-/**
- * TipTap JSON to Markdown Converter
- *
- * Converts TipTap's rich text JSON format to clean, structured Markdown.
- * This preserves formatting, structure, and context while being highly readable for AI.
- *
- * Benefits over plain text:
- * - Preserves headings, lists, tables, code blocks
- * - Maintains emphasis (bold, italic, code)
- * - Keeps links with URLs
- * - Retains structure and hierarchy
- * - AI can better understand context
- */
+
 
 interface TipTapNode {
   type: string
@@ -28,9 +16,6 @@ interface TipTapDoc {
   content: TipTapNode[]
 }
 
-/**
- * Main conversion function
- */
 export function tiptapToMarkdown(json: string | TipTapDoc): string {
   try {
     const doc: TipTapDoc = typeof json === "string" ? JSON.parse(json) : json
@@ -46,9 +31,6 @@ export function tiptapToMarkdown(json: string | TipTapDoc): string {
   }
 }
 
-/**
- * Convert array of nodes to markdown
- */
 function convertNodes(
   nodes: TipTapNode[],
   context?: { inTable?: boolean; inList?: boolean }
@@ -56,9 +38,6 @@ function convertNodes(
   return nodes.map((node) => convertNode(node, context)).join("")
 }
 
-/**
- * Convert a single node to markdown
- */
 function convertNode(
   node: TipTapNode,
   context?: { inTable?: boolean; inList?: boolean }
@@ -99,7 +78,7 @@ function convertNode(
       return convertTableCell(node)
 
     case "hardBreak":
-      return "  \n" // Markdown line break
+      return "  \n"
 
     case "horizontalRule":
       return "\n---\n\n"
@@ -108,7 +87,7 @@ function convertNode(
       return convertImage(node)
 
     default:
-      // Fallback: process children if they exist
+
       if (node.content) {
         return convertNodes(node.content, context)
       }
@@ -116,9 +95,6 @@ function convertNode(
   }
 }
 
-/**
- * Convert paragraph node
- */
 function convertParagraph(
   node: TipTapNode,
   context?: { inTable?: boolean }
@@ -129,7 +105,6 @@ function convertParagraph(
 
   const content = convertNodes(node.content)
 
-  // In tables, don't add extra newlines
   if (context?.inTable) {
     return content
   }
@@ -137,9 +112,6 @@ function convertParagraph(
   return content + "\n\n"
 }
 
-/**
- * Convert heading node
- */
 function convertHeading(node: TipTapNode): string {
   const level = node.attrs?.level || 1
   const hashes = "#".repeat(level)
@@ -147,9 +119,6 @@ function convertHeading(node: TipTapNode): string {
   return `${hashes} ${content}\n\n`
 }
 
-/**
- * Convert text node with marks (bold, italic, code, links)
- */
 function convertText(node: TipTapNode): string {
   let text = node.text || ""
 
@@ -157,7 +126,6 @@ function convertText(node: TipTapNode): string {
     return text
   }
 
-  // Apply marks in reverse order for proper nesting
   for (const mark of node.marks.reverse()) {
     switch (mark.type) {
       case "bold":
@@ -182,7 +150,7 @@ function convertText(node: TipTapNode): string {
         break
 
       case "underline":
-        // Markdown doesn't have native underline, use emphasis
+
         text = `_${text}_`
         break
     }
@@ -191,60 +159,41 @@ function convertText(node: TipTapNode): string {
   return text
 }
 
-/**
- * Convert code block
- */
 function convertCodeBlock(node: TipTapNode): string {
   const language = node.attrs?.language || ""
   const content = node.content ? convertNodes(node.content) : ""
   return `\`\`\`${language}\n${content}\n\`\`\`\n\n`
 }
 
-/**
- * Convert blockquote
- */
 function convertBlockquote(node: TipTapNode): string {
   const content = node.content ? convertNodes(node.content) : ""
-  // Split by lines and prefix each with >
+
   const lines = content.trim().split("\n")
   const quoted = lines.map((line) => `> ${line}`).join("\n")
   return `${quoted}\n\n`
 }
 
-/**
- * Convert bullet list
- */
 function convertBulletList(node: TipTapNode): string {
   const items = node.content ? convertNodes(node.content, { inList: true }) : ""
   return items + "\n"
 }
 
-/**
- * Convert ordered list
- */
 function convertOrderedList(node: TipTapNode): string {
   const items = node.content ? convertNodes(node.content, { inList: true }) : ""
   return items + "\n"
 }
 
-/**
- * Convert list item
- */
 function convertListItem(
   node: TipTapNode,
   context?: { inList?: boolean }
 ): string {
   const content = node.content ? convertNodes(node.content) : ""
-  // Remove trailing newlines from content for cleaner list formatting
+
   const cleanContent = content.trim()
 
-  // Use - for bullet points (could also detect ordered vs unordered from parent)
   return `- ${cleanContent}\n`
 }
 
-/**
- * Convert table
- */
 function convertTable(node: TipTapNode): string {
   if (!node.content || node.content.length === 0) {
     return ""
@@ -252,9 +201,8 @@ function convertTable(node: TipTapNode): string {
 
   const rows = node.content.map((row) => convertNode(row, { inTable: true }))
 
-  // Add header separator after first row
   if (rows.length > 0) {
-    // Count columns from first row to create separator
+
     const firstRow = node.content[0]
     const colCount = firstRow.content?.length || 0
     const separator = "|" + " --- |".repeat(colCount) + "\n"
@@ -265,9 +213,6 @@ function convertTable(node: TipTapNode): string {
   return rows.join("") + "\n"
 }
 
-/**
- * Convert table row
- */
 function convertTableRow(node: TipTapNode): string {
   if (!node.content) {
     return "|\n"
@@ -277,22 +222,16 @@ function convertTableRow(node: TipTapNode): string {
   return "| " + cells.join(" | ") + " |\n"
 }
 
-/**
- * Convert table cell
- */
 function convertTableCell(node: TipTapNode): string {
   if (!node.content) {
     return ""
   }
 
   const content = convertNodes(node.content, { inTable: true })
-  // Remove newlines within cells
+
   return content.trim().replace(/\n/g, " ")
 }
 
-/**
- * Convert image node
- */
 function convertImage(node: TipTapNode): string {
   const src = node.attrs?.src || ""
   const alt = node.attrs?.alt || "image"
@@ -305,9 +244,6 @@ function convertImage(node: TipTapNode): string {
   return `![${alt}](${src})\n\n`
 }
 
-/**
- * Extract plain text only (fallback for simple use cases)
- */
 export function tiptapToPlainText(json: string | TipTapDoc): string {
   try {
     const doc: TipTapDoc = typeof json === "string" ? JSON.parse(json) : json
@@ -323,9 +259,6 @@ export function tiptapToPlainText(json: string | TipTapDoc): string {
   }
 }
 
-/**
- * Recursively extract text from nodes
- */
 function extractText(nodes: TipTapNode[]): string {
   return nodes
     .map((node) => {
@@ -337,7 +270,6 @@ function extractText(nodes: TipTapNode[]): string {
         return extractText(node.content)
       }
 
-      // Add space for hard breaks
       if (node.type === "hardBreak") {
         return " "
       }

@@ -1,31 +1,16 @@
-/**
- * Dedicated Offscreen Document Entry Point
- *
- * This is a SEPARATE build from the background script, designed to run
- * in a full DOM environment with access to:
- * - URL.createObjectURL (for WASM loading)
- * - Web Workers
- * - IndexedDB
- *
- * DO NOT import background script code here - it's built for service workers!
- */
+
 
 import { generateEmbedding } from "~services/ai-service"
 import * as dbService from "~services/db-service"
 
 console.log("🟢 [Offscreen] Dedicated offscreen document initialized")
 
-/**
- * Message handler for database and AI operations
- */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log("📨 [Offscreen] Received message:", message.type)
 
-  // Handle async operations
   ;(async () => {
     try {
       switch (message.type) {
-        // ==================== SEARCH OPERATIONS ====================
 
         case "DB_SEARCH_BY_VECTOR": {
           const { vector, limit } = message.payload
@@ -44,8 +29,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ success: true, data: results })
           break
         }
-
-        // ==================== NOTE OPERATIONS ====================
 
         case "DB_GET_NOTE": {
           const { id } = message.payload
@@ -88,16 +71,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           break
         }
 
-        // ==================== CATEGORY OPERATIONS ====================
-
         case "DB_GET_ALL_CATEGORIES": {
           console.log("🏷️  [Offscreen] Getting all categories")
           const categories = await dbService.getAllCategories()
           sendResponse({ success: true, data: categories })
           break
         }
-
-        // ==================== STATISTICS OPERATIONS ====================
 
         case "DB_GET_STATISTICS": {
           console.log("📊 [Offscreen] Getting database statistics")
@@ -108,8 +87,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ success: true, data: stats })
           break
         }
-
-        // ==================== PERSONA OPERATIONS ====================
 
         case "DB_GET_PERSONA": {
           const { id } = message.payload
@@ -166,8 +143,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           break
         }
 
-        // ==================== AI OPERATIONS ====================
-
         case "AI_GENERATE_EMBEDDING": {
           const { text } = message.payload
           console.log(
@@ -194,7 +169,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
   })()
 
-  // Return true to indicate we'll respond asynchronously
   return true
 })
 

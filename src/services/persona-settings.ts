@@ -1,27 +1,15 @@
-/**
- * Persona Settings Service
- *
- * Manages user settings related to persona selection using chrome.storage.local
- */
+
 
 import type { PersonaSettings } from "~types/persona"
 
 const SETTINGS_KEY = "mindkeep_persona_settings"
 
-/**
- * Default settings
- */
 const DEFAULT_SETTINGS: PersonaSettings = {
   selectedPersonaId: null,
   defaultPersonaId: null,
   lastUpdated: Date.now()
 }
 
-/**
- * Get current persona settings
- *
- * @returns Current settings or defaults if not set
- */
 export async function getPersonaSettings(): Promise<PersonaSettings> {
   console.log(" [Settings] getPersonaSettings called")
 
@@ -42,12 +30,6 @@ export async function getPersonaSettings(): Promise<PersonaSettings> {
   }
 }
 
-/**
- * Update persona settings
- *
- * @param updates - Partial settings to update
- * @returns Updated settings
- */
 export async function updatePersonaSettings(
   updates: Partial<Omit<PersonaSettings, "lastUpdated">>
 ): Promise<PersonaSettings> {
@@ -71,12 +53,6 @@ export async function updatePersonaSettings(
   }
 }
 
-/**
- * Set the selected persona
- *
- * @param personaId - The persona ID to select (null for default mode)
- * @returns Updated settings
- */
 export async function setSelectedPersona(
   personaId: string | null
 ): Promise<PersonaSettings> {
@@ -85,11 +61,6 @@ export async function setSelectedPersona(
   return updatePersonaSettings({ selectedPersonaId: personaId })
 }
 
-/**
- * Get the currently selected persona ID
- *
- * @returns The selected persona ID or null
- */
 export async function getSelectedPersonaId(): Promise<string | null> {
   console.log(" [Settings] getSelectedPersonaId called")
 
@@ -99,12 +70,6 @@ export async function getSelectedPersonaId(): Promise<string | null> {
   return settings.selectedPersonaId
 }
 
-/**
- * Set the default persona (auto-activated on startup)
- *
- * @param personaId - The persona ID to set as default
- * @returns Updated settings
- */
 export async function setDefaultPersona(
   personaId: string | null
 ): Promise<PersonaSettings> {
@@ -113,11 +78,6 @@ export async function setDefaultPersona(
   return updatePersonaSettings({ defaultPersonaId: personaId })
 }
 
-/**
- * Clear all persona settings (reset to defaults)
- *
- * @returns Default settings
- */
 export async function clearPersonaSettings(): Promise<PersonaSettings> {
   console.log(" [Settings] clearPersonaSettings called")
 
@@ -132,12 +92,6 @@ export async function clearPersonaSettings(): Promise<PersonaSettings> {
   }
 }
 
-/**
- * Listen for settings changes
- *
- * @param callback - Function to call when settings change
- * @returns Cleanup function to remove listener
- */
 export function onPersonaSettingsChanged(
   callback: (settings: PersonaSettings) => void
 ): () => void {
@@ -156,7 +110,6 @@ export function onPersonaSettingsChanged(
 
   chrome.storage.onChanged.addListener(listener)
 
-  // Return cleanup function
   return () => {
     console.log(" [Settings] Removing settings change listener")
     chrome.storage.onChanged.removeListener(listener)

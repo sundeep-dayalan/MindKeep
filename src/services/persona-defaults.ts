@@ -1,8 +1,4 @@
-/**
- * Default Persona Templates
- *
- * Pre-built personas that provide common use cases out of the box
- */
+
 
 import type { PersonaTemplate } from "~types/persona"
 
@@ -155,7 +151,7 @@ Best regards,
 
 **Key Points:**
 • [Main point 1]
-• [Main point 2] 
+• [Main point 2]
 • [Main point 3]
 
 **Details:** [2-3 sentences of context]
@@ -180,10 +176,6 @@ Best regards,
   }
 ]
 
-/**
- * Initialize default personas in the database
- * Only creates them if they don't already exist (checked by name)
- */
 export async function initializeDefaultPersonas(): Promise<void> {
   console.log(" [DefaultPersonas] Initializing default personas")
 

@@ -33,7 +33,6 @@ export const Tabs = ({
   const [canScrollRight, setCanScrollRight] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
-  // Update tabs and active state when propTabs changes
   useEffect(() => {
     setTabs(propTabs)
     setActive(propTabs[0])
@@ -46,7 +45,6 @@ export const Tabs = ({
     setTabs(newTabs)
     setActive(newTabs[0])
 
-    // Notify parent of tab change
     if (onTabChange && selectedTab[0]) {
       onTabChange(selectedTab[0].value)
     }
@@ -89,7 +87,7 @@ export const Tabs = ({
   return (
     <>
       <div className="plasmo-relative plasmo-w-full">
-        {/* Left Gradient & Arrow */}
+        {}
         {canScrollLeft && (
           <div className="plasmo-absolute plasmo-left-0 plasmo-top-0 plasmo-bottom-0 plasmo-w-20 plasmo-z-10 plasmo-flex plasmo-items-center plasmo-pointer-events-none">
             <div className="plasmo-absolute plasmo-inset-0 plasmo-bg-gradient-to-r plasmo-from-slate-50 plasmo-via-slate-50/50 plasmo-to-transparent" />
@@ -112,7 +110,7 @@ export const Tabs = ({
           </div>
         )}
 
-        {/* Right Gradient & Arrow */}
+        {}
         {canScrollRight && (
           <div className="plasmo-absolute plasmo-right-0 plasmo-top-0 plasmo-bottom-0 plasmo-w-20 plasmo-z-10 plasmo-flex plasmo-items-center plasmo-justify-end plasmo-pointer-events-none">
             <div className="plasmo-absolute plasmo-inset-0 plasmo-bg-gradient-to-l plasmo-from-slate-50 plasmo-via-slate-50/50 plasmo-to-transparent" />
@@ -135,7 +133,7 @@ export const Tabs = ({
           </div>
         )}
 
-        {/* Tabs Container */}
+        {}
         <div
           ref={scrollContainerRef}
           className={cn(

@@ -1,9 +1,4 @@
-/**
- * Injected Icon Component
- *
- * The MindKeep icon that appears in input fields on focus.
- * Clicking it opens the in-page chat modal.
- */
+
 
 interface InjectedIconProps {
   onClick: () => void
@@ -29,7 +24,7 @@ export function InjectedIcon({ onClick, isActive }: InjectedIconProps) {
       }}
       title="Open MindKeep AI"
       type="button">
-      {/* MindKeep Logo - Simple brain icon */}
+      {}
       <svg
         className="plasmo-w-4 plasmo-h-4"
         fill="none"
@@ -47,17 +42,11 @@ export function InjectedIcon({ onClick, isActive }: InjectedIconProps) {
   )
 }
 
-/**
- * Create and inject the icon into an input field
- * Returns the icon element for management
- *
- * Dropbox-style corner badge design - sits at top-left corner outside the input
- */
 export function createInjectedIcon(
   inputElement: HTMLInputElement | HTMLTextAreaElement | HTMLElement,
   onClick: () => void
 ): HTMLElement {
-  // Check if element is visible before creating icon
+
   const isVisible = (element: HTMLElement): boolean => {
     const rect = element.getBoundingClientRect()
     const style = window.getComputedStyle(element)
@@ -72,13 +61,12 @@ export function createInjectedIcon(
 
   if (!isVisible(inputElement)) {
     console.log("⚠️ [InjectedIcon] Input field not visible, delaying icon creation")
-    // Return a placeholder that will be replaced when the field becomes visible
+
     const placeholder = document.createElement("div")
     placeholder.style.display = "none"
     return placeholder
   }
 
-  // Create a container for the corner badge
   const iconContainer = document.createElement("div")
   iconContainer.className = "mindkeep-icon-container"
   iconContainer.style.cssText = `
@@ -93,8 +81,6 @@ export function createInjectedIcon(
     transform: translateY(-2px);
   `
 
-  // Position the container relative to the input's position on screen
-  // Use a small delay to ensure the element is in its final position
   const updateInitialPosition = () => {
     const inputRect = inputElement.getBoundingClientRect()
 
@@ -107,13 +93,11 @@ export function createInjectedIcon(
       height: inputRect.height
     })
 
-    // Position badge below the text box in bottom-right corner (Grammarly style)
-    // The badge should be positioned outside and below the input field
     const iconTop = inputRect.bottom + 4
     const iconLeft = inputRect.right - 34
 
-    iconContainer.style.top = `${iconTop}px` // 4px gap below the input
-    iconContainer.style.left = `${iconLeft}px` // Aligned to right edge with 10px padding
+    iconContainer.style.top = `${iconTop}px`
+    iconContainer.style.left = `${iconLeft}px`
 
     console.log("[InjectedIcon] Icon position set to:", {
       top: iconTop,
@@ -122,28 +106,22 @@ export function createInjectedIcon(
     })
   }
 
-  // Initial position
   updateInitialPosition()
 
-  // Update position after a small delay to handle dynamic layouts
   setTimeout(updateInitialPosition, 50)
 
-  // Store original input styles to restore later
   const originalBorder = inputElement.style.border || ""
   const originalBoxShadow = inputElement.style.boxShadow || ""
   const originalOutline = inputElement.style.outline || ""
   const originalBorderRadius = inputElement.style.borderRadius || ""
 
-  // Add subtle enhanced border styling to the input (softer than before)
   inputElement.style.border = "2px solid #a78bfa !important"
   inputElement.style.boxShadow = "0 0 0 1px rgba(167, 139, 250, 0.1) !important"
   inputElement.style.outline = "none !important"
   inputElement.style.transition = "all 0.2s ease !important"
 
-  // Append to document body
   document.body.appendChild(iconContainer)
 
-  // Create the button with MindKeep logo (matching assets/icon.png)
   const button = document.createElement("button")
   button.type = "button"
   button.style.cssText = `
@@ -163,7 +141,6 @@ export function createInjectedIcon(
     z-index: 999999 !important;
   `
 
-  // Create SVG pencil icon that matches the logo
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg")
   svg.setAttribute("viewBox", "0 0 24 24")
   svg.setAttribute("fill", "white")
@@ -174,14 +151,12 @@ export function createInjectedIcon(
     pointer-events: none !important;
   `
 
-  // Pencil path that matches your logo design
   const path = document.createElementNS("http://www.w3.org/2000/svg", "path")
   path.setAttribute("d", "M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z")
 
   svg.appendChild(path)
   button.appendChild(svg)
 
-  // Create tooltip
   const tooltip = document.createElement("div")
   tooltip.className = "mindkeep-tooltip"
   tooltip.style.cssText = `
@@ -206,12 +181,10 @@ export function createInjectedIcon(
     gap: 6px !important;
   `
 
-  // Add text content
   tooltip.textContent = "Search your notes"
 
   iconContainer.appendChild(tooltip)
 
-  // Add hover effect - scale, glow, and show tooltip
   button.addEventListener("mouseenter", () => {
     button.style.transform = "scale(1.15)"
     button.style.boxShadow = "0 4px 14px rgba(245, 158, 11, 0.5)"
@@ -234,7 +207,6 @@ export function createInjectedIcon(
 
   iconContainer.appendChild(button)
 
-  // Show icon with fade-in and slide-down animation
   console.log("[InjectedIcon] Preparing to show icon with animation")
   requestAnimationFrame(() => {
     console.log("[InjectedIcon] Setting opacity to 1 and transform to translateY(0)")
@@ -243,7 +215,6 @@ export function createInjectedIcon(
     console.log("[InjectedIcon] Icon should now be visible, opacity:", iconContainer.style.opacity)
   })
 
-  // Update icon position on scroll/resize
   const updatePosition = () => {
     const rect = inputElement.getBoundingClientRect()
     iconContainer.style.top = `${rect.bottom + 4}px`
@@ -253,12 +224,10 @@ export function createInjectedIcon(
   window.addEventListener("scroll", updatePosition, true)
   window.addEventListener("resize", updatePosition)
 
-  // Store cleanup function and original styles on the icon container
   ;(iconContainer as any).__cleanup = () => {
     window.removeEventListener("scroll", updatePosition, true)
     window.removeEventListener("resize", updatePosition)
 
-    // Restore original input styles
     inputElement.style.border = originalBorder
     inputElement.style.boxShadow = originalBoxShadow
     inputElement.style.outline = originalOutline
@@ -272,26 +241,22 @@ export function createInjectedIcon(
   return iconContainer
 }
 
-/**
- * Remove the injected icon from an input field
- */
 export function removeInjectedIcon(
   inputElement: HTMLInputElement | HTMLTextAreaElement | HTMLElement,
   iconElement: HTMLElement
 ) {
-  // Fade out and slide up animation before removal
+
   iconElement.style.opacity = "0"
   iconElement.style.transform = "translateY(-2px)"
 
   setTimeout(() => {
-    // Call cleanup function if it exists (this also restores input styles)
+
     if ((iconElement as any).__cleanup) {
       ;(iconElement as any).__cleanup()
     }
 
-    // Remove the icon
     iconElement.remove()
 
     console.log("🗑️  [InjectedIcon] Corner badge removed from input")
-  }, 200) // Match the transition duration
+  }, 200)
 }

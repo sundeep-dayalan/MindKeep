@@ -1,15 +1,4 @@
-/**
- * Database service for MindKeep
- * Manages all database interactions using Dexie.js (wrapper over IndexedDB)
- *
- * CRITICAL: This service stores and retrieves data AS-IS.
- * It does NOT generate embeddings - that is done by ai-service.ts in the background script
- * It does NOT encrypt/decrypt - that is done by crypto.ts in the background script
- *
- * The background script orchestrates the full pipeline:
- * SAVE: Receive data → Generate embedding → Encrypt content → Store here
- * RETRIEVE: Fetch from here → Decrypt content → Return to UI
- */
+
 
 import Dexie, { type Table } from "dexie"
 
@@ -17,12 +6,11 @@ import type { Persona, PersonaInput } from "~types/persona"
 import { setSelectedPersona } from "~services/persona-settings"
 import { decrypt } from "~util/crypto"
 
-// Note interface (decrypted, user-facing format)
 export interface Note {
   id: string
   title: string
-  content: string // Rich text JSON (decrypted, for display in TipTap)
-  contentPlaintext: string // Plain text extracted from rich text (decrypted, for search)
+  content: string
+  contentPlaintext: string
   category: string
   embedding?: number[]
   createdAt: number
@@ -30,52 +18,38 @@ export interface Note {
   sourceUrl?: string
 }
 
-// Internal storage format (content is encrypted at rest)
 export interface StoredNote {
   id: string
-  title: string // Plaintext for searching/filtering
-  content: string // ENCRYPTED TipTap JSON (base64 string) - stored as "content" in DB
-  contentPlaintext: string // ENCRYPTED plain text for search (base64 string)
-  category: string // Plaintext for filtering
-  embedding?: number[] // Plaintext vector for semantic search
+  title: string
+  content: string
+  contentPlaintext: string
+  category: string
+  embedding?: number[]
   createdAt: number
   updatedAt: number
   sourceUrl?: string
 }
 
-/**
- * Dexie Database Class
- * Defines the schema and provides typed access to tables
- */
 class MindKeepDatabase extends Dexie {
-  notes!: Table<StoredNote, string> // StoredNote type, string key (id)
-  personas!: Table<Persona, string> // Persona type, string key (id)
+  notes!: Table<StoredNote, string>
+  personas!: Table<Persona, string>
 
   constructor() {
     super("mindkeep_db")
 
-    // Define schema
-    // The string after the & symbol defines indexes
-    // Primary key (id) is automatically indexed
-    // Version 2: Added contentPlaintext field for rich text support
     this.version(2).stores({
-      notes: "id, category, updatedAt, createdAt, title" // indexed fields for fast queries
+      notes: "id, category, updatedAt, createdAt, title"
     })
 
-    // Version 3: Added personas table
     this.version(3).stores({
       notes: "id, category, updatedAt, createdAt, title",
-      personas: "id, name, createdAt, updatedAt, isActive, isDefault" // indexed fields for personas
+      personas: "id, name, createdAt, updatedAt, isActive, isDefault"
     })
   }
 }
 
-// Create singleton database instance
 const db = new MindKeepDatabase()
 
-/**
- * Calculate cosine similarity between two vectors
- */
 function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) return 0
 
@@ -97,33 +71,17 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return dotProduct / (magnitudeA * magnitudeB)
 }
 
-/**
- * Generate a unique ID for a note
- */
 function generateId(): string {
   return `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 }
 
-/**
- * Add a new note to the database
- *
- * IMPORTANT: This function expects the data to be PRE-PROCESSED by the background script:
- * - content should be ENCRYPTED TipTap JSON (base64 string from crypto.encrypt())
- * - contentPlaintext should be ENCRYPTED plain text (base64 string from crypto.encrypt())
- * - embedding should be GENERATED (number array from ai-service.generateEmbedding())
- *
- * This function ONLY stores the data as provided.
- *
- * @param noteData - Pre-processed note data with encrypted content and generated embedding
- * @returns The stored note metadata (with encrypted content)
- */
 export async function addNote(noteData: {
   title: string
-  content: string // ENCRYPTED TipTap JSON (base64 string)
-  contentPlaintext: string // ENCRYPTED plain text (base64 string)
+  content: string
+  contentPlaintext: string
   category?: string
   sourceUrl?: string
-  embedding?: number[] // Pre-generated embedding vector
+  embedding?: number[]
 }): Promise<StoredNote> {
   try {
     const id = generateId()
@@ -140,10 +98,10 @@ export async function addNote(noteData: {
     const storedNote: StoredNote = {
       id,
       title: noteData.title,
-      content: noteData.content, // Store encrypted TipTap JSON as-is
-      contentPlaintext: noteData.contentPlaintext, // Store encrypted plaintext as-is
+      content: noteData.content,
+      contentPlaintext: noteData.contentPlaintext,
       category: noteData.category || "general",
-      embedding: noteData.embedding, // Store embedding as-is
+      embedding: noteData.embedding,
       createdAt: now,
       updatedAt: now,
       sourceUrl: noteData.sourceUrl
@@ -157,15 +115,6 @@ export async function addNote(noteData: {
   }
 }
 
-/**
- * Get a single note by ID and decrypt its content
- *
- * IMPORTANT: This function retrieves the stored note and decrypts both the
- * TipTap JSON content and plaintext content before returning.
- *
- * @param id - The unique ID of the note
- * @returns The note with decrypted content, or null if not found
- */
 export async function getNote(id: string): Promise<Note | null> {
   try {
     const storedNote = await db.notes.get(id)
@@ -174,15 +123,14 @@ export async function getNote(id: string): Promise<Note | null> {
       return null
     }
 
-    // Decrypt both content fields
     const content = await decrypt(storedNote.content)
     const contentPlaintext = await decrypt(storedNote.contentPlaintext)
 
     return {
       id: storedNote.id,
       title: storedNote.title,
-      content, // Decrypted TipTap JSON
-      contentPlaintext, // Decrypted plain text
+      content,
+      contentPlaintext,
       category: storedNote.category,
       embedding: storedNote.embedding,
       createdAt: storedNote.createdAt,
@@ -195,30 +143,18 @@ export async function getNote(id: string): Promise<Note | null> {
   }
 }
 
-/**
- * Update an existing note
- *
- * IMPORTANT: If content is provided in updates, it should be PRE-ENCRYPTED.
- * If contentPlaintext is provided, it should be PRE-ENCRYPTED.
- * If embedding is provided, it should be PRE-GENERATED.
- * The background script handles encryption/embedding before calling this.
- *
- * @param id - The unique ID of the note to update
- * @param updates - The fields to update (content should be encrypted if provided)
- * @returns The updated note with decrypted content
- */
 export async function updateNote(
   id: string,
   updates: {
     title?: string
-    content?: string // If provided, should be ENCRYPTED TipTap JSON
-    contentPlaintext?: string // If provided, should be ENCRYPTED plain text
+    content?: string
+    contentPlaintext?: string
     category?: string
-    embedding?: number[] // If provided, should be pre-generated
+    embedding?: number[]
   }
 ): Promise<Note | null> {
   try {
-    // Get existing stored note (with encrypted content)
+
     const existingStoredNote = await db.notes.get(id)
 
     if (!existingStoredNote) {
@@ -228,9 +164,9 @@ export async function updateNote(
     const updatedNote: StoredNote = {
       id,
       title: updates.title ?? existingStoredNote.title,
-      content: updates.content ?? existingStoredNote.content, // Use encrypted content as-is
+      content: updates.content ?? existingStoredNote.content,
       contentPlaintext:
-        updates.contentPlaintext ?? existingStoredNote.contentPlaintext, // Use encrypted plaintext as-is
+        updates.contentPlaintext ?? existingStoredNote.contentPlaintext,
       category: updates.category ?? existingStoredNote.category,
       embedding: updates.embedding ?? existingStoredNote.embedding,
       createdAt: existingStoredNote.createdAt,
@@ -240,15 +176,14 @@ export async function updateNote(
 
     await db.notes.put(updatedNote)
 
-    // Decrypt both content fields for return value
     const content = await decrypt(updatedNote.content)
     const contentPlaintext = await decrypt(updatedNote.contentPlaintext)
 
     return {
       id: updatedNote.id,
       title: updatedNote.title,
-      content, // Decrypted TipTap JSON
-      contentPlaintext, // Decrypted plain text
+      content,
+      contentPlaintext,
       category: updatedNote.category,
       embedding: updatedNote.embedding,
       createdAt: updatedNote.createdAt,
@@ -261,9 +196,6 @@ export async function updateNote(
   }
 }
 
-/**
- * Delete a note
- */
 export async function deleteNote(id: string): Promise<boolean> {
   try {
     await db.notes.delete(id)
@@ -274,14 +206,6 @@ export async function deleteNote(id: string): Promise<boolean> {
   }
 }
 
-/**
- * Get all stored notes (internal function, returns encrypted content)
- *
- * INTERNAL USE ONLY: Returns notes with encrypted content.
- * Used for vector search operations where we don't need to decrypt all notes.
- *
- * @returns Array of stored notes with encrypted content
- */
 async function getAllStoredNotes(): Promise<StoredNote[]> {
   try {
     return await db.notes.toArray()
@@ -291,14 +215,6 @@ async function getAllStoredNotes(): Promise<StoredNote[]> {
   }
 }
 
-/**
- * Get all notes and decrypt their content
- *
- * IMPORTANT: This function retrieves all stored notes and decrypts both
- * content fields before returning. Used by the Side Panel to display notes.
- *
- * @returns Array of notes with decrypted content, sorted by updatedAt (newest first)
- */
 export async function getAllNotes(): Promise<Note[]> {
   try {
     const storedNotes = await getAllStoredNotes()
@@ -306,14 +222,14 @@ export async function getAllNotes(): Promise<Note[]> {
 
     for (const storedNote of storedNotes) {
       try {
-        // Decrypt both content fields
+
         const content = await decrypt(storedNote.content)
         const contentPlaintext = await decrypt(storedNote.contentPlaintext)
         notes.push({
           id: storedNote.id,
           title: storedNote.title,
-          content, // Decrypted TipTap JSON
-          contentPlaintext, // Decrypted plain text
+          content,
+          contentPlaintext,
           category: storedNote.category,
           embedding: storedNote.embedding,
           createdAt: storedNote.createdAt,
@@ -333,20 +249,6 @@ export async function getAllNotes(): Promise<Note[]> {
   }
 }
 
-/**
- * Search notes by vector similarity (optimized with Dexie)
- *
- * IMPORTANT: This function performs semantic search using pre-generated embeddings.
- * The query embedding should be generated by the background script before calling this.
- *
- * OPTIMIZATION: This function efficiently loads all notes at once (fast with Dexie),
- * calculates similarity scores in memory, and only decrypts the top matching results.
- * This is much faster than decrypting everything upfront.
- *
- * @param vector - The query embedding vector (from ai-service.generateEmbedding)
- * @param limit - Maximum number of results to return
- * @returns Array of notes with decrypted content, sorted by similarity score (highest first)
- */
 export async function searchNotesByVector(
   vector: number[],
   limit: number = 5
@@ -354,7 +256,7 @@ export async function searchNotesByVector(
   const startTime = performance.now()
 
   try {
-    // Efficiently get all stored notes with Dexie (returns encrypted content)
+
     const fetchStartTime = performance.now()
     const storedNotes = await db.notes
       .filter((note) => note.embedding && note.embedding.length > 0)
@@ -369,7 +271,6 @@ export async function searchNotesByVector(
       return []
     }
 
-    // Calculate similarity scores (fast, in-memory operation)
     const scoreStartTime = performance.now()
     const scored = storedNotes.map((note) => ({
       note,
@@ -380,7 +281,6 @@ export async function searchNotesByVector(
       `⏱ [DB Vector Search] Calculate similarity scores: ${scoreTime.toFixed(2)}ms`
     )
 
-    // Sort by score (descending) and take top results
     const sortStartTime = performance.now()
     scored.sort((a, b) => b.score - a.score)
     const topResults = scored.slice(0, limit)
@@ -389,7 +289,6 @@ export async function searchNotesByVector(
       `⏱ [DB Vector Search] Sort and slice top ${limit} results: ${sortTime.toFixed(2)}ms`
     )
 
-    // Decrypt ONLY the top matching notes (critical optimization)
     const decryptStartTime = performance.now()
     const decryptedResults: Array<{ note: Note; score: number }> = []
     for (const { note, score } of topResults) {
@@ -400,8 +299,8 @@ export async function searchNotesByVector(
           note: {
             id: note.id,
             title: note.title,
-            content, // Decrypted TipTap JSON
-            contentPlaintext, // Decrypted plain text
+            content,
+            contentPlaintext,
             category: note.category,
             embedding: note.embedding,
             createdAt: note.createdAt,
@@ -434,14 +333,6 @@ export async function searchNotesByVector(
   }
 }
 
-/**
- * Search notes semantically and return with full decrypted content
- * This is specifically for AI search where we need all content to summarize
- *
- * @param vector - The query embedding vector
- * @param limit - Maximum number of results to return
- * @returns Array of notes with decrypted content and combined text for summarization
- */
 export async function searchNotesSemanticWithContent(
   vector: number[],
   limit: number = 5
@@ -464,7 +355,7 @@ export async function searchNotesSemanticWithContent(
     const combineStartTime = performance.now()
     const combinedContent = matchingNotes
       .map((result, idx) => {
-        // Use plain text content for AI summarization (not TipTap JSON)
+
         return `Note ${idx + 1}: ${result.note.title}\n${result.note.contentPlaintext}\n---`
       })
       .join("\n\n")
@@ -492,16 +383,6 @@ export async function searchNotesSemanticWithContent(
   }
 }
 
-/**
- * Search notes by title (OPTIMIZED: uses indexed prefix search)
- *
- * This function uses a hybrid approach:
- * 1. For title search: Uses the indexed 'title' field for fast prefix matching
- * 2. For content search: Falls back to full scan (can't avoid since content is encrypted)
- *
- * Note: Since content is encrypted, we can't search it without decryption.
- * For best performance, prefer searching by title when possible.
- */
 export async function searchNotesByTitle(query: string): Promise<Note[]> {
   try {
     if (!query || query.trim() === "") {
@@ -509,21 +390,17 @@ export async function searchNotesByTitle(query: string): Promise<Note[]> {
     }
 
     const lowerQuery = query.toLowerCase()
-    const results = new Map<string, Note>() // Use Map to avoid duplicates
+    const results = new Map<string, Note>()
 
-    // OPTIMIZATION 1: Search by title using the index (fast!)
-    // This uses case-insensitive prefix matching on the indexed title field
     const titleMatches = await db.notes
       .where("title")
       .startsWithIgnoreCase(query)
       .toArray()
 
-    // Also check for title substring matches (not as fast, but covers more cases)
     const titleSubstringMatches = await db.notes
       .filter((note) => note.title.toLowerCase().includes(lowerQuery))
       .toArray()
 
-    // Combine and decrypt title matches
     const allTitleMatches = [...titleMatches, ...titleSubstringMatches]
     const uniqueTitleMatches = Array.from(
       new Map(allTitleMatches.map((note) => [note.id, note])).values()
@@ -549,17 +426,15 @@ export async function searchNotesByTitle(query: string): Promise<Note[]> {
       }
     }
 
-    // OPTIMIZATION 2: For content search, we need to decrypt
-    // Only do this if the title search didn't find many results
     if (results.size < 10) {
-      // Get notes not already found by title search
+
       const remainingNotes = await db.notes
         .filter((note) => !results.has(note.id))
         .toArray()
 
       for (const storedNote of remainingNotes) {
         try {
-          // Search in plaintext content
+
           const contentPlaintext = await decrypt(storedNote.contentPlaintext)
           if (contentPlaintext.toLowerCase().includes(lowerQuery)) {
             const content = await decrypt(storedNote.content)
@@ -588,18 +463,14 @@ export async function searchNotesByTitle(query: string): Promise<Note[]> {
   }
 }
 
-/**
- * Get notes by category (optimized with Dexie's indexed query)
- */
 export async function getNotesByCategory(category: string): Promise<Note[]> {
   try {
-    // Use Dexie's indexed query for efficient filtering
+
     const storedNotes = await db.notes
       .where("category")
       .equals(category)
       .toArray()
 
-    // Decrypt only the filtered results
     const notes: Note[] = []
     for (const storedNote of storedNotes) {
       try {
@@ -628,16 +499,9 @@ export async function getNotesByCategory(category: string): Promise<Note[]> {
   }
 }
 
-/**
- * Get all unique categories (OPTIMIZED: uses index, no decryption needed)
- *
- * This function is extremely fast because it reads ONLY from the category index
- * without touching any note objects or decrypting any content.
- */
 export async function getAllCategories(): Promise<string[]> {
   try {
-    // Use Dexie's uniqueKeys() to get unique categories from the index
-    // This is orders of magnitude faster than loading all notes
+
     const categories = await db.notes.orderBy("category").uniqueKeys()
     return categories as string[]
   } catch (error) {
@@ -646,10 +510,6 @@ export async function getAllCategories(): Promise<string[]> {
   }
 }
 
-/**
- * Get statistics about notes by category
- * Returns count of notes per category without decryption
- */
 export async function getCategoryStatistics(): Promise<
   Array<{ category: string; count: number; lastUpdated: number }>
 > {
@@ -679,10 +539,6 @@ export async function getCategoryStatistics(): Promise<
   }
 }
 
-/**
- * Get comprehensive database statistics
- * Provides overview of all notes without decrypting content
- */
 export async function getDatabaseStatistics(): Promise<{
   totalNotes: number
   categories: Array<{ category: string; count: number; lastUpdated: number }>
@@ -722,9 +578,6 @@ export async function getDatabaseStatistics(): Promise<{
   }
 }
 
-/**
- * Create a new category
- */
 export function createCategory(categoryName: string): string {
   const trimmed = categoryName.trim().toLowerCase()
 
@@ -739,9 +592,6 @@ export function createCategory(categoryName: string): string {
   return trimmed
 }
 
-/**
- * Update category for multiple notes
- */
 export async function updateCategory(
   oldCategory: string,
   newCategory: string
@@ -764,9 +614,6 @@ export async function updateCategory(
   }
 }
 
-/**
- * Delete a category and reassign notes
- */
 export async function deleteCategory(
   category: string,
   reassignTo: string = "general"
@@ -789,9 +636,6 @@ export async function deleteCategory(
   }
 }
 
-/**
- * Clear all notes
- */
 export async function clearAllNotes(): Promise<void> {
   try {
     await db.notes.clear()
@@ -802,18 +646,14 @@ export async function clearAllNotes(): Promise<void> {
   }
 }
 
-/**
- * Debug function to verify IndexedDB connection and data
- */
 export async function debugIndexedDB(): Promise<void> {
   console.log("=== IndexedDB Debug Info ===")
 
   try {
-    // List all databases
+
     const databases = await indexedDB.databases()
     console.log("Available databases:", databases)
 
-    // Check our database
     console.log("Connected to database:", db.name)
     console.log("Database version:", db.verno)
     console.log(
@@ -821,11 +661,9 @@ export async function debugIndexedDB(): Promise<void> {
       db.tables.map((t) => t.name)
     )
 
-    // Count notes
     const count = await db.notes.count()
     console.log(`Total notes in database: ${count}`)
 
-    // Get all raw stored notes (encrypted)
     const rawNotes = await db.notes.toArray()
     console.log("Raw stored notes (encrypted):", rawNotes)
 
@@ -835,23 +673,10 @@ export async function debugIndexedDB(): Promise<void> {
   }
 }
 
-// ============================================================================
-// PERSONA MANAGEMENT FUNCTIONS
-// ============================================================================
-
-/**
- * Generate a unique ID for a persona
- */
 function generatePersonaId(): string {
   return `persona_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 }
 
-/**
- * Add a new persona to the database
- *
- * @param personaData - The persona data to save
- * @returns The created persona with generated ID and timestamps
- */
 export async function addPersona(personaData: PersonaInput): Promise<Persona> {
   console.log(" [DB] addPersona called with:", personaData)
 
@@ -876,12 +701,6 @@ export async function addPersona(personaData: PersonaInput): Promise<Persona> {
   return persona
 }
 
-/**
- * Get a persona by ID
- *
- * @param id - The persona ID
- * @returns The persona or undefined if not found
- */
 export async function getPersona(id: string): Promise<Persona | undefined> {
   console.log(" [DB] getPersona called with ID:", id)
 
@@ -896,11 +715,6 @@ export async function getPersona(id: string): Promise<Persona | undefined> {
   return persona
 }
 
-/**
- * Get all personas from the database
- *
- * @returns Array of all personas, sorted by name (deduplicated by ID)
- */
 export async function getAllPersonas(): Promise<Persona[]> {
   console.log(" [DB] getAllPersonas called")
 
@@ -911,7 +725,6 @@ export async function getAllPersonas(): Promise<Persona[]> {
     personas.map((p) => ({ id: p.id, name: p.name }))
   )
 
-  // Deduplicate by ID (in case there are duplicates in the database)
   const uniquePersonas = Array.from(
     new Map(personas.map((p) => [p.id, p])).values()
   )
@@ -927,13 +740,6 @@ export async function getAllPersonas(): Promise<Persona[]> {
   return uniquePersonas
 }
 
-/**
- * Update an existing persona
- *
- * @param id - The persona ID to update
- * @param updates - Partial persona data to update
- * @returns The updated persona or undefined if not found
- */
 export async function updatePersona(
   id: string,
   updates: Partial<PersonaInput>
@@ -963,12 +769,6 @@ export async function updatePersona(
   return updated
 }
 
-/**
- * Delete a persona from the database
- *
- * @param id - The persona ID to delete
- * @returns True if deleted, false if not found or is a default persona
- */
 export async function deletePersona(id: string): Promise<boolean> {
   console.log(" [DB] deletePersona called for ID:", id)
 
@@ -990,11 +790,6 @@ export async function deletePersona(id: string): Promise<boolean> {
   return true
 }
 
-/**
- * Get all active personas
- *
- * @returns Array of active personas
- */
 export async function getActivePersonas(): Promise<Persona[]> {
   console.log(" [DB] getActivePersonas called")
 
@@ -1005,17 +800,11 @@ export async function getActivePersonas(): Promise<Persona[]> {
   return personas
 }
 
-/**
- * Set a persona as active (and deactivate all others)
- *
- * @param id - The persona ID to activate (null to deactivate all)
- * @returns True if successful
- */
 export async function setActivePersona(id: string | null): Promise<boolean> {
   console.log(" [DB] setActivePersona called with ID:", id)
 
   try {
-    // Deactivate all personas first
+
     console.log(" [DB] Fetching all personas...")
     const allPersonas = await db.personas.toArray()
     console.log(` [DB] Found ${allPersonas.length} personas in database`)
@@ -1030,7 +819,6 @@ export async function setActivePersona(id: string | null): Promise<boolean> {
     )
     console.log(" [DB] All personas deactivated")
 
-    // Activate the specified persona if ID provided
     if (id) {
       console.log(" [DB] Looking for persona with ID:", id)
       const persona = await db.personas.get(id)
@@ -1050,7 +838,6 @@ export async function setActivePersona(id: string | null): Promise<boolean> {
       console.log(" [DB] All personas deactivated (default mode)")
     }
 
-    // Persist selection to chrome.storage for restoration on next load
     console.log(" [DB] Persisting selection to chrome.storage...")
     await setSelectedPersona(id)
     console.log(" [DB] Saved persona selection to chrome.storage")
@@ -1063,11 +850,6 @@ export async function setActivePersona(id: string | null): Promise<boolean> {
   }
 }
 
-/**
- * Get the currently active persona
- *
- * @returns The active persona or null if none active
- */
 export async function getActivePersona(): Promise<Persona | null> {
   console.log(" [DB] getActivePersona called")
 
@@ -1082,12 +864,6 @@ export async function getActivePersona(): Promise<Persona | null> {
   return null
 }
 
-/**
- * Clean up duplicate personas from the database
- * Keeps only the most recent version of each persona (by name)
- *
- * @returns Number of duplicate personas removed
- */
 export async function cleanupDuplicatePersonas(): Promise<number> {
   console.log(" [DB] cleanupDuplicatePersonas called")
 
@@ -1095,7 +871,6 @@ export async function cleanupDuplicatePersonas(): Promise<number> {
     const allPersonas = await db.personas.toArray()
     console.log(` [DB] Found ${allPersonas.length} total personas in database`)
 
-    // Group personas by name
     const personasByName = new Map<string, Persona[]>()
     for (const persona of allPersonas) {
       const existing = personasByName.get(persona.name) || []
@@ -1105,15 +880,12 @@ export async function cleanupDuplicatePersonas(): Promise<number> {
 
     let removedCount = 0
 
-    // For each group, keep only the most recent one
     for (const [name, personas] of personasByName.entries()) {
       if (personas.length > 1) {
         console.log(` [DB] Found ${personas.length} duplicates of "${name}"`)
 
-        // Sort by updatedAt (newest first)
         personas.sort((a, b) => b.updatedAt - a.updatedAt)
 
-        // Keep the first (newest), delete the rest
         const toKeep = personas[0]
         const toDelete = personas.slice(1)
 

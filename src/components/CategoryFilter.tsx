@@ -26,7 +26,7 @@ export function CategoryFilter({
 
   return (
     <div className="plasmo-bg-white plasmo-border plasmo-border-slate-200 plasmo-rounded-lg plasmo-overflow-hidden">
-      {/* Header - Always Visible */}
+      {}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="plasmo-w-full plasmo-p-3 plasmo-flex plasmo-items-center plasmo-justify-between hover:plasmo-bg-slate-50 plasmo-transition-colors">
@@ -71,10 +71,10 @@ export function CategoryFilter({
         </div>
       </button>
 
-      {/* Expandable Content */}
+      {}
       {isExpanded && (
         <div className="plasmo-border-t plasmo-border-slate-200 plasmo-p-3 plasmo-pt-2">
-          {/* Category Search (only show if more than 10 categories) */}
+          {}
           {categories.length > 10 && (
             <div className="plasmo-mb-2">
               <div className="plasmo-relative">
@@ -119,7 +119,7 @@ export function CategoryFilter({
             </div>
           )}
 
-          {/* Scrollable Category Pills Container */}
+          {}
           <div
             className="plasmo-overflow-y-auto"
             style={{

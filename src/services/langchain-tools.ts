@@ -1,8 +1,4 @@
-/**
- * LangChain Tools for MindKeep
- *
- * Wraps note operations as LangChain tools for agentic workflows.
- */
+
 
 import { DynamicStructuredTool } from "@langchain/core/tools"
 import { z } from "zod"
@@ -10,10 +6,6 @@ import { z } from "zod"
 import * as aiService from "./ai-proxy"
 import type { Note } from "./db-proxy"
 import * as dbService from "./db-proxy"
-
-// ============================================================================
-// TOOL SCHEMAS (using Zod for validation)
-// ============================================================================
 
 const SearchNotesSchema = z.object({
   query: z.string().describe("The search query to find relevant notes"),
@@ -102,15 +94,6 @@ const ConfirmOrganizeNoteSchema = z.object({
     .describe("Whether the user confirmed the organization action")
 })
 
-// ============================================================================
-// TOOLS IMPLEMENTATION
-// ============================================================================
-
-/**
- * Search Notes Tool
- * Performs semantic search through user's notes
- */
-
 export const searchNotesTool = new DynamicStructuredTool({
   name: "search_notes",
   description:
@@ -123,7 +106,6 @@ export const searchNotesTool = new DynamicStructuredTool({
       let vectorResults = []
       let embedding: number[] | null = null
 
-      // --- Step 1: Semantic Vector Search (with fallback) ---
       try {
         embedding = await aiService.EmbeddingPipeline.generateEmbedding(query)
         vectorResults = await dbService.searchNotesByVector(embedding, limit)
@@ -132,20 +114,17 @@ export const searchNotesTool = new DynamicStructuredTool({
           `[Tool: search_notes] Vector search unavailable: ${embeddingError.message}`
         )
         console.warn(`[Tool: search_notes] Falling back to title-only search`)
-        // Vector search failed - will continue with title-only search below
+
       }
 
-      // --- Step 2: Keyword Title Search ---
       const titleResults = await dbService.searchNotesByTitle(query)
 
-      // --- Step 3: Merge and De-duplicate Results ---
       const allResults = new Map<string, any>()
 
       console.log(
         `[Tool: search_notes] Found ${vectorResults.length} vector results and ${titleResults.length} title results`
       )
 
-      // Add vector results first, respecting a proper threshold
       if (vectorResults.length > 0) {
         const MIN_SIMILARITY_THRESHOLD = -0.2
         vectorResults.forEach(({ note, score }) => {
@@ -155,22 +134,20 @@ export const searchNotesTool = new DynamicStructuredTool({
         })
       }
 
-      // Add title matches, which might not have been caught by vector search
       titleResults.forEach((note) => {
         if (!allResults.has(note.id)) {
-          allResults.set(note.id, { ...note, similarity: null }) // No similarity score for keyword match
+          allResults.set(note.id, { ...note, similarity: null })
         }
       })
 
-      // Convert map back to an array and format for the agent
       const finalResults = Array.from(allResults.values()).map((note) => {
         return {
           id: note.id,
           title: note.title,
           content: note.contentPlaintext
-            .replace(/\\n/g, "\n") // Convert escaped newlines to actual newlines
-            .replace(/\n{3,}/g, "\n\n") // Replace 3+ consecutive newlines with just 2
-            .replace(/\n\s+\n/g, "\n\n") // Remove whitespace-only lines
+            .replace(/\\n/g, "\n")
+            .replace(/\n{3,}/g, "\n\n")
+            .replace(/\n\s+\n/g, "\n\n")
             .trim(),
           category: note.category,
           similarity: note.similarity
@@ -187,7 +164,7 @@ export const searchNotesTool = new DynamicStructuredTool({
       return JSON.stringify({
         success: true,
         message: `Found ${finalResults.length} relevant note(s).`,
-        notes: finalResults.slice(0, limit) // Ensure we don't exceed the limit
+        notes: finalResults.slice(0, limit)
       })
     } catch (error) {
       console.error("[Tool: search_notes] Error:", error)
@@ -199,10 +176,6 @@ export const searchNotesTool = new DynamicStructuredTool({
   }
 })
 
-/**
- * Get Note Tool
- * Retrieves a specific note by ID
- */
 export const getNoteTool = new DynamicStructuredTool({
   name: "get_note",
   description:
@@ -227,10 +200,10 @@ export const getNoteTool = new DynamicStructuredTool({
           id: note.id,
           title: note.title,
           content: note.contentPlaintext
-            .replace(/\\n/g, "\n") // Convert escaped newlines to actual newlines
-            .replace(/\n{3,}/g, "\n\n") // Replace 3+ consecutive newlines with just 2
-            .replace(/\n\s+\n/g, "\n\n") // Remove whitespace-only lines
-            .trim(), // Remove leading/trailing whitespace
+            .replace(/\\n/g, "\n")
+            .replace(/\n{3,}/g, "\n\n")
+            .replace(/\n\s+\n/g, "\n\n")
+            .trim(),
           category: note.category,
           createdAt: new Date(note.createdAt).toLocaleDateString(),
           updatedAt: new Date(note.updatedAt).toLocaleDateString(),
@@ -247,10 +220,6 @@ export const getNoteTool = new DynamicStructuredTool({
   }
 })
 
-/**
- * Create Note Tool
- * Creates a new note
- */
 export const createNoteTool = new DynamicStructuredTool({
   name: "create_note",
   description:
@@ -259,10 +228,6 @@ export const createNoteTool = new DynamicStructuredTool({
   func: async ({ title, content, category = "general" }) => {
     try {
       console.log(`[Tool: create_note] Creating note: "${title}"`)
-
-      // This tool should be called from background script context where encryption is available
-      // For now, return a message indicating the note would be created
-      // In full implementation, this would call the background script
 
       return JSON.stringify({
         success: true,
@@ -283,10 +248,6 @@ export const createNoteTool = new DynamicStructuredTool({
   }
 })
 
-/**
- * Update Note Tool
- * Updates an existing note
- */
 export const updateNoteTool = new DynamicStructuredTool({
   name: "update_note",
   description:
@@ -296,7 +257,6 @@ export const updateNoteTool = new DynamicStructuredTool({
     try {
       console.log(`[Tool: update_note] Updating note: ${noteId}`)
 
-      // Check if note exists
       const existingNote = await dbService.getNote(noteId)
       if (!existingNote) {
         return JSON.stringify({
@@ -320,10 +280,6 @@ export const updateNoteTool = new DynamicStructuredTool({
   }
 })
 
-/**
- * Delete Note Tool
- * Deletes a note
- */
 export const deleteNoteTool = new DynamicStructuredTool({
   name: "delete_note",
   description:
@@ -333,7 +289,6 @@ export const deleteNoteTool = new DynamicStructuredTool({
     try {
       console.log(`[Tool: delete_note] Deleting note: ${noteId}`)
 
-      // Check if note exists first
       const note = await dbService.getNote(noteId)
       if (!note) {
         return JSON.stringify({
@@ -358,10 +313,6 @@ export const deleteNoteTool = new DynamicStructuredTool({
   }
 })
 
-/**
- * List Categories Tool
- * Lists all unique categories
- */
 export const listCategoriesTool = new DynamicStructuredTool({
   name: "list_categories",
   description:
@@ -387,10 +338,6 @@ export const listCategoriesTool = new DynamicStructuredTool({
   }
 })
 
-/**
- * Get Statistics Tool
- * Retrieves comprehensive statistics about notes and categories
- */
 export const getStatisticsTool = new DynamicStructuredTool({
   name: "get_statistics",
   description:
@@ -402,7 +349,6 @@ export const getStatisticsTool = new DynamicStructuredTool({
 
       const stats = await dbService.getDatabaseStatistics()
 
-      // Format dates for better readability
       const formatDate = (timestamp: number | null) => {
         if (!timestamp) return "N/A"
         return new Date(timestamp).toLocaleDateString("en-US", {
@@ -436,11 +382,6 @@ export const getStatisticsTool = new DynamicStructuredTool({
   }
 })
 
-/**
- * Create Note From Chat Tool
- * Creates a note from conversation with smart parameter handling
- * Handles missing title/category by requesting clarification or auto-generating
- */
 export const createNoteFromChatTool = new DynamicStructuredTool({
   name: "create_note_from_chat",
   description: `Create a note from the current conversation. This is used when the user says things like:
@@ -448,12 +389,12 @@ export const createNoteFromChatTool = new DynamicStructuredTool({
  - "save that as a note"
  - "add this as note under aws category"
  - "add this as note with title Amazon"
- 
+
  The tool intelligently handles missing parameters:
  - If content is missing but this is a confirmation phrase, it should already be extracted from conversation
  - If title is missing, either requests clarification or auto-generates
  - If category is missing, suggests existing categories or auto-generates
- 
+
  Use this tool when the user wants to save information from the chat as a note.`,
   schema: CreateNoteFromChatSchema,
   func: async ({ content, title, category, skipClarification = false }) => {
@@ -463,7 +404,6 @@ export const createNoteFromChatTool = new DynamicStructuredTool({
         { content, title, category, skipClarification }
       )
 
-      // Determine what's missing
       const missingParams = {
         content: !content || content.trim() === "",
         title: !title,
@@ -475,8 +415,6 @@ export const createNoteFromChatTool = new DynamicStructuredTool({
         missingParams
       )
 
-      // If content is missing, we need to signal that we should use conversation history
-      // This will be handled by the agent layer
       if (missingParams.content) {
         console.error(
           "[Tool: create_note_from_chat] Content is missing! This should have been extracted by the agent."
@@ -490,12 +428,11 @@ export const createNoteFromChatTool = new DynamicStructuredTool({
         })
       }
 
-      // If title or category is missing and skipClarification is false, request clarification
       if (
         !skipClarification &&
         (missingParams.title || missingParams.category)
       ) {
-        // Get all existing categories for suggestions
+
         const existingCategories = await dbService.getAllCategories()
 
         return JSON.stringify({
@@ -512,7 +449,7 @@ export const createNoteFromChatTool = new DynamicStructuredTool({
             category: missingParams.category
           },
           existingCategories: existingCategories,
-          noteContent: content, // Pass content so it can be used for generation
+          noteContent: content,
           message:
             missingParams.title && missingParams.category
               ? "I can create this note for you! Would you like me to auto-generate a title and category, or would you prefer to provide them?"
@@ -522,20 +459,15 @@ export const createNoteFromChatTool = new DynamicStructuredTool({
         })
       }
 
-      // If we reach here, either all params are provided or skipClarification is true
-      // In case of skipClarification, the agent should have auto-generated missing values
-
-      // Actually create the note if we have all required params
       if (title && category && content) {
         try {
-          // Generate embedding for the content
+
           const embedding = await aiService.generateEmbedding(content)
 
-          // Create the note via dbService
           const createdNote = await dbService.addNote({
             title: title,
             content: content,
-            contentPlaintext: content, // For chat-created notes, content is already plaintext
+            contentPlaintext: content,
             category: category,
             embedding: embedding
           })
@@ -549,7 +481,7 @@ export const createNoteFromChatTool = new DynamicStructuredTool({
             noteCreated: true,
             message: `I have created a new note titled "${title}" under the category "${category}" containing the following information:\n\n${content}`,
             noteData: {
-              id: createdNote.id, // Only return the ID, not the full note object with embedding
+              id: createdNote.id,
               title: title,
               content: content,
               category: category
@@ -567,7 +499,6 @@ export const createNoteFromChatTool = new DynamicStructuredTool({
         }
       }
 
-      // Fallback: return metadata without creating
       return JSON.stringify({
         success: true,
         message: `Note will be created with title "${title || "Auto-generated"}" under category "${category || "general"}".`,
@@ -587,18 +518,13 @@ export const createNoteFromChatTool = new DynamicStructuredTool({
   }
 })
 
-/**
- * Organize Note Tool
- * Finds semantically similar notes and suggests category reorganization
- * This tool should be called automatically after a note is created
- */
 export const organizeNoteTool = new DynamicStructuredTool({
   name: "organize_note",
   description: `Organize a newly created note by finding semantically similar notes and suggesting better category placement.
- 
+
  This tool analyzes the note's title and content to find related notes in the database.
  If related notes are found in a different category, it suggests reorganizing the note.
- 
+
  Call this tool automatically after creating a note to help maintain organized categories.`,
   schema: OrganizeNoteSchema,
   func: async ({ noteId, suggestedCategory }) => {
@@ -607,7 +533,6 @@ export const organizeNoteTool = new DynamicStructuredTool({
         `[Tool: organize_note] Organizing note: ${noteId}, suggested: ${suggestedCategory}`
       )
 
-      // Get the note that was just created
       const note = await dbService.getNote(noteId)
       if (!note) {
         return JSON.stringify({
@@ -620,19 +545,17 @@ export const organizeNoteTool = new DynamicStructuredTool({
         `[Tool: organize_note] Found note: "${note.title}" in category "${note.category}"`
       )
 
-      // Search for semantically similar notes based on title and content
       const searchQuery = `${note.title} ${note.contentPlaintext}`.substring(
         0,
         500
-      ) // Limit search query length
+      )
       const embedding = await aiService.generateEmbedding(searchQuery)
-      const similarNotes = await dbService.searchNotesByVector(embedding, 10) // Get top 10 similar notes
+      const similarNotes = await dbService.searchNotesByVector(embedding, 10)
 
       console.log(
         `[Tool: organize_note] Found ${similarNotes.length} similar notes`
       )
 
-      // Filter out the note itself and group by category
       const otherNotes = similarNotes.filter(
         (result) => result.note.id !== noteId
       )
@@ -654,10 +577,8 @@ export const organizeNoteTool = new DynamicStructuredTool({
         Array.from(categoryGroups.keys())
       )
 
-      // Remove the current note's category from suggestions
       categoryGroups.delete(note.category)
 
-      // If no similar notes in other categories, no reorganization needed
       if (categoryGroups.size === 0) {
         console.log(
           `[Tool: organize_note] No similar notes found in other categories`
@@ -669,7 +590,6 @@ export const organizeNoteTool = new DynamicStructuredTool({
         })
       }
 
-      // Find the category with the most similar notes
       let bestCategory = ""
       let maxCount = 0
       let relatedNotesInBestCategory: Array<{ note: Note; score: number }> = []
@@ -686,7 +606,6 @@ export const organizeNoteTool = new DynamicStructuredTool({
         `[Tool: organize_note] Best matching category: "${bestCategory}" with ${maxCount} notes`
       )
 
-      // Prepare suggestion for user
       const relatedTitles = relatedNotesInBestCategory
         .slice(0, 3)
         .map((result) => `• ${result.note.title}`)
@@ -712,14 +631,10 @@ export const organizeNoteTool = new DynamicStructuredTool({
   }
 })
 
-/**
- * Confirm Organize Note Tool
- * Executes the category reorganization after user confirmation
- */
 export const confirmOrganizeNoteTool = new DynamicStructuredTool({
   name: "confirm_organize_note",
   description: `Confirm and execute the note reorganization based on user's response.
- 
+
  Call this tool after the user has responded to the organization suggestion from organize_note tool.
  If user confirms (says yes/sure/ok), move the note to the suggested category.
  If user declines (says no/not now), keep the note in its current category.`,
@@ -749,7 +664,6 @@ export const confirmOrganizeNoteTool = new DynamicStructuredTool({
         })
       }
 
-      // User confirmed - update the note's category
       console.log(
         `[Tool: confirm_organize_note] Moving note from "${note.category}" to "${targetCategory}"`
       )
@@ -789,13 +703,6 @@ export const confirmOrganizeNoteTool = new DynamicStructuredTool({
   }
 })
 
-// ============================================================================
-// TOOL COLLECTION
-// ============================================================================
-
-/**
- * All available tools for the agent
- */
 export const allTools = [
   searchNotesTool,
   getNoteTool,
@@ -809,9 +716,6 @@ export const allTools = [
   confirmOrganizeNoteTool
 ]
 
-/**
- * Read-only tools (safe for any context)
- */
 export const readOnlyTools = [
   searchNotesTool,
   getNoteTool,
@@ -819,9 +723,6 @@ export const readOnlyTools = [
   getStatisticsTool
 ]
 
-/**
- * Get tools by names
- */
 export function getToolsByNames(names: string[]) {
   return allTools.filter((tool) => names.includes(tool.name))
 }

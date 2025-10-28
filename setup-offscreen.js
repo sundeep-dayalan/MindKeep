@@ -1,31 +1,19 @@
-/**
- * Post-build script to set up the offscreen document
- *
- * This script:
- * 1. Checks if Plasmo built an offscreen bundle
- * 2. If not, copies the background bundle (which includes offscreen code)
- * 3. Creates the offscreen.html file with proper CSP
- *
- * Supports both dev and prod builds
- */
+
 
 const fs = require("fs")
 const path = require("path")
 
-// Detect if we're in dev or prod mode
-const buildMode = process.argv[2] || "prod" // Can be 'dev' or 'prod'
+const buildMode = process.argv[2] || "prod"
 const BUILD_DIR = path.join(__dirname, "build", `chrome-mv3-${buildMode}`)
 const OFFSCREEN_DIR = path.join(BUILD_DIR, "offscreen")
 
 console.log(`📦 Setting up offscreen document for ${buildMode} build...`)
 
-// Create offscreen directory
 if (!fs.existsSync(OFFSCREEN_DIR)) {
   fs.mkdirSync(OFFSCREEN_DIR, { recursive: true })
   console.log("✅ Created offscreen directory")
 }
 
-// Look for a dedicated offscreen build or fall back to background bundle
 const offscreenBuildPath = path.join(
   BUILD_DIR,
   "static",
@@ -57,7 +45,6 @@ const offscreenJsPath = path.join(OFFSCREEN_DIR, "offscreen.js")
 fs.copyFileSync(sourcePath, offscreenJsPath)
 console.log("✅ Copied bundle to offscreen/offscreen.js")
 
-// Create offscreen.html with proper CSP for WASM
 const offscreenHtml = `<!DOCTYPE html>
 <html>
   <head>

@@ -35,31 +35,24 @@ function SidePanel() {
   const [loading, setLoading] = useState(false)
   const [aiStatus, setAiStatus] = useState<HealthCheckStatus[]>([])
 
-  // Editor state
   const [editingNote, setEditingNote] = useState<Note | null>(null)
   const [noteTitle, setNoteTitle] = useState("")
   const [noteContent, setNoteContent] = useState("")
   const [noteCategory, setNoteCategory] = useState("general")
 
-  // Add a ref to track the editor so we can update it when messages arrive
   const editorRef = useRef<RichTextEditorRef | null>(null)
 
-  // Load notes and categories
   useEffect(() => {
     loadData()
 
-    // Check AI availability on mount
     checkAllAIServices().then(setAiStatus)
 
-    // Initialize default personas on first load
     initializeDefaultPersonas().catch((error) => {
       console.error("Failed to initialize default personas:", error)
     })
 
-    // Notify background that side panel is open
     chrome.runtime.sendMessage({ type: "SIDE_PANEL_OPENED" })
 
-    // Listen for close message from background
     const handleMessage = (
       message: any,
       sender: chrome.runtime.MessageSender
@@ -67,28 +60,26 @@ function SidePanel() {
       if (message.type === "CLOSE_SIDE_PANEL") {
         window.close()
       } else if (message.type === "FILL_EDITOR") {
-        // Handle context menu "Save to MindKeep"
+
         const content = message.data.content || ""
         const isHtml = message.data.isHtml || false
 
-        // Reset editor state
         setNoteTitle("")
         setNoteCategory("general")
         setEditingNote(null)
         setView("editor")
 
-        // Set content appropriately based on type
         if (isHtml) {
-          // For HTML content, set it and let the editor render
+
           setNoteContent(content)
-          // If editor is already mounted, update it directly
+
           setTimeout(() => {
             if (editorRef.current) {
               editorRef.current.setContent(content)
             }
           }, 100)
         } else {
-          // For plain text, just set the state
+
           setNoteContent(content)
         }
       }
@@ -116,7 +107,6 @@ function SidePanel() {
     setLoading(false)
   }
 
-  // Clear search and reload
   const clearSearchQuery = () => {
     setSearchQuery("")
     loadData()
@@ -147,18 +137,16 @@ function SidePanel() {
     const contentPlaintext = editorRef?.getText() || ""
     const contentJSON = editorRef?.getJSON()
 
-    // Check if content exists
     if (!contentPlaintext.trim()) {
       alert("Content is required")
       return
     }
 
-    // Use the passed category if provided, otherwise use the state category
     const categoryToSave = finalCategory || noteCategory
 
     setLoading(true)
     try {
-      // Auto-generate title if not provided
+
       let finalTitle = noteTitle.trim()
       if (!finalTitle) {
         console.log(
@@ -172,25 +160,22 @@ function SidePanel() {
             ` [Auto Title] Generated: "${finalTitle}" in ${(performance.now() - titleGenerationStart).toFixed(2)}ms`
           )
 
-          // Update the UI to show the generated title
           setNoteTitle(finalTitle)
         } catch (error) {
           console.error(" [Auto Title] Generation failed:", error)
-          // Fallback to a default title
+
           finalTitle = "Untitled Note"
           setNoteTitle(finalTitle)
         }
       }
 
-      // Convert TipTap JSON to string for storage
       const contentJSONString = JSON.stringify(contentJSON)
 
       if (editingNote) {
-        // For updates, generate embedding here (in DOM context with full Web APIs)
+
         const updateStartTime = performance.now()
         console.log(" [UI Update] Updating existing note:", editingNote.id)
 
-        // Generate new embedding for updated content (from plaintext)
         const embeddingStartTime = performance.now()
         const embedding = await generateEmbedding(contentPlaintext)
         const embeddingTime = performance.now() - embeddingStartTime
@@ -198,7 +183,6 @@ function SidePanel() {
           `⏱ [UI Update] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embedding.length} dimensions)`
         )
 
-        // Send update request to background script with pre-generated embedding
         const messageStartTime = performance.now()
         const response = await chrome.runtime.sendMessage({
           type: "UPDATE_NOTE",
@@ -228,11 +212,10 @@ function SidePanel() {
           ` [UI Update] Breakdown: Embedding=${embeddingTime.toFixed(2)}ms, Background=${messageTime.toFixed(2)}ms`
         )
       } else {
-        // For new notes, generate embedding here (in DOM context with full Web APIs)
+
         const saveStartTime = performance.now()
         console.log(" [UI Save] Creating new note...")
 
-        // Step 1: Generate embedding from plaintext content
         const embeddingStartTime = performance.now()
         const embedding = await generateEmbedding(contentPlaintext)
         const embeddingTime = performance.now() - embeddingStartTime
@@ -240,7 +223,6 @@ function SidePanel() {
           `⏱ [UI Save] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embedding.length} dimensions)`
         )
 
-        // Get current tab URL for sourceUrl
         let sourceUrl: string | undefined
         try {
           const tabs = await chrome.tabs.query({
@@ -252,7 +234,6 @@ function SidePanel() {
           console.warn("Could not get tab URL:", e)
         }
 
-        // Step 2: Send to background script with pre-generated embedding
         const messageStartTime = performance.now()
         const saveId = `save_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
         console.log(
@@ -327,9 +308,9 @@ function SidePanel() {
     console.log(" [SidePanel] Persona activated:", persona?.name || "None")
 
     try {
-      // Update the global agent with the new persona
+
       const agent = await getGlobalAgent()
-      await agent.setPersona(persona) // Now async - recreates session
+      await agent.setPersona(persona)
 
       console.log(" [SidePanel] Global agent updated with persona")
     } catch (error) {
@@ -357,12 +338,10 @@ function SidePanel() {
     }
   }
 
-  // Handle search input change with auto-search
   const handleSearchInput = (value: string) => {
     console.log(" [Search] Query changed to:", value)
     setSearchQuery(value)
-    // Note: Filtering is done via filteredNotes, no need for async search here
-    // Just update the query and let React handle the filtering
+
   }
 
   const handleAISearch = async (
@@ -375,10 +354,8 @@ function SidePanel() {
     try {
       console.log(" [LangChain Agent] Processing query:", query)
 
-      // Use the LangChain agent for agentic search (already imported at top)
       const agent = await getGlobalAgent()
 
-      // Use streaming if callback is provided
       if (onStreamChunk) {
         console.log(" [LangChain Agent] Using streaming mode")
 
@@ -386,10 +363,10 @@ function SidePanel() {
 
         for await (const event of agent.runStream(query, conversationHistory)) {
           if (event.type === "chunk") {
-            // Stream text chunks to UI
+
             onStreamChunk(event.data as string)
           } else if (event.type === "complete") {
-            // Store final response
+
             finalResponse = event.data as import("~services/langchain-agent").AgentResponse
           }
         }
@@ -401,15 +378,12 @@ function SidePanel() {
         return finalResponse || { aiResponse: "", extractedData: null, referenceNotes: [] }
       }
 
-      // Fallback to non-streaming mode
       const response = await agent.run(query, conversationHistory)
 
       const totalTime = performance.now() - startTime
       console.log(` [LangChain Agent] TOTAL time: ${totalTime.toFixed(2)}ms`)
       console.log(` [LangChain Agent] Structured response:`, response)
 
-      // Return the full response object for clarification support
-      // AISearchBar will handle it appropriately
       return response
     } catch (error) {
       const totalTime = performance.now() - startTime
@@ -421,8 +395,6 @@ function SidePanel() {
     }
   }
 
-  // Filter notes by search query only
-  // Category filtering is handled by AnimatedCategoryTabs component
   const filteredNotes = notes.filter((note) => {
     const matchesSearch =
       searchQuery === "" ||
@@ -431,7 +403,6 @@ function SidePanel() {
     return matchesSearch
   })
 
-  // Debug logging for search
   if (searchQuery) {
     console.log(
       ` [Search] Query: "${searchQuery}", Total notes: ${notes.length}, Filtered: ${filteredNotes.length}`
@@ -441,7 +412,7 @@ function SidePanel() {
   return (
     <div className="plasmo-w-full plasmo-h-screen plasmo-bg-slate-50 plasmo-overflow-hidden">
       <div className="plasmo-h-full plasmo-flex plasmo-flex-col">
-        {/* Header */}
+        {}
         <Header
           onClose={handleClose}
           onPersonasClick={handlePersonasClick}
@@ -452,7 +423,7 @@ function SidePanel() {
           onSearchClear={clearSearchQuery}
         />
 
-        {/* Content */}
+        {}
         <div className="plasmo-flex-1 plasmo-flex plasmo-flex-col plasmo-overflow-hidden">
           {view === "personas" ? (
             <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-no-visible-scrollbar">
@@ -463,13 +434,13 @@ function SidePanel() {
             </div>
           ) : view === "list" ? (
             <div className="plasmo-flex-1 plasmo-flex plasmo-flex-col plasmo-overflow-hidden plasmo-relative">
-              {/* Sticky Top Section - AI Banner only */}
+              {}
               <div className="plasmo-flex-shrink-0">
-                {/* AI Status Banner */}
+                {}
                 <AIStatusBanner />
               </div>
 
-              {/* Notes Section - Full height scrollable area */}
+              {}
               <div className="plasmo-flex-1 plasmo-min-h-0">
                 <AnimatedCategoryTabs
                   categories={categories}
@@ -486,7 +457,7 @@ function SidePanel() {
               </div>
             </div>
           ) : (
-            /* Editor View */
+
             <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-no-visible-scrollbar plasmo-p-4 plasmo-pb-8">
               <NoteEditor
                 title={noteTitle}
@@ -504,7 +475,7 @@ function SidePanel() {
             </div>
           )}
 
-          {/* Fixed Bottom Search Bar - hide in personas view, editor view, and when AI is not available */}
+          {}
           {view !== "personas" &&
             view !== "editor" &&
             aiStatus.length > 0 &&

@@ -1,13 +1,4 @@
-/**
- * AI Service for MindKeep
- * Handles embeddings generation
- * Uses @xenova/transformers for embeddings
- *
- * CRITICAL: This service only generates embeddings.
- * It does NOT handle encryption - that is done by crypto.ts
- * It does NOT handle storage - that is done by db-service.ts
- * Google Nano AI operations (Summarizer, Rewriter) are handled by nano-service.ts
- */
+
 
 import type { FeatureExtractionPipeline } from "@xenova/transformers"
 import { env, pipeline } from "@xenova/transformers"
@@ -18,28 +9,18 @@ import type { ScoredCategory } from "~types/response"
 import * as NanoService from "./gemini-nano-service"
 import { executePrompt, type PromptOptions } from "./gemini-nano-service"
 
-// Configure transformers.js for Chrome extension environment
 env.allowLocalModels = false
 env.useBrowserCache = true
 
-// CRITICAL: Service workers don't support blob URLs
-// We need to use remote models only
 env.backends.onnx.wasm.proxy = false
 
-// Embedding model
 const EMBEDDING_MODEL = "Xenova/all-MiniLM-L6-v2"
 
-/**
- * EmbeddingPipeline class - Singleton for generating embeddings
- */
 export class EmbeddingPipeline {
   static task = "feature-extraction" as const
   static model = EMBEDDING_MODEL
   static instance: FeatureExtractionPipeline | null = null
 
-  /**
-   * Get or create the embedding pipeline instance
-   */
   static async getInstance(): Promise<FeatureExtractionPipeline> {
     if (this.instance === null) {
       console.log("Initializing embedding pipeline...")
@@ -52,15 +33,6 @@ export class EmbeddingPipeline {
     return this.instance
   }
 
-  /**
-   * Generate embedding for plaintext content
-   *
-   * IMPORTANT: This function expects PLAINTEXT input.
-   * It should be called BEFORE encryption in the pipeline.
-   *
-   * @param text - The plaintext content to generate embedding for
-   * @returns An array of numbers representing the embedding vector
-   */
   static async generateEmbedding(text: string): Promise<number[]> {
     const startTime = performance.now()
     try {
@@ -71,7 +43,6 @@ export class EmbeddingPipeline {
         `⏱ [Embedding] Pipeline initialization: ${pipelineTime.toFixed(2)}ms`
       )
 
-      // Generate embedding from plaintext
       const embeddingStartTime = performance.now()
       const output = await pipeline(text, {
         pooling: "mean",
@@ -82,7 +53,6 @@ export class EmbeddingPipeline {
         `⏱ [Embedding] Generation time: ${embeddingTime.toFixed(2)}ms`
       )
 
-      // Convert tensor to array
       const conversionStartTime = performance.now()
       const embedding = Array.from(output.data) as number[]
       const conversionTime = performance.now() - conversionStartTime
@@ -107,29 +77,15 @@ export class EmbeddingPipeline {
   }
 }
 
-/**
- * Generate embedding for a plaintext string
- * This is the primary function used by the background script.
- *
- * Pipeline position: Step 2 (after data reception, before encryption)
- *
- * @param text - The plaintext content to generate embedding for
- * @returns A promise that resolves to the embedding vector
- */
 export async function generateEmbedding(text: string): Promise<number[]> {
   return EmbeddingPipeline.generateEmbedding(text)
 }
 
-/**
- * Batch generate embeddings for multiple texts
- * Useful for initial setup or bulk operations
- */
-// A more performant version
 export async function generateBatchEmbeddings(
   texts: string[]
 ): Promise<number[][]> {
   try {
-    // Use Promise.all to run all embedding tasks concurrently
+
     const embeddingPromises = texts.map((text) => generateEmbedding(text))
     const embeddings = await Promise.all(embeddingPromises)
     return embeddings
@@ -139,7 +95,6 @@ export async function generateBatchEmbeddings(
   }
 }
 
-// Re-export types and functions from nano-service for convenience
 export {
   checkAllNanoServices as checkAllAIServices,
   checkRewriterAvailability,
@@ -147,14 +102,6 @@ export {
 } from "./gemini-nano-service"
 export type { HealthCheckStatus } from "./gemini-nano-service"
 
-/**
- * Summarizes text using the experimental Summarizer API.
- * This is a convenience wrapper around nano-service.summarizeText
- * with default context and smart content optimization.
- *
- * @param textToSummarize The text content to summarize.
- * @returns A promise that resolves to the summary string.
- */
 export async function summarizeText(textToSummarize: string): Promise<string> {
   const defaultContext = `You are a summarizer for a notes app. Create concise, clear summaries. Fix spelling mistakes. Use bullet points for readability if needed.
 Rules:
@@ -165,24 +112,13 @@ Rules:
 - Do not use phrases like "This text is about" or "The summary is".
 - Provide only the summary directly.`
 
-  // OPTIMIZATION: For large notes (200KB+), apply smart truncation to fit token budget
-  // Summarizer API has similar token limits. We allocate ~3428 tokens (12000 chars)
-  // This preserves enough context for meaningful summaries while staying under quota
   const optimizedText = optimizeContentForAI(textToSummarize, 12000)
 
   return NanoService.summarizeText(optimizedText, {
     context: defaultContext
   })
 }
-/**
- * Rewrites text using the experimental Rewriter API.
- * This is a convenience wrapper around nano-service.rewriteText
- * with default context for title rewriting.
- *
- * @param textToRewrite The text content to rewrite.
- * @param sharedContext Additional context to help the rewriter.
- * @returns A promise that resolves to the rewritten string.
- */
+
 export async function rewriteText(
   textToRewrite: string,
   sharedContext: string
@@ -201,15 +137,6 @@ Rules:
   })
 }
 
-/**
- * Optimizes large content for title/category generation by applying smart truncation.
- * Uses a "sandwich" approach: keeps beginning and end of content, which usually contains
- * the most relevant information for title/category generation.
- *
- * @param content The full content to optimize
- * @param maxChars Maximum characters to keep (default: 1500 for ~428 tokens)
- * @returns Optimized content string
- */
 function optimizeContentForAI(
   content: string,
   maxChars: number = 1500
@@ -218,9 +145,6 @@ function optimizeContentForAI(
     return content
   }
 
-  // For title/category generation, we use a "sandwich" approach:
-  // - First 60% of maxChars from beginning (usually contains main topic/intro)
-  // - Last 40% of maxChars from end (often contains summary or key points)
   const beginningChars = Math.floor(maxChars * 0.6)
   const endingChars = Math.floor(maxChars * 0.4)
 
@@ -236,10 +160,6 @@ function optimizeContentForAI(
   return optimized
 }
 
-/**
- * Generate a title from content using chrome.ai API (Gemini Nano)
- * Creates a short, descriptive title based on the content
- */
 export async function generateTitle(
   titleContent: string,
   noteContent: string
@@ -248,16 +168,13 @@ export async function generateTitle(
   console.log(` [Generate Title] Starting title generation...`)
 
   try {
-    // If title is empty, generate from content; otherwise improve the existing title
+
     const textToProcess = titleContent.trim() || noteContent.trim()
 
     if (!textToProcess) {
       throw new Error("No content available to generate title from")
     }
 
-    // OPTIMIZATION: For large notes (200KB+), truncate intelligently to fit token budget
-    // Gemini Nano has ~4000 token limit. We allocate ~428 tokens (1500 chars) for content
-    // to leave room for system prompts, response schema, and other overhead
     const optimizedContent = optimizeContentForAI(textToProcess, 1500)
 
     const titleResponseSchema = {
@@ -265,7 +182,7 @@ export async function generateTitle(
       properties: {
         generatedTitle: { type: "string", description: "The generated title." }
       },
-      required: ["generatedTitle"] // Only the generatedTitle is strictly required
+      required: ["generatedTitle"]
     }
 
     const controller = new AbortController()
@@ -286,24 +203,22 @@ export async function generateTitle(
  `
 
     const options: PromptOptions = {
-      // Session creation options
+
       initialPrompts: initialPrompts,
-      temperature: 0.5, // Lower temperature for more predictable, less creative output
-      topK: 1, // Constrain the model to the most likely token
+      temperature: 0.5,
+      topK: 1,
       onDownloadProgress: ({ loaded, total }) => {
         console.log(`Model downloading: ${Math.round((loaded / total) * 100)}%`)
       },
 
-      // Execution options
-      signal: signal, // Pass the AbortSignal
-      responseConstraint: titleResponseSchema, // Enforce the JSON schema
-      omitResponseConstraintInput: false // Tell the model it will be constrained
+      signal: signal,
+      responseConstraint: titleResponseSchema,
+      omitResponseConstraintInput: false
     }
 
     console.log("Executing prompt to extract title...")
     const jsonResponse = await executePrompt(mainPrompt, options)
 
-    // The response will be a JSON string, so you need to parse it
     const titleData = JSON.parse(jsonResponse)
 
     console.log(" Successfully extracted title data:")
@@ -319,15 +234,11 @@ export async function generateTitle(
       ` [Generate Title] Could not generate title after ${totalTime.toFixed(2)}ms, falling back to original.`,
       error
     )
-    // Fallback: return the original title if it exists, otherwise return a truncated version of content
+
     return titleContent.trim() || "Untitled Note"
   }
 }
 
-/**
- * Generate a category from content using chrome.ai API (Gemini Nano)
- * Creates a short, descriptive category based on the content
- */
 export async function generateCategory(noteContent: string): Promise<string> {
   const startTime = performance.now()
   console.log(` [Generate Category] Starting category generation...`)
@@ -337,8 +248,6 @@ export async function generateCategory(noteContent: string): Promise<string> {
       throw new Error("No content available to generate category from")
     }
 
-    // OPTIMIZATION: For large notes, use smart truncation instead of simple substring
-    // Allocate ~857 tokens (3000 chars) for category generation
     const optimizedContent = optimizeContentForAI(noteContent, 3000)
 
     const categoryResponseSchema = {
@@ -379,7 +288,7 @@ Return a JSON object with the category name.`
 
     const options: PromptOptions = {
       initialPrompts: initialPrompts,
-      temperature: 0.3, // Low temperature for consistent categorization
+      temperature: 0.3,
       topK: 1,
       signal: signal,
       responseConstraint: categoryResponseSchema,
@@ -408,12 +317,6 @@ Return a JSON object with the category name.`
   }
 }
 
-/**
- * Calculate cosine similarity between two embedding vectors
- * @param vecA First embedding vector
- * @param vecB Second embedding vector
- * @returns Similarity score between 0 and 1 (1 = identical, 0 = completely different)
- */
 function cosineSimilarity(vecA: number[], vecB: number[]): number {
   if (vecA.length !== vecB.length) {
     throw new Error("Vectors must have the same length")
@@ -435,15 +338,6 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
   return dotProduct / magnitude
 }
 
-/**
- * Generates a list of relevant categories for a note using embeddings and cosine similarity.
- * This is MUCH faster than using the Prompt API (~100-500ms vs 2-5 seconds).
- *
- * @param titleContent The title of the note.
- * @param noteContent The body content of the note.
- * @param availableCategories An array of existing categories to choose from.
- * @returns A promise that resolves to an array of ScoredCategory objects.
- */
 export async function getRelevantCategories(
   titleContent: string,
   noteContent: string,
@@ -455,20 +349,17 @@ export async function getRelevantCategories(
   try {
     const textToProcess = `${titleContent.trim()} ${noteContent.trim()}`
 
-    // Exit early if there is no content to analyze or no categories to match against
     if (!textToProcess.trim() || availableCategories.length === 0) {
       console.log("No content or categories available for analysis.")
       return []
     }
 
-    // Step 1: Generate embedding for the note content
     const noteEmbeddingStart = performance.now()
     const noteEmbedding = await generateEmbedding(textToProcess)
     console.log(
       `⏱ [Get Categories] Note embedding: ${(performance.now() - noteEmbeddingStart).toFixed(2)}ms`
     )
 
-    // Step 2: Generate embeddings for all categories in parallel
     const categoryEmbeddingsStart = performance.now()
     const categoryEmbeddings =
       await generateBatchEmbeddings(availableCategories)
@@ -476,7 +367,6 @@ export async function getRelevantCategories(
       `⏱ [Get Categories] Category embeddings (${availableCategories.length}): ${(performance.now() - categoryEmbeddingsStart).toFixed(2)}ms`
     )
 
-    // Step 3: Calculate cosine similarity between note and each category
     const similarityStart = performance.now()
     const scoredCategories: ScoredCategory[] = availableCategories.map(
       (category, index) => {
@@ -494,7 +384,6 @@ export async function getRelevantCategories(
       `⏱ [Get Categories] Similarity calculation: ${(performance.now() - similarityStart).toFixed(2)}ms`
     )
 
-    // Step 4: Sort by relevance score (highest first)
     const sortedCategories = scoredCategories.sort(
       (a, b) => b.relevanceScore - a.relevanceScore
     )
@@ -515,7 +404,7 @@ export async function getRelevantCategories(
       ` [Get Categories] Could not generate categories after ${totalTime.toFixed(2)}ms.`,
       error
     )
-    // Fallback: return an empty array on error
+
     return []
   }
 }

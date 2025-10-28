@@ -1,18 +1,4 @@
-/**
- * CategorySuggestions Component
- *
- * Displays AI-suggested relevant categories as clickable chips
- * to help users quickly assign categories to notes.
- *
- * Usage:
- * <CategorySuggestions
- * noteTitle="My AI Research"
- * noteContent="Notes about Gemini Nano..."
- * availableCategories={["AI", "Research", "Work"]}
- * onCategorySelect={(category) => handleSelectCategory(category)}
- * excludeCategories={["AI"]} // Optional: categories already assigned
- * />
- */
+
 
 import { useEffect, useRef, useState } from "react"
 
@@ -20,21 +6,21 @@ import { getRelevantCategories } from "~services/ai-service"
 import type { ScoredCategory } from "~types/response"
 
 interface CategorySuggestionsProps {
-  /** The title of the note to analyze */
+
   noteTitle: string
-  /** The content of the note to analyze */
+
   noteContent: string
-  /** List of all available categories to suggest from */
+
   availableCategories: string[]
-  /** Callback when user clicks a suggested category */
+
   onCategorySelect: (category: string) => void
-  /** Optional: categories already assigned (will be excluded from suggestions) */
+
   excludeCategories?: string[]
-  /** Optional: minimum relevance score to display (0.0 - 1.0, default: 0) */
+
   minRelevanceScore?: number
-  /** Optional: maximum number of suggestions to show (default: 3) */
+
   maxSuggestions?: number
-  /** Optional: custom class name for styling */
+
   className?: string
 }
 
@@ -52,13 +38,11 @@ export function CategorySuggestions({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Use refs to hold the latest values without causing re-renders
   const availableCategoriesRef = useRef(availableCategories)
   const excludeCategoriesRef = useRef(excludeCategories)
   const minRelevanceScoreRef = useRef(minRelevanceScore)
   const maxSuggestionsRef = useRef(maxSuggestions)
 
-  // Update refs when props change
   useEffect(() => {
     availableCategoriesRef.current = availableCategories
   }, [availableCategories])
@@ -79,13 +63,12 @@ export function CategorySuggestions({
     let isMounted = true
 
     const fetchSuggestions = async () => {
-      // Don't fetch if there's no content to analyze
+
       if (!noteTitle.trim() && !noteContent.trim()) {
         setSuggestions([])
         return
       }
 
-      // Don't fetch if there are no available categories
       if (availableCategoriesRef.current.length === 0) {
         setSuggestions([])
         return
@@ -103,13 +86,11 @@ export function CategorySuggestions({
 
         if (!isMounted) return
 
-        // Filter out already assigned categories and low-scoring suggestions
-        // Remove duplicates by creating a Map with category as key
         const uniqueCategories = new Map<string, ScoredCategory>()
 
         results.forEach((item) => {
           const categoryLower = item.category.toLowerCase()
-          // Only keep the highest scoring version of each category
+
           if (
             !excludeCategoriesRef.current
               .map((c) => c.toLowerCase())
@@ -141,7 +122,6 @@ export function CategorySuggestions({
       }
     }
 
-    // Debounce the fetch to avoid too many calls while typing
     const timeoutId = setTimeout(fetchSuggestions, 500)
 
     return () => {
@@ -151,19 +131,17 @@ export function CategorySuggestions({
   }, [
     noteTitle,
     noteContent
-    // ONLY noteTitle and noteContent trigger re-fetch
-    // Other props are accessed via refs to avoid unnecessary re-renders
+
   ])
 
   const handleCategoryClick = (category: string) => {
-    // Hide the clicked suggestion immediately
+
     setSuggestions((prevSuggestions) =>
       prevSuggestions.filter((item) => item.category !== category)
     )
     onCategorySelect(category)
   }
 
-  // Don't render anything if there are no suggestions
   if (!isLoading && suggestions.length === 0 && !error) {
     return null
   }

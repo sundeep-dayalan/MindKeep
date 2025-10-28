@@ -32,7 +32,6 @@ export const Tabs = ({
   const [canScrollRight, setCanScrollRight] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
-  // Create a map of tab values to their counts for quick lookup
   const tabCountMap = useMemo(() => {
     const map = new Map<string, number>()
     propTabs.forEach((tab) => {
@@ -43,11 +42,9 @@ export const Tabs = ({
     return map
   }, [propTabs])
 
-  // Update tabs when propTabs structure changes (add/remove tabs)
-  // but preserve the order and just update counts
   useEffect(() => {
     setTabs((prevTabs) => {
-      // If tab structure changed (different values), reset completely
+
       const prevValues = prevTabs
         .map((t) => t.value)
         .sort()
@@ -62,7 +59,6 @@ export const Tabs = ({
         return propTabs
       }
 
-      // Otherwise, update counts AND content while preserving order
       return prevTabs.map((tab) => {
         const matchingPropTab = propTabs.find((pt) => pt.value === tab.value)
         return matchingPropTab
@@ -77,21 +73,18 @@ export const Tabs = ({
   }, [propTabs])
 
   const moveSelectedTabToTop = (idx: number) => {
-    // Get the selected tab from propTabs with its current count
+
     const selectedTab = propTabs[idx]
 
-    // Create new tabs array with selected tab first, preserving all counts
     const newTabs = [selectedTab, ...propTabs.filter((_, i) => i !== idx)]
 
     setTabs(newTabs)
     setActive(selectedTab)
 
-    // Notify parent of tab change
     if (onTabChange && selectedTab) {
       onTabChange(selectedTab.value)
     }
 
-    // Scroll the container to the start to show the newly selected tab
     setTimeout(() => {
       const container = scrollContainerRef.current
       if (container) {
@@ -139,10 +132,10 @@ export const Tabs = ({
 
   return (
     <>
-      {/* Overlay Tabs Header */}
+      {}
       <div className="plasmo-absolute plasmo-top-0 plasmo-left-0 plasmo-right-0 plasmo-z-10 plasmo-px-4 plasmo-pt-1">
         <div className="plasmo-relative plasmo-w-full">
-          {/* Left Gradient & Arrow */}
+          {}
           {canScrollLeft && (
             <div className="plasmo-absolute plasmo-left-0 plasmo-top-0 plasmo-bottom-0 plasmo-w-20 plasmo-z-10 plasmo-flex plasmo-items-center plasmo-pointer-events-none">
               <div className="plasmo-absolute plasmo-inset-0 plasmo-bg-gradient-to-r plasmo-from-slate-50 plasmo-via-slate-50/50 plasmo-to-transparent" />
@@ -165,7 +158,7 @@ export const Tabs = ({
             </div>
           )}
 
-          {/* Right Gradient & Arrow */}
+          {}
           {canScrollRight && (
             <div className="plasmo-absolute plasmo-right-0 plasmo-top-0 plasmo-bottom-0 plasmo-w-20 plasmo-z-10 plasmo-flex plasmo-items-center plasmo-justify-end plasmo-pointer-events-none">
               <div className="plasmo-absolute plasmo-inset-0 plasmo-bg-gradient-to-l plasmo-from-slate-50 plasmo-via-slate-50/50 plasmo-to-transparent" />
@@ -188,7 +181,7 @@ export const Tabs = ({
             </div>
           )}
 
-          {/* Tabs Container */}
+          {}
           <div
             ref={scrollContainerRef}
             className={`plasmo-flex plasmo-flex-row plasmo-items-center plasmo-justify-start [perspective:1000px] plasmo-relative plasmo-overflow-x-auto plasmo-overflow-y-hidden plasmo-no-visible-scrollbar plasmo-max-w-full plasmo-w-full plasmo-gap-1 plasmo-p-1 plasmo-bg-transparent plasmo-backdrop-blur-xl plasmo-border-b plasmo-border-white/20 plasmo-shadow-md plasmo-rounded-full ${containerClassName || ""}`}>
@@ -196,7 +189,7 @@ export const Tabs = ({
               <button
                 key={tab.value}
                 onClick={() => {
-                  // Find the index in propTabs
+
                   const propTabIndex = propTabs.findIndex(
                     (t) => t.value === tab.value
                   )

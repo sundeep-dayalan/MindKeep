@@ -1,33 +1,13 @@
-/**
- * Offscreen Document Script for MindKeep
- *
- * This script runs in an offscreen document context which provides:
- * 1. Access to the extension's IndexedDB (shared with side panel)
- * 2. Ability to respond to messages from content scripts
- * 3. Long-lived context for database operations
- * 4. Full DOM environment for WASM/Worker operations (transformers.js)
- *
- * Purpose: Bridge the gap between content scripts (which have isolated IndexedDB)
- * and the extension's shared IndexedDB containing all notes.
- */
-
 import * as dbService from "~services/db-service"
 
 console.log("🟢 [Offscreen] Offscreen document initialized")
 
-/**
- * Message handler for database operations
- * Routes requests from content scripts to the appropriate db-service functions
- */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log("📨 [Offscreen] Received message:", message.type)
 
-  // All async operations need to return true to keep the message channel open
   const handleAsync = async () => {
     try {
       switch (message.type) {
-        // ==================== SEARCH OPERATIONS ====================
-
         case "DB_SEARCH_BY_VECTOR": {
           const { vector, limit } = message.payload
           console.log(`🔍 [Offscreen] Searching by vector (limit: ${limit})`)
@@ -45,8 +25,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ success: true, data: results })
           break
         }
-
-        // ==================== NOTE OPERATIONS ====================
 
         case "DB_GET_NOTE": {
           const { id } = message.payload
@@ -89,16 +67,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           break
         }
 
-        // ==================== CATEGORY OPERATIONS ====================
-
         case "DB_GET_ALL_CATEGORIES": {
           console.log("🏷️  [Offscreen] Getting all categories")
           const categories = await dbService.getAllCategories()
           sendResponse({ success: true, data: categories })
           break
         }
-
-        // ==================== STATISTICS OPERATIONS ====================
 
         case "DB_GET_STATISTICS": {
           console.log("📊 [Offscreen] Getting database statistics")
@@ -109,8 +83,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ success: true, data: stats })
           break
         }
-
-        // ==================== PERSONA OPERATIONS ====================
 
         case "DB_GET_PERSONA": {
           const { id } = message.payload
@@ -180,10 +152,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
   }
 
-  // Execute async handler
   handleAsync()
 
-  // Return true to indicate we'll respond asynchronously
   return true
 })
 

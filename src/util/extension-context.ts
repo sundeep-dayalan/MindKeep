@@ -1,18 +1,8 @@
-/**
- * Extension Context Utilities
- *
- * Helpers for detecting and handling invalidated extension contexts.
- * When an extension is reloaded while content scripts are running,
- * any chrome.runtime or chrome.storage API calls will fail.
- */
 
-/**
- * Check if the extension context is still valid
- * Returns false if the extension has been reloaded/updated
- */
+
 export function isExtensionContextValid(): boolean {
   try {
-    // Try to access chrome.runtime.id - this will throw if context is invalid
+
     if (!chrome?.runtime?.id) {
       return false
     }
@@ -22,10 +12,6 @@ export function isExtensionContextValid(): boolean {
   }
 }
 
-/**
- * Safely execute a function that uses chrome extension APIs
- * Returns null if the extension context is invalid
- */
 export async function safeExtensionCall<T>(
   fn: () => Promise<T>,
   fallback?: T
@@ -38,7 +24,7 @@ export async function safeExtensionCall<T>(
   try {
     return await fn()
   } catch (error) {
-    // Check if error is due to invalidated context
+
     if (
       error instanceof Error &&
       error.message.includes("Extension context invalidated")
@@ -49,15 +35,11 @@ export async function safeExtensionCall<T>(
       )
       return fallback ?? null
     }
-    // Re-throw other errors
+
     throw error
   }
 }
 
-/**
- * Safely add a chrome.storage listener
- * Returns a cleanup function, or null if context is invalid
- */
 export function safeAddStorageListener(
   listener: (
     changes: { [key: string]: chrome.storage.StorageChange },
@@ -79,7 +61,7 @@ export function safeAddStorageListener(
           chrome.storage.onChanged.removeListener(listener)
         }
       } catch (error) {
-        // Silently ignore cleanup errors
+
         console.debug("Failed to remove storage listener (context may be invalid)")
       }
     }
@@ -89,11 +71,8 @@ export function safeAddStorageListener(
   }
 }
 
-/**
- * Show a user-friendly message when extension context is invalidated
- */
 export function showExtensionReloadMessage() {
-  // Only show in content script contexts (not in extension pages)
+
   const isContentScript =
     typeof window !== "undefined" &&
     (window.location.protocol === "http:" ||

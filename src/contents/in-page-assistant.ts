@@ -1,9 +1,4 @@
-/**
- * In-Page Assistant Content Script
- *
- * Main orchestrator for the in-page AI assistant feature.
- * Manages input field detection, icon injection, and chat modal display.
- */
+
 
 import type { PlasmoCSConfig } from "plasmo"
 import React from "react"
@@ -20,15 +15,13 @@ import {
   setupPositionTracking
 } from "~content/position-calculator"
 
-// Import the CSS file - Plasmo will automatically inject it
 import "./in-page-assistant.css"
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
-  all_frames: true // Run in all frames including iframes
+  all_frames: true
 }
 
-// Global state
 let fieldManager: InputFieldManager | null = null
 let activeChatModal: {
   field: ManagedInputField
@@ -37,16 +30,12 @@ let activeChatModal: {
   cleanup: () => void
 } | null = null
 
-/**
- * Handle when an input field receives focus
- */
 const handleFieldFocus = (field: ManagedInputField) => {
   console.log("🎯 [InPageAssistant] handleFieldFocus called!")
   console.log("🎯 [InPageAssistant] Field element:", field.element)
   console.log("🎯 [InPageAssistant] Field has icon?", !!field.iconElement)
   console.log("🎯 [InPageAssistant] Icon element:", field.iconElement)
 
-  // Create and attach icon if not already present
   if (!field.iconElement) {
     console.log("🎯 [InPageAssistant] Creating icon...")
     const icon = createInjectedIcon(field.element, () => openChatModal(field))
@@ -54,10 +43,9 @@ const handleFieldFocus = (field: ManagedInputField) => {
     console.log("🎯 [InPageAssistant] Icon display style:", icon.style.display)
     console.log("🎯 [InPageAssistant] Icon parent:", icon.parentElement)
 
-    // Check if icon is a placeholder (element not visible)
     if (icon.style.display === "none") {
       console.log("🎯 [InPageAssistant] Icon placeholder created, retrying after delay...")
-      // Retry after element has settled into position
+
       setTimeout(() => {
         if (field.isActive && !field.iconElement) {
           console.log("🎯 [InPageAssistant] Retrying icon creation...")
@@ -83,13 +71,9 @@ const handleFieldFocus = (field: ManagedInputField) => {
   }
 }
 
-/**
- * Handle when an input field loses focus
- */
 const handleFieldBlur = (field: ManagedInputField) => {
   console.log("🔄 [InPageAssistant] Field blurred")
 
-  // Remove icon after a delay (to allow clicking the icon)
   setTimeout(() => {
     if (field.iconElement && !field.isActive) {
       removeInjectedIcon(field.element, field.iconElement)
@@ -98,20 +82,14 @@ const handleFieldBlur = (field: ManagedInputField) => {
   }, 200)
 }
 
-/**
- * Open the chat modal for a specific input field
- */
 const openChatModal = (field: ManagedInputField) => {
   console.log("💬 [InPageAssistant] Opening chat modal")
 
-  // Detect if we're in an iframe
   const isInIframe = window.self !== window.top
   console.log("🖼️  [InPageAssistant] Running in iframe:", isInIframe)
 
-  // Close any existing chat
   closeActiveChat()
 
-  // Calculate position
   const modalDimensions = { width: 400, height: 500 }
   const position = calculateModalPosition(field.element, modalDimensions)
 
@@ -121,7 +99,6 @@ const openChatModal = (field: ManagedInputField) => {
     height: window.innerHeight
   })
 
-  // If in iframe, adjust position to ensure it's visible
   if (isInIframe) {
     const adjustedPosition = {
       top: Math.min(
@@ -133,7 +110,7 @@ const openChatModal = (field: ManagedInputField) => {
         window.innerWidth - modalDimensions.width - 20
       )
     }
-    // Ensure not negative
+
     adjustedPosition.top = Math.max(10, adjustedPosition.top)
     adjustedPosition.left = Math.max(10, adjustedPosition.left)
 
@@ -145,20 +122,16 @@ const openChatModal = (field: ManagedInputField) => {
     position.left = adjustedPosition.left
   }
 
-  // Get input field content for context
   const fieldContent = fieldManager?.getFieldContent(field) || ""
 
-  // Create modal container
   const modalContainer = document.createElement("div")
   modalContainer.id = "mindkeep-in-page-chat"
   modalContainer.style.cssText =
     "position: fixed; z-index: 999999; pointer-events: none;"
   document.body.appendChild(modalContainer)
 
-  // Create React root
   const root = createRoot(modalContainer)
 
-  // Render modal
   root.render(
     React.createElement(
       "div",
@@ -172,13 +145,12 @@ const openChatModal = (field: ManagedInputField) => {
     )
   )
 
-  // Setup position tracking for scroll/resize
   const cleanupTracking = setupPositionTracking(
     field.element,
     modalContainer,
     modalDimensions,
     (newPosition) => {
-      // Re-render with new position
+
       root.render(
         React.createElement(
           "div",
@@ -194,7 +166,6 @@ const openChatModal = (field: ManagedInputField) => {
     }
   )
 
-  // Store active chat reference
   activeChatModal = {
     field,
     modalElement: modalContainer,
@@ -205,29 +176,20 @@ const openChatModal = (field: ManagedInputField) => {
   console.log("✅ [InPageAssistant] Chat modal opened")
 }
 
-/**
- * Close the active chat modal
- */
 const closeActiveChat = () => {
   if (activeChatModal) {
     console.log("🔒 [InPageAssistant] Closing chat modal")
 
-    // Cleanup position tracking
     activeChatModal.cleanup()
 
-    // Unmount React component
     activeChatModal.root.unmount()
 
-    // Remove modal container
     activeChatModal.modalElement.remove()
 
     activeChatModal = null
   }
 }
 
-/**
- * Handle text insertion into the input field
- */
 const handleInsert = (field: ManagedInputField, text: string) => {
   console.log(
     "📝 [InPageAssistant] Inserting text:",
@@ -236,52 +198,44 @@ const handleInsert = (field: ManagedInputField, text: string) => {
 
   if (!fieldManager) return
 
-  // Determine insertion mode based on selection
   const hasSelection = field.selectedText && field.selectedText.length > 0
 
   if (hasSelection) {
-    // Replace selected text
+
     fieldManager.replaceText(field, text, false)
     console.log("✅ [InPageAssistant] Replaced selected text")
   } else {
-    // Insert at cursor position
+
     fieldManager.insertTextAtCursor(field, text)
     console.log("✅ [InPageAssistant] Inserted at cursor")
   }
 
-  // Visual feedback (highlight the input briefly)
   field.element.style.transition = "background-color 0.3s ease"
-  field.element.style.backgroundColor = "#dbeafe" // Light blue
+  field.element.style.backgroundColor = "#dbeafe"
   setTimeout(() => {
     field.element.style.backgroundColor = ""
   }, 500)
 }
 
-/**
- * Handle highlight events from modal
- */
 const handleHighlightEvent = (event: CustomEvent) => {
   if (activeChatModal) {
     const field = activeChatModal.field
     const shouldHighlight = event.detail.highlight
 
     if (shouldHighlight) {
-      // Add highlight effect
+
       field.element.style.transition =
         "box-shadow 0.2s ease, border-color 0.2s ease"
       field.element.style.boxShadow = "0 0 0 3px rgba(34, 197, 94, 0.2)"
       field.element.style.borderColor = "#22c55e"
     } else {
-      // Remove highlight effect
+
       field.element.style.boxShadow = ""
       field.element.style.borderColor = ""
     }
   }
 }
 
-/**
- * Initialize the in-page assistant
- */
 console.log(
   "🚀🚀🚀 [InPageAssistant] Script loaded! Document ready state:",
   document.readyState
@@ -293,7 +247,7 @@ function init() {
   console.log("📍 [InPageAssistant] Document body exists:", !!document.body)
 
   try {
-    // Initialize field manager
+
     fieldManager = new InputFieldManager()
     console.log("✅ [InPageAssistant] InputFieldManager created")
 
@@ -303,7 +257,6 @@ function init() {
     })
     console.log("✅ [InPageAssistant] InputFieldManager initialized")
 
-    // Listen for highlight events from modal
     window.addEventListener(
       "mindkeep-highlight-insert",
       handleHighlightEvent as EventListener
@@ -315,7 +268,6 @@ function init() {
   }
 }
 
-// Wait for DOM to be ready
 if (document.readyState === "loading") {
   console.log("⏳ [InPageAssistant] Waiting for DOMContentLoaded...")
   document.addEventListener("DOMContentLoaded", init)
@@ -326,7 +278,6 @@ if (document.readyState === "loading") {
   init()
 }
 
-// Cleanup on page unload
 window.addEventListener("beforeunload", () => {
   console.log("🧹 [InPageAssistant] Page unloading, cleaning up")
   if (fieldManager) {
