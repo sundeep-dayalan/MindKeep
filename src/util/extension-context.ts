@@ -1,8 +1,5 @@
-
-
 export function isExtensionContextValid(): boolean {
   try {
-
     if (!chrome?.runtime?.id) {
       return false
     }
@@ -17,14 +14,15 @@ export async function safeExtensionCall<T>(
   fallback?: T
 ): Promise<T | null> {
   if (!isExtensionContextValid()) {
-    console.warn("⚠️  [ExtensionContext] Extension context is invalid, skipping API call")
+    console.warn(
+      "⚠️  [ExtensionContext] Extension context is invalid, skipping API call"
+    )
     return fallback ?? null
   }
 
   try {
     return await fn()
   } catch (error) {
-
     if (
       error instanceof Error &&
       error.message.includes("Extension context invalidated")
@@ -61,18 +59,21 @@ export function safeAddStorageListener(
           chrome.storage.onChanged.removeListener(listener)
         }
       } catch (error) {
-
-        console.debug("Failed to remove storage listener (context may be invalid)")
+        console.debug(
+          "Failed to remove storage listener (context may be invalid)"
+        )
       }
     }
   } catch (error) {
-    console.warn("⚠️  [ExtensionContext] Failed to add storage listener:", error)
+    console.warn(
+      "⚠️  [ExtensionContext] Failed to add storage listener:",
+      error
+    )
     return null
   }
 }
 
 export function showExtensionReloadMessage() {
-
   const isContentScript =
     typeof window !== "undefined" &&
     (window.location.protocol === "http:" ||

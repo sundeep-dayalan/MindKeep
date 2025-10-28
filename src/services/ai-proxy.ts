@@ -1,5 +1,3 @@
-
-
 import * as aiService from "~services/ai-service"
 
 function isContentScript(): boolean {

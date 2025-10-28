@@ -1,5 +1,3 @@
-
-
 export interface Position {
   top: number
   left: number
@@ -44,9 +42,7 @@ export function calculateModalPosition(
     if (top < EDGE_PADDING) {
       top = EDGE_PADDING
     }
-  }
-
-  else if (spaceBelow >= modalDimensions.height + SPACING + EDGE_PADDING) {
+  } else if (spaceBelow >= modalDimensions.height + SPACING + EDGE_PADDING) {
     placement = "bottom"
     top = inputRect.bottom + SPACING
     left = inputRect.left
@@ -57,9 +53,7 @@ export function calculateModalPosition(
     if (left < EDGE_PADDING) {
       left = EDGE_PADDING
     }
-  }
-
-  else if (spaceLeft >= modalDimensions.width + SPACING + EDGE_PADDING) {
+  } else if (spaceLeft >= modalDimensions.width + SPACING + EDGE_PADDING) {
     placement = "left"
     left = inputRect.left - modalDimensions.width - SPACING
     top = inputRect.top
@@ -70,9 +64,7 @@ export function calculateModalPosition(
     if (top < EDGE_PADDING) {
       top = EDGE_PADDING
     }
-  }
-
-  else if (spaceAbove >= modalDimensions.height + SPACING + EDGE_PADDING) {
+  } else if (spaceAbove >= modalDimensions.height + SPACING + EDGE_PADDING) {
     placement = "top"
     top = inputRect.top - modalDimensions.height - SPACING
     left = inputRect.left
@@ -83,10 +75,7 @@ export function calculateModalPosition(
     if (left < EDGE_PADDING) {
       left = EDGE_PADDING
     }
-  }
-
-  else {
-
+  } else {
     placement = "bottom"
     left = Math.max(EDGE_PADDING, (viewport.width - modalDimensions.width) / 2)
     top = Math.max(EDGE_PADDING, (viewport.height - modalDimensions.height) / 2)
@@ -99,7 +88,6 @@ export function calculateIconPosition(inputElement: HTMLElement): {
   top: string
   right: string
 } {
-
   const PADDING = 8
 
   return {

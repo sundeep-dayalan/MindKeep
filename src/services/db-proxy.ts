@@ -1,10 +1,7 @@
-
-
 import type { Note, Persona } from "~services/db-service"
 import * as dbService from "~services/db-service"
 
 function isContentScript(): boolean {
-
   try {
     return (
       typeof window !== "undefined" &&

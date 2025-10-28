@@ -107,7 +107,6 @@ export const RichTextEditor = forwardRef<
             "plasmo-prose plasmo-prose-sm plasmo-max-w-none plasmo-min-h-[240px] plasmo-px-3 plasmo-py-2 plasmo-text-slate-900 focus:plasmo-outline-none"
         },
         handleKeyDown: (view, event) => {
-
           if (event.key === "Enter" && !event.shiftKey && onSubmit) {
             event.preventDefault()
             onSubmit()
@@ -169,13 +168,11 @@ export const RichTextEditor = forwardRef<
       setContent: (content: string | any) => {
         if (editor) {
           try {
-
             if (typeof content === "string") {
               try {
                 const parsed = JSON.parse(content)
                 editor.commands.setContent(parsed)
               } catch {
-
                 editor.commands.setContent(content)
               }
             } else {

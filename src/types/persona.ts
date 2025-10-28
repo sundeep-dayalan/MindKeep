@@ -1,7 +1,4 @@
-
-
 export interface Persona {
-
   id: string
 
   name: string
@@ -22,14 +19,12 @@ export interface Persona {
 }
 
 export enum AgentMode {
-
   DEFAULT = "default",
 
   PERSONA = "persona"
 }
 
 export interface PersonaSettings {
-
   selectedPersonaId: string | null
 
   defaultPersonaId?: string | null

@@ -1,5 +1,3 @@
-
-
 import { useEffect, useState } from "react"
 
 import {
@@ -50,7 +48,6 @@ export function PersonaSelector({
       changes: { [key: string]: chrome.storage.StorageChange },
       areaName: string
     ) => {
-
       if (areaName === "local" && changes["mindkeep_persona_settings"]) {
         const newSettings = changes["mindkeep_persona_settings"].newValue
         const oldSettings = changes["mindkeep_persona_settings"].oldValue
@@ -86,7 +83,6 @@ export function PersonaSelector({
               }
             }
           } else {
-
             console.log(
               " [PersonaSelector] Syncing to default mode from storage"
             )
@@ -140,7 +136,6 @@ export function PersonaSelector({
       let active: Persona | null
 
       if (isContentScript) {
-
         console.log(
           " [PersonaSelector] Running in content script, fetching via messaging"
         )
@@ -157,7 +152,6 @@ export function PersonaSelector({
         allPersonas = personasResponse?.personas || []
         active = activeResponse?.persona || null
       } else {
-
         console.log(
           " [PersonaSelector] Running in extension page, using direct DB access"
         )
@@ -186,7 +180,6 @@ export function PersonaSelector({
     } catch (error) {
       console.error(" [PersonaSelector] Error loading personas:", error)
     } finally {
-
       setIsInitializing(false)
       if (onInitializationChange) {
         onInitializationChange(false)
@@ -269,14 +262,12 @@ export function PersonaSelector({
     setIsOpen(false)
 
     try {
-
       const isContentScript =
         typeof window !== "undefined" &&
         (window.location.protocol === "http:" ||
           window.location.protocol === "https:")
 
       if (isContentScript) {
-
         console.log(
           " [PersonaSelector] Running in content script, using messaging to set active persona"
         )
@@ -293,7 +284,6 @@ export function PersonaSelector({
           throw new Error(response?.error || "Failed to set active persona")
         }
       } else {
-
         await setActivePersona(persona?.id || null)
       }
 

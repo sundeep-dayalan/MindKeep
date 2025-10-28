@@ -1,7 +1,4 @@
-
-
 declare global {
-
   type AIProgressEvent = ProgressEvent & { loaded: number; total: number }
   interface AIModel {
     addEventListener(

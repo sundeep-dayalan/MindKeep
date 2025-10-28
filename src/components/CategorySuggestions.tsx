@@ -1,12 +1,9 @@
-
-
 import { useEffect, useRef, useState } from "react"
 
 import { getRelevantCategories } from "~services/ai-service"
 import type { ScoredCategory } from "~types/response"
 
 interface CategorySuggestionsProps {
-
   noteTitle: string
 
   noteContent: string
@@ -63,7 +60,6 @@ export function CategorySuggestions({
     let isMounted = true
 
     const fetchSuggestions = async () => {
-
       if (!noteTitle.trim() && !noteContent.trim()) {
         setSuggestions([])
         return
@@ -128,14 +124,9 @@ export function CategorySuggestions({
       isMounted = false
       clearTimeout(timeoutId)
     }
-  }, [
-    noteTitle,
-    noteContent
-
-  ])
+  }, [noteTitle, noteContent])
 
   const handleCategoryClick = (category: string) => {
-
     setSuggestions((prevSuggestions) =>
       prevSuggestions.filter((item) => item.category !== category)
     )

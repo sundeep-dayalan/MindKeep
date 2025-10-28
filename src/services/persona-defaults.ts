@@ -1,5 +1,3 @@
-
-
 import type { PersonaTemplate } from "~types/persona"
 
 import { addPersona, getAllPersonas } from "./db-service"

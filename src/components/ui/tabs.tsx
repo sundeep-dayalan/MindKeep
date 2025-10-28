@@ -44,7 +44,6 @@ export const Tabs = ({
 
   useEffect(() => {
     setTabs((prevTabs) => {
-
       const prevValues = prevTabs
         .map((t) => t.value)
         .sort()
@@ -73,7 +72,6 @@ export const Tabs = ({
   }, [propTabs])
 
   const moveSelectedTabToTop = (idx: number) => {
-
     const selectedTab = propTabs[idx]
 
     const newTabs = [selectedTab, ...propTabs.filter((_, i) => i !== idx)]
@@ -189,7 +187,6 @@ export const Tabs = ({
               <button
                 key={tab.value}
                 onClick={() => {
-
                   const propTabIndex = propTabs.findIndex(
                     (t) => t.value === tab.value
                   )

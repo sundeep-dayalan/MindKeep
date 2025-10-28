@@ -1,9 +1,7 @@
-
-
 import Dexie, { type Table } from "dexie"
 
-import type { Persona, PersonaInput } from "~types/persona"
 import { setSelectedPersona } from "~services/persona-settings"
+import type { Persona, PersonaInput } from "~types/persona"
 import { decrypt } from "~util/crypto"
 
 export interface Note {
@@ -154,7 +152,6 @@ export async function updateNote(
   }
 ): Promise<Note | null> {
   try {
-
     const existingStoredNote = await db.notes.get(id)
 
     if (!existingStoredNote) {
@@ -222,7 +219,6 @@ export async function getAllNotes(): Promise<Note[]> {
 
     for (const storedNote of storedNotes) {
       try {
-
         const content = await decrypt(storedNote.content)
         const contentPlaintext = await decrypt(storedNote.contentPlaintext)
         notes.push({
@@ -256,7 +252,6 @@ export async function searchNotesByVector(
   const startTime = performance.now()
 
   try {
-
     const fetchStartTime = performance.now()
     const storedNotes = await db.notes
       .filter((note) => note.embedding && note.embedding.length > 0)
@@ -355,7 +350,6 @@ export async function searchNotesSemanticWithContent(
     const combineStartTime = performance.now()
     const combinedContent = matchingNotes
       .map((result, idx) => {
-
         return `Note ${idx + 1}: ${result.note.title}\n${result.note.contentPlaintext}\n---`
       })
       .join("\n\n")
@@ -427,14 +421,12 @@ export async function searchNotesByTitle(query: string): Promise<Note[]> {
     }
 
     if (results.size < 10) {
-
       const remainingNotes = await db.notes
         .filter((note) => !results.has(note.id))
         .toArray()
 
       for (const storedNote of remainingNotes) {
         try {
-
           const contentPlaintext = await decrypt(storedNote.contentPlaintext)
           if (contentPlaintext.toLowerCase().includes(lowerQuery)) {
             const content = await decrypt(storedNote.content)
@@ -465,7 +457,6 @@ export async function searchNotesByTitle(query: string): Promise<Note[]> {
 
 export async function getNotesByCategory(category: string): Promise<Note[]> {
   try {
-
     const storedNotes = await db.notes
       .where("category")
       .equals(category)
@@ -501,7 +492,6 @@ export async function getNotesByCategory(category: string): Promise<Note[]> {
 
 export async function getAllCategories(): Promise<string[]> {
   try {
-
     const categories = await db.notes.orderBy("category").uniqueKeys()
     return categories as string[]
   } catch (error) {
@@ -650,7 +640,6 @@ export async function debugIndexedDB(): Promise<void> {
   console.log("=== IndexedDB Debug Info ===")
 
   try {
-
     const databases = await indexedDB.databases()
     console.log("Available databases:", databases)
 
@@ -804,7 +793,6 @@ export async function setActivePersona(id: string | null): Promise<boolean> {
   console.log(" [DB] setActivePersona called with ID:", id)
 
   try {
-
     console.log(" [DB] Fetching all personas...")
     const allPersonas = await db.personas.toArray()
     console.log(` [DB] Found ${allPersonas.length} personas in database`)

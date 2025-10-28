@@ -1,5 +1,3 @@
-
-
 import React, { useEffect, useRef, useState, type CSSProperties } from "react"
 
 import { AISearchBar } from "~components/AISearchBar"
@@ -65,7 +63,6 @@ export function InPageChatModal({
   }, [isDragging, dragOffset])
 
   const handleDragStart = (e: React.MouseEvent) => {
-
     const target = e.target as HTMLElement
     const isInteractive =
       target.tagName === "INPUT" ||

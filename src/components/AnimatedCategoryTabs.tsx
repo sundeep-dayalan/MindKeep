@@ -24,7 +24,6 @@ export function AnimatedCategoryTabs({
   onDelete,
   loading
 }: AnimatedCategoryTabsProps) {
-
   const getNotesForCategory = (category: string) => {
     if (category === "all") {
       return notes
@@ -137,7 +136,6 @@ function NotesContent({
   }
 
   const bentoItems: BentoItem[] = notes.map((note, index) => {
-
     const contentLength = note.contentPlaintext?.length || 0
     const hasImage = note.content?.includes('"type":"image"') || false
 
@@ -146,12 +144,10 @@ function NotesContent({
     let height = 3
 
     if (hasImage) {
-
       if (contentLength < 100) height = 3
       else if (contentLength < 300) height = 3
       else height = 4
     } else {
-
       if (contentLength < 150) height = 3
       else if (contentLength < 350) height = 3
       else if (contentLength < 600) height = 4

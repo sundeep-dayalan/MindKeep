@@ -1,5 +1,3 @@
-
-
 interface TipTapNode {
   type: string
   attrs?: Record<string, any>
@@ -87,7 +85,6 @@ function convertNode(
       return convertImage(node)
 
     default:
-
       if (node.content) {
         return convertNodes(node.content, context)
       }
@@ -150,7 +147,6 @@ function convertText(node: TipTapNode): string {
         break
 
       case "underline":
-
         text = `_${text}_`
         break
     }
@@ -202,7 +198,6 @@ function convertTable(node: TipTapNode): string {
   const rows = node.content.map((row) => convertNode(row, { inTable: true }))
 
   if (rows.length > 0) {
-
     const firstRow = node.content[0]
     const colCount = firstRow.content?.length || 0
     const separator = "|" + " --- |".repeat(colCount) + "\n"

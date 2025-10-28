@@ -1,20 +1,16 @@
 @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
 
-
-
 @tailwind components;
 @tailwind utilities;
-
 
 #mindkeep-in-page-chat,
 #mindkeep-in-page-chat *,
 .mindkeep-icon-container,
 .mindkeep-icon-container * {
   font-family: "Poppins", sans-serif !important;
-  
+
   box-sizing: border-box !important;
 }
-
 
 #mindkeep-in-page-chat {
   all: initial;

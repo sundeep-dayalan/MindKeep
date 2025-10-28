@@ -209,7 +209,6 @@ export function AISearchBar({
   }, [])
 
   React.useEffect(() => {
-
     if (isLoadingFromStorage) {
       return
     }
@@ -267,7 +266,6 @@ export function AISearchBar({
     )
 
     try {
-
       console.log("[AISearchBar] Getting global agent with persona...")
       const agent = await getGlobalAgent(persona)
 
@@ -364,7 +362,6 @@ export function AISearchBar({
   }
 
   const estimateTokens = (text: string): number => {
-
     return Math.ceil(text.length / 4)
   }
 
@@ -403,7 +400,6 @@ export function AISearchBar({
       }
 
       if (projectedTotal > tokenUsage.quota * 1.2) {
-
         return {
           valid: false,
           reason: `Input too large for current session. Try a shorter message or start a new chat.`
@@ -455,7 +451,6 @@ export function AISearchBar({
       setMessages((prev) => [...prev, compactionNotice])
 
       try {
-
         const agent = await getGlobalAgent()
         await agent.rotateSessionWithSummary()
 
@@ -516,21 +511,18 @@ export function AISearchBar({
     }
 
     if (query && onSearch && !isSearching) {
-
       setLastSubmittedContentJSON(contentJSON)
 
       if (pendingManualInput.type && pendingManualInput.pendingNoteData) {
         console.log("Processing manual input:", pendingManualInput.type, query)
 
         if (pendingManualInput.type === "category") {
-
           await handleClarificationOption(
             "select_category",
             query,
             pendingManualInput.pendingNoteData
           )
         } else if (pendingManualInput.type === "title") {
-
           await handleClarificationOption(
             "use_manual_title",
             query,
@@ -565,7 +557,6 @@ export function AISearchBar({
       setMessages((prev) => [...prev, streamingMessage])
 
       try {
-
         const conversationHistory = messages
           .filter((m) => m.type === "user" || m.type === "ai")
           .map((m) => ({
@@ -579,7 +570,6 @@ export function AISearchBar({
         let isFirstChunk = true
         let didReceiveChunks = false
         const handleStreamChunk = (chunk: string) => {
-
           if (isFirstChunk) {
             console.log(`📡 [Streaming] First chunk received, starting stream`)
             setIsStreaming(true)
@@ -612,7 +602,6 @@ export function AISearchBar({
         if (didReceiveChunks) {
           setMessages((prev) => prev.filter((m) => m.id !== streamingMessageId))
         } else {
-
           setMessages((prev) => prev.filter((m) => m.id !== streamingMessageId))
         }
 
@@ -620,7 +609,6 @@ export function AISearchBar({
           typeof aiResponse === "object" &&
           ("aiResponse" in aiResponse || "referenceNotes" in aiResponse)
         ) {
-
           let fullReferenceNotes: Note[] = []
           if (
             aiResponse.referenceNotes &&
@@ -675,7 +663,6 @@ export function AISearchBar({
 
           await checkTokenUsage()
         } else {
-
           const aiMessage: Message = {
             id: `ai-${Date.now()}`,
             type: "ai",
@@ -745,7 +732,6 @@ export function AISearchBar({
     setIsSearching(true)
 
     try {
-
       const { generateTitle, generateCategory } = await import(
         "~services/ai-service"
       )
@@ -757,7 +743,6 @@ export function AISearchBar({
 
       switch (action) {
         case "cancel_note_creation": {
-
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
@@ -783,7 +768,6 @@ export function AISearchBar({
         }
 
         case "auto_generate_both": {
-
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
@@ -822,7 +806,6 @@ export function AISearchBar({
         }
 
         case "start_manual_flow": {
-
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
@@ -875,7 +858,6 @@ export function AISearchBar({
         }
 
         case "auto_generate_title": {
-
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
@@ -932,7 +914,6 @@ export function AISearchBar({
         }
 
         case "manual_title": {
-
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
@@ -964,7 +945,6 @@ export function AISearchBar({
         }
 
         case "auto_generate_category": {
-
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
@@ -1021,7 +1001,6 @@ export function AISearchBar({
         }
 
         case "select_category": {
-
           finalCategory = value
           const userMessage: Message = {
             id: `user-${Date.now()}`,
@@ -1065,7 +1044,6 @@ export function AISearchBar({
         }
 
         case "manual_category": {
-
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
@@ -1097,7 +1075,6 @@ export function AISearchBar({
         }
 
         case "use_manual_title": {
-
           finalTitle = value
           const userMessage: Message = {
             id: `user-${Date.now()}`,
@@ -1142,7 +1119,6 @@ export function AISearchBar({
         }
 
         case "confirm_organize": {
-
           console.log(`[${callId}] Organization confirmation:`, value)
 
           const userMessage: Message = {
@@ -1227,7 +1203,6 @@ export function AISearchBar({
 
         let contentJSONString: string
         if (lastSubmittedContentJSON && noteContent) {
-
           console.log(" Extracting relevant portion from rich content JSON...")
 
           const fullMarkdown = tiptapToMarkdown(lastSubmittedContentJSON)
@@ -1268,17 +1243,14 @@ export function AISearchBar({
                 ` Filtered to ${filteredNodes.length} nodes (removed prompt)`
               )
             } else {
-
               contentJSONString = JSON.stringify(lastSubmittedContentJSON)
               console.log(" Filtering failed, using full content")
             }
           } else {
-
             console.log(" Content matches exactly, using full rich JSON")
             contentJSONString = JSON.stringify(lastSubmittedContentJSON)
           }
         } else {
-
           console.log(" No rich content found, converting plain text to JSON")
           const contentJSON = {
             type: "doc",
@@ -1347,7 +1319,6 @@ export function AISearchBar({
           )
 
           try {
-
             const { organizeNoteTool } = await import(
               "~services/langchain-tools"
             )
@@ -1414,7 +1385,6 @@ export function AISearchBar({
             }
           } catch (error) {
             console.error(`[${callId}] Error running organize_note:`, error)
-
           }
         }
 
@@ -1436,7 +1406,6 @@ export function AISearchBar({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       handleSubmit(e)
@@ -1563,7 +1532,6 @@ export function AISearchBar({
         <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-overflow-x-hidden plasmo-no-visible-scrollbar plasmo-space-y-4 plasmo-px-4 plasmo-py-4 plasmo-max-h-[500px] plasmo-bg-white/10 plasmo-backdrop-blur-lg plasmo-rounded-2xl plasmo-border plasmo-border-white/30 plasmo-mb-4">
           {messages
             .filter((message) => {
-
               if (message.type === "ai" && !message.content.trim()) {
                 return false
               }
@@ -1572,7 +1540,6 @@ export function AISearchBar({
 
             .filter((_, index, arr) => {
               if (enableInsertMode) {
-
                 const lastAiIndex = arr
                   .map((m, i) => ({ m, i }))
                   .reverse()
@@ -1662,7 +1629,6 @@ export function AISearchBar({
                                 : "Copy response"
                             }>
                             {copiedMessageId === message.id ? (
-
                               <svg
                                 className="plasmo-w-3.5 plasmo-h-3.5 plasmo-text-green-600"
                                 fill="none"
@@ -1676,7 +1642,6 @@ export function AISearchBar({
                                 />
                               </svg>
                             ) : (
-
                               <svg
                                 className="plasmo-w-3.5 plasmo-h-3.5 plasmo-text-slate-600"
                                 fill="none"
@@ -1707,7 +1672,6 @@ export function AISearchBar({
                           </div>
                           <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-2">
                             {message.clarificationOptions.map((option, idx) => {
-
                               if (idx === 0) {
                                 console.log(
                                   "🎨 [AISearchBar] Rendering clarification buttons for message:",
@@ -1814,7 +1778,6 @@ export function AISearchBar({
               compact={true}
               onSubmit={handleSubmit}
               onUpdate={() => {
-
                 const currentText = editorRef.current?.getText() || ""
                 setCurrentInputLength(currentText.length)
 
@@ -1847,7 +1810,6 @@ export function AISearchBar({
               onClick={
                 showInsertButton && enableInsertMode && onInsert
                   ? () => {
-
                       const lastAiMessage = messages
                         .slice()
                         .reverse()
@@ -1877,7 +1839,6 @@ export function AISearchBar({
                 currentInputLength > 8000
               }>
               {showInsertButton && enableInsertMode ? (
-
                 <>
                   <span className="plasmo-text-xs plasmo-font-medium">
                     Insert
@@ -1887,7 +1848,6 @@ export function AISearchBar({
                   </span>
                 </>
               ) : (
-
                 <>
                   <span className="plasmo-text-xs plasmo-font-medium">
                     Send

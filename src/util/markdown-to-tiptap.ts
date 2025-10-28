@@ -1,10 +1,7 @@
-
-
 import { marked } from "marked"
 
 export async function markdownToTipTapHTML(markdown: string): Promise<string> {
   try {
-
     const html = await marked.parse(markdown, {
       gfm: true,
       breaks: true

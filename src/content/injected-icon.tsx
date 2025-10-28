@@ -1,5 +1,3 @@
-
-
 interface InjectedIconProps {
   onClick: () => void
   isActive: boolean
@@ -46,7 +44,6 @@ export function createInjectedIcon(
   inputElement: HTMLInputElement | HTMLTextAreaElement | HTMLElement,
   onClick: () => void
 ): HTMLElement {
-
   const isVisible = (element: HTMLElement): boolean => {
     const rect = element.getBoundingClientRect()
     const style = window.getComputedStyle(element)
@@ -60,7 +57,9 @@ export function createInjectedIcon(
   }
 
   if (!isVisible(inputElement)) {
-    console.log("⚠️ [InjectedIcon] Input field not visible, delaying icon creation")
+    console.log(
+      "⚠️ [InjectedIcon] Input field not visible, delaying icon creation"
+    )
 
     const placeholder = document.createElement("div")
     placeholder.style.display = "none"
@@ -152,7 +151,10 @@ export function createInjectedIcon(
   `
 
   const path = document.createElementNS("http://www.w3.org/2000/svg", "path")
-  path.setAttribute("d", "M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z")
+  path.setAttribute(
+    "d",
+    "M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z"
+  )
 
   svg.appendChild(path)
   button.appendChild(svg)
@@ -209,10 +211,15 @@ export function createInjectedIcon(
 
   console.log("[InjectedIcon] Preparing to show icon with animation")
   requestAnimationFrame(() => {
-    console.log("[InjectedIcon] Setting opacity to 1 and transform to translateY(0)")
+    console.log(
+      "[InjectedIcon] Setting opacity to 1 and transform to translateY(0)"
+    )
     iconContainer.style.opacity = "1"
     iconContainer.style.transform = "translateY(0)"
-    console.log("[InjectedIcon] Icon should now be visible, opacity:", iconContainer.style.opacity)
+    console.log(
+      "[InjectedIcon] Icon should now be visible, opacity:",
+      iconContainer.style.opacity
+    )
   })
 
   const updatePosition = () => {
@@ -223,7 +230,6 @@ export function createInjectedIcon(
 
   window.addEventListener("scroll", updatePosition, true)
   window.addEventListener("resize", updatePosition)
-
   ;(iconContainer as any).__cleanup = () => {
     window.removeEventListener("scroll", updatePosition, true)
     window.removeEventListener("resize", updatePosition)
@@ -245,12 +251,10 @@ export function removeInjectedIcon(
   inputElement: HTMLInputElement | HTMLTextAreaElement | HTMLElement,
   iconElement: HTMLElement
 ) {
-
   iconElement.style.opacity = "0"
   iconElement.style.transform = "translateY(-2px)"
 
   setTimeout(() => {
-
     if ((iconElement as any).__cleanup) {
       ;(iconElement as any).__cleanup()
     }

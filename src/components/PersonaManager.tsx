@@ -1,5 +1,3 @@
-
-
 import { useEffect, useState } from "react"
 
 import {
@@ -237,7 +235,6 @@ export function PersonaManager({
     setIsGeneratingTitle(true)
 
     try {
-
       const inputSource = formData.context.trim() || formData.description.trim()
 
       const truncatedInput =

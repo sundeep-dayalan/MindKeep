@@ -1,5 +1,3 @@
-
-
 import type { PlasmoCSConfig } from "plasmo"
 import React from "react"
 import { createRoot, type Root } from "react-dom/client"
@@ -44,12 +42,16 @@ const handleFieldFocus = (field: ManagedInputField) => {
     console.log("🎯 [InPageAssistant] Icon parent:", icon.parentElement)
 
     if (icon.style.display === "none") {
-      console.log("🎯 [InPageAssistant] Icon placeholder created, retrying after delay...")
+      console.log(
+        "🎯 [InPageAssistant] Icon placeholder created, retrying after delay..."
+      )
 
       setTimeout(() => {
         if (field.isActive && !field.iconElement) {
           console.log("🎯 [InPageAssistant] Retrying icon creation...")
-          const retryIcon = createInjectedIcon(field.element, () => openChatModal(field))
+          const retryIcon = createInjectedIcon(field.element, () =>
+            openChatModal(field)
+          )
           if (retryIcon.style.display !== "none") {
             fieldManager?.attachIcon(field, retryIcon)
             console.log("🎯 [InPageAssistant] Icon created on retry")
@@ -59,7 +61,10 @@ const handleFieldFocus = (field: ManagedInputField) => {
     } else {
       fieldManager?.attachIcon(field, icon)
       console.log("🎯 [InPageAssistant] Icon attached to field")
-      console.log("🎯 [InPageAssistant] Field icon element after attach:", field.iconElement)
+      console.log(
+        "🎯 [InPageAssistant] Field icon element after attach:",
+        field.iconElement
+      )
     }
   } else {
     console.log("🎯 [InPageAssistant] Icon already exists, skipping creation")
@@ -150,7 +155,6 @@ const openChatModal = (field: ManagedInputField) => {
     modalContainer,
     modalDimensions,
     (newPosition) => {
-
       root.render(
         React.createElement(
           "div",
@@ -201,11 +205,9 @@ const handleInsert = (field: ManagedInputField, text: string) => {
   const hasSelection = field.selectedText && field.selectedText.length > 0
 
   if (hasSelection) {
-
     fieldManager.replaceText(field, text, false)
     console.log("✅ [InPageAssistant] Replaced selected text")
   } else {
-
     fieldManager.insertTextAtCursor(field, text)
     console.log("✅ [InPageAssistant] Inserted at cursor")
   }
@@ -223,13 +225,11 @@ const handleHighlightEvent = (event: CustomEvent) => {
     const shouldHighlight = event.detail.highlight
 
     if (shouldHighlight) {
-
       field.element.style.transition =
         "box-shadow 0.2s ease, border-color 0.2s ease"
       field.element.style.boxShadow = "0 0 0 3px rgba(34, 197, 94, 0.2)"
       field.element.style.borderColor = "#22c55e"
     } else {
-
       field.element.style.boxShadow = ""
       field.element.style.borderColor = ""
     }
@@ -247,7 +247,6 @@ function init() {
   console.log("📍 [InPageAssistant] Document body exists:", !!document.body)
 
   try {
-
     fieldManager = new InputFieldManager()
     console.log("✅ [InPageAssistant] InputFieldManager created")
 

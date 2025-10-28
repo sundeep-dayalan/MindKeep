@@ -33,7 +33,6 @@ const COLOR_PALETTE = [
 ]
 
 const getColorForNote = (noteId: string): (typeof COLOR_PALETTE)[0] => {
-
   let hash = 0
   for (let i = 0; i < noteId.length; i++) {
     hash = (hash << 5) - hash + noteId.charCodeAt(i)
@@ -79,7 +78,6 @@ const formatTimeAgo = (timestamp: number): string => {
   } else if (diffHours < 24) {
     return `${diffHours}h`
   } else {
-
     const date = new Date(timestamp)
     return date.toLocaleDateString("en-US", {
       month: "short",
@@ -89,7 +87,6 @@ const formatTimeAgo = (timestamp: number): string => {
 }
 
 const truncateText = (text: string, maxWidthPercent: number): string => {
-
   const maxChars = maxWidthPercent === 80 ? 40 : 15
   if (text.length > maxChars) {
     return text.slice(0, maxChars - 3) + "..."
@@ -104,7 +101,6 @@ const TipTapPreview = ({
   content: string
   textColor?: string
 }) => {
-
   const parsedContent = React.useMemo(() => {
     try {
       const parsed = JSON.parse(content)
@@ -164,7 +160,6 @@ const TipTapPreview = ({
 
   React.useEffect(() => {
     if (editor && parsedContent) {
-
       const timer = setTimeout(() => {
         editor.commands.setContent(parsedContent)
       }, 0)

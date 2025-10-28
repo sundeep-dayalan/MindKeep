@@ -1,5 +1,3 @@
-
-
 export interface ManagedInputField {
   element: HTMLInputElement | HTMLTextAreaElement | HTMLElement
   iconElement: HTMLElement | null
@@ -45,13 +43,12 @@ export class InputFieldManager {
       '[contenteditable="plaintext-only"]',
       '[contenteditable=""]',
       'div[role="textbox"]',
-      '[contenteditable]'
+      "[contenteditable]"
     ]
 
     const inputs = document.querySelectorAll(selectors.join(", "))
 
     inputs.forEach((input) => {
-
       if (
         input instanceof HTMLInputElement &&
         (input.type === "search" ||
@@ -75,7 +72,6 @@ export class InputFieldManager {
   private setupMutationObserver() {
     this.observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
-
         if (mutation.type === "attributes" && mutation.target) {
           const element = mutation.target as HTMLElement
 
@@ -83,9 +79,7 @@ export class InputFieldManager {
             this.registerField(
               element as HTMLInputElement | HTMLTextAreaElement | HTMLElement
             )
-          }
-
-          else if (this.fields.has(element)) {
+          } else if (this.fields.has(element)) {
             this.unregisterField(element)
           }
         }
@@ -136,19 +130,20 @@ export class InputFieldManager {
   }
 
   private isValidInputField(element: HTMLElement): boolean {
-
     if (this.fields.has(element)) {
       return false
     }
 
     let currentElement: HTMLElement | null = element
     while (currentElement) {
-
       if (currentElement.id === "mindkeep-in-page-chat") {
         return false
       }
 
-      if (currentElement.className && typeof currentElement.className === "string") {
+      if (
+        currentElement.className &&
+        typeof currentElement.className === "string"
+      ) {
         if (
           currentElement.className.includes("mindkeep-") ||
           currentElement.className.includes("plasmo-")
@@ -295,7 +290,6 @@ export class InputFieldManager {
         element.selectionEnd || 0
       )
     } else if (this.isContentEditable(element)) {
-
       const selection = window.getSelection()
       if (selection && selection.rangeCount > 0) {
         field.selectedText = selection.toString()
@@ -354,12 +348,10 @@ export class InputFieldManager {
 
       console.log("✍️  [InputFieldManager] Inserted text at cursor position")
     } else if (this.isContentEditable(element)) {
-
       element.focus()
 
       try {
-
-        const success = document.execCommand('insertText', false, text)
+        const success = document.execCommand("insertText", false, text)
 
         if (success) {
           console.log(
@@ -369,8 +361,9 @@ export class InputFieldManager {
           throw new Error("execCommand failed")
         }
       } catch (error) {
-
-        console.log("⚠️ [InputFieldManager] execCommand failed, using fallback method")
+        console.log(
+          "⚠️ [InputFieldManager] execCommand failed, using fallback method"
+        )
         const selection = window.getSelection()
         if (selection && selection.rangeCount > 0) {
           const range = selection.getRangeAt(0)
@@ -383,10 +376,10 @@ export class InputFieldManager {
           selection.removeAllRanges()
           selection.addRange(range)
 
-          const inputEvent = new InputEvent('input', {
+          const inputEvent = new InputEvent("input", {
             bubbles: true,
             cancelable: true,
-            inputType: 'insertText',
+            inputType: "insertText",
             data: text
           })
           element.dispatchEvent(inputEvent)
@@ -411,16 +404,13 @@ export class InputFieldManager {
       element instanceof HTMLTextAreaElement
     ) {
       if (replaceAll) {
-
         element.value = text
         element.setSelectionRange(text.length, text.length)
       } else {
-
         const start = element.selectionStart || 0
         const end = element.selectionEnd || 0
 
         if (start !== end) {
-
           const currentValue = element.value
           element.value =
             currentValue.substring(0, start) +
@@ -430,7 +420,6 @@ export class InputFieldManager {
           const newCursorPos = start + text.length
           element.setSelectionRange(newCursorPos, newCursorPos)
         } else {
-
           this.insertTextAtCursor(field, text)
         }
       }
@@ -444,7 +433,6 @@ export class InputFieldManager {
       )
     } else if (this.isContentEditable(element)) {
       if (replaceAll) {
-
         element.focus()
 
         const selection = window.getSelection()
@@ -454,15 +442,14 @@ export class InputFieldManager {
         selection?.addRange(range)
 
         try {
-          document.execCommand('insertText', false, text)
+          document.execCommand("insertText", false, text)
         } catch (error) {
-
           element.textContent = text
 
-          const inputEvent = new InputEvent('input', {
+          const inputEvent = new InputEvent("input", {
             bubbles: true,
             cancelable: true,
-            inputType: 'insertText',
+            inputType: "insertText",
             data: text
           })
           element.dispatchEvent(inputEvent)

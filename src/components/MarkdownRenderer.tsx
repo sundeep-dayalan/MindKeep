@@ -1,5 +1,3 @@
-
-
 import { marked } from "marked"
 import { useEffect, useRef } from "react"
 
@@ -33,7 +31,6 @@ export function MarkdownRenderer({
       ref={containerRef}
       className={`plasmo-markdown-content ${className}`}
       style={{
-
         fontSize: "0.875rem",
         lineHeight: "1.5",
         color: "#334155"

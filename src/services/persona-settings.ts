@@ -1,5 +1,3 @@
-
-
 import type { PersonaSettings } from "~types/persona"
 
 const SETTINGS_KEY = "mindkeep_persona_settings"

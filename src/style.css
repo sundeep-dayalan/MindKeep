@@ -4,13 +4,10 @@
 @tailwind components;
 @tailwind utilities;
 
-
-
 #plasmo-shadow-container,
 #plasmo-shadow-container * {
   font-family: "Poppins", sans-serif;
 }
-
 
 body.extension-page,
 html.extension-page {
@@ -22,7 +19,6 @@ html.extension-page {
   box-sizing: border-box;
   font-family: "Poppins", sans-serif;
 }
-
 
 #plasmo-shadow-container img {
   image-rendering: -webkit-optimize-contrast;
@@ -36,7 +32,6 @@ html.extension-page {
   -moz-osx-font-smoothing: grayscale;
 }
 
-
 .plasmo-object-cover {
   image-rendering: -webkit-optimize-contrast !important;
   image-rendering: optimizeQuality !important;
@@ -45,7 +40,6 @@ html.extension-page {
   transform: translate3d(0, 0, 0) !important;
   -webkit-transform: translate3d(0, 0, 0) !important;
 }
-
 
 .no-visible-scrollbar {
   scrollbar-width: none;
@@ -57,7 +51,6 @@ html.extension-page {
   display: none;
 }
 
-
 .scrollbar-hide {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -67,13 +60,11 @@ html.extension-page {
   display: none;
 }
 
-
 [class*="bento"] > div,
 [style*="grid"] > div {
   padding: 0 !important;
   background: transparent !important;
 }
-
 
 .plasmo-no-visible-scrollbar {
   scrollbar-width: none !important;
@@ -95,7 +86,6 @@ html.extension-page {
   display: none !important;
 }
 
-
 .plasmo-overflow-x-auto::-webkit-scrollbar {
   display: none !important;
   height: 0 !important;
@@ -105,7 +95,6 @@ html.extension-page {
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
 }
-
 
 .scrollbar-thin {
   scrollbar-width: thin;
@@ -128,16 +117,13 @@ html.extension-page {
   background-color: transparent;
 }
 
-
 .plasmo-overflow-y-auto {
   overflow-y: auto !important;
 }
 
-
 .ProseMirror {
   outline: none;
 }
-
 
 .compact-editor .ProseMirror {
   min-height: 2.5em !important;
@@ -276,7 +262,6 @@ html.extension-page {
   height: 0;
 }
 
-
 .ProseMirror table {
   border-collapse: collapse;
   table-layout: fixed;
@@ -322,7 +307,6 @@ html.extension-page {
   margin: 0;
 }
 
-
 @keyframes slideUp {
   from {
     transform: translateY(100%);
@@ -338,7 +322,6 @@ html.extension-page {
   animation: slideUp 0.3s ease-out forwards;
 }
 
-
 .plasmo-break-words {
   word-break: break-word;
   overflow-wrap: break-word;
@@ -348,7 +331,6 @@ html.extension-page {
 .plasmo-overflow-wrap-anywhere {
   overflow-wrap: anywhere;
 }
-
 
 .plasmo-line-clamp-2 {
   display: -webkit-box;

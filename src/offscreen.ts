@@ -1,5 +1,3 @@
-
-
 import { generateEmbedding } from "~services/ai-service"
 import * as dbService from "~services/db-service"
 
@@ -7,11 +5,9 @@ console.log("🟢 [Offscreen] Dedicated offscreen document initialized")
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log("📨 [Offscreen] Received message:", message.type)
-
   ;(async () => {
     try {
       switch (message.type) {
-
         case "DB_SEARCH_BY_VECTOR": {
           const { vector, limit } = message.payload
           console.log(`🔍 [Offscreen] Searching by vector (limit: ${limit})`)

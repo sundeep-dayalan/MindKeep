@@ -1,5 +1,3 @@
-
-
 import { z } from "zod"
 import { zodToJsonSchema } from "zod-to-json-schema"
 
@@ -11,7 +9,6 @@ import * as GeminiNanoService from "./gemini-nano-service"
 import { allTools } from "./langchain-tools"
 
 export interface AgentResponse {
-
   extractedData: string | null
 
   referenceNotes: string[]
@@ -93,7 +90,6 @@ Important:
 - When asked about "how many notes" or "statistics", use the get_statistics tool`
 
 function estimateTokens(text: string): number {
-
   return Math.ceil(text.length / 3.5)
 }
 
@@ -112,7 +108,6 @@ function extractRelevantContent(
     .filter((word) => word.length > 3)
 
   if (queryKeywords.length > 0) {
-
     const sentences = noteContent.split(/[.!?]+/).filter((s) => s.trim())
 
     const relevantSentences: Array<{ sentence: string; score: number }> = []
@@ -211,18 +206,15 @@ function buildOptimizedSessionHistory(
     const msgTokens = estimateTokens(msg.content)
 
     if (totalTokens + msgTokens <= maxTotalTokens) {
-
       optimizedHistory.unshift(msg)
       totalTokens += msgTokens
       console.log(
         `[Session Optimizer] Added message ${i}: ${msgTokens} tokens (total: ${totalTokens})`
       )
     } else {
-
       const remainingTokens = maxTotalTokens - totalTokens
 
       if (remainingTokens > 100) {
-
         const truncatedMsg = {
           role: msg.role,
           content: optimizeMessageForSession(msg.content, remainingTokens)
@@ -403,7 +395,6 @@ Provide ONLY the summary, no preamble.`
     console.log("🔄 [Agent] Rotating session to prevent token overflow...")
 
     try {
-
       const recentMessages = this.rawConversationHistory.slice(-4)
 
       const summary = await this.createContextSummary(recentMessages)
@@ -514,7 +505,6 @@ When helping users:
     let currentTokenCount = 0
 
     for (const result of toolResults) {
-
       if (result.tool === "search_notes" && result.result?.notes) {
         const notes = result.result.notes
         const optimizedNotes = []
@@ -524,7 +514,6 @@ When helping users:
         )
 
         for (const note of notes) {
-
           if (note.embedding) {
             delete note.embedding
           }
@@ -630,7 +619,6 @@ When helping users:
     }
 
     try {
-
       const toolsNeeded = await this.selectTools(input, this.sessionId)
 
       if (this.verbose) {
@@ -646,7 +634,6 @@ When helping users:
 
         try {
           if (toolResults.length > 0) {
-
             const searchResult = toolResults.find(
               (t) => t.tool === "search_notes"
             )
@@ -876,7 +863,6 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
             }
           } catch (error) {
             console.error("[Agent] Error running organize_note:", error)
-
           }
         }
 
@@ -934,7 +920,6 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
     }
 
     try {
-
       const toolsNeeded = await this.selectTools(input, this.sessionId)
 
       let toolResults: any[] = []
@@ -1140,7 +1125,6 @@ NOTE: You are in PERSONA mode. You can ONLY search and read notes. You CANNOT cr
 
     let conversationContext = ""
     if (this.rawConversationHistory && this.rawConversationHistory.length > 0) {
-
       const recentMessages = this.rawConversationHistory.slice(-5)
 
       console.log(
@@ -1152,7 +1136,6 @@ NOTE: You are in PERSONA mode. You can ONLY search and read notes. You CANNOT cr
           "\n\nRecent conversation:\n" +
           recentMessages
             .map((msg, idx) => {
-
               const content =
                 msg.content.length > 2000
                   ? msg.content.substring(0, 2000) + "... [truncated]"
@@ -1172,7 +1155,6 @@ NOTE: You are in PERSONA mode. You can ONLY search and read notes. You CANNOT cr
 
     const isNoteCreationFollowUp = this.rawConversationHistory.some(
       (msg, idx) => {
-
         if (
           msg.role === "assistant" &&
           idx >= this.rawConversationHistory.length - 3
@@ -1692,8 +1674,15 @@ Begin analysis. Respond ONLY with a complete JSON object with all 5 required fie
       const parsedResponse = JSON.parse(jsonStringResponse)
 
       // Check if parsedResponse is actually an object, not a primitive (like number 0)
-      if (typeof parsedResponse !== 'object' || parsedResponse === null || Array.isArray(parsedResponse)) {
-        console.error("[Stage 1] AI returned non-object response:", parsedResponse)
+      if (
+        typeof parsedResponse !== "object" ||
+        parsedResponse === null ||
+        Array.isArray(parsedResponse)
+      ) {
+        console.error(
+          "[Stage 1] AI returned non-object response:",
+          parsedResponse
+        )
         return {
           data: null,
           type: "other",
@@ -2142,7 +2131,6 @@ IMPORTANT Rules:
     console.log("Model response:", responseText)
 
     try {
-
       let cleanedText = responseText
         .replace(/```json\s*/g, "")
         .replace(/```/g, "")
@@ -2194,7 +2182,6 @@ IMPORTANT Rules:
     }> = []
 
     if (extractedData) {
-
       actions.push({
         type: "copy",
         label: "Copy to clipboard",
@@ -2334,7 +2321,6 @@ ${this.activePersona ? `- Active persona: ${this.activePersona.name}` : ""}`
     }
 
     if (clarificationType === "category") {
-
       if (existingCategories.length > 0 && noteContent) {
         try {
           const relevantCategories = await getRelevantCategories(

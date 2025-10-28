@@ -1,5 +1,3 @@
-
-
 const ALGORITHM = "AES-GCM"
 const KEY_LENGTH = 256
 const IV_LENGTH = 12
@@ -156,7 +154,6 @@ export async function encrypt(text: string): Promise<string> {
 
 export async function decrypt(encryptedText: string): Promise<string> {
   try {
-
     const combined = new Uint8Array(base64ToArrayBuffer(encryptedText))
 
     const iv = combined.slice(0, IV_LENGTH)

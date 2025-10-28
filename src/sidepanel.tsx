@@ -8,7 +8,12 @@ import { AnimatedCategoryTabs } from "~components/AnimatedCategoryTabs"
 import { Header } from "~components/Header"
 import { NoteEditor, type RichTextEditorRef } from "~components/NoteEditor"
 import { PersonaManager } from "~components/PersonaManager"
-import { generateEmbedding, generateTitle } from "~services/ai-service"
+import {
+  checkAllAIServices,
+  generateEmbedding,
+  generateTitle,
+  type HealthCheckStatus
+} from "~services/ai-service"
 import {
   deleteNote,
   getAllCategories,
@@ -16,10 +21,6 @@ import {
   searchNotesByTitle,
   type Note
 } from "~services/db-service"
-import {
-  checkAllAIServices,
-  type HealthCheckStatus
-} from "~services/ai-service"
 import { getGlobalAgent } from "~services/langchain-agent"
 import { initializeDefaultPersonas } from "~services/persona-defaults"
 import type { Persona } from "~types/persona"
@@ -60,7 +61,6 @@ function SidePanel() {
       if (message.type === "CLOSE_SIDE_PANEL") {
         window.close()
       } else if (message.type === "FILL_EDITOR") {
-
         const content = message.data.content || ""
         const isHtml = message.data.isHtml || false
 
@@ -70,7 +70,6 @@ function SidePanel() {
         setView("editor")
 
         if (isHtml) {
-
           setNoteContent(content)
 
           setTimeout(() => {
@@ -79,7 +78,6 @@ function SidePanel() {
             }
           }, 100)
         } else {
-
           setNoteContent(content)
         }
       }
@@ -146,7 +144,6 @@ function SidePanel() {
 
     setLoading(true)
     try {
-
       let finalTitle = noteTitle.trim()
       if (!finalTitle) {
         console.log(
@@ -172,7 +169,6 @@ function SidePanel() {
       const contentJSONString = JSON.stringify(contentJSON)
 
       if (editingNote) {
-
         const updateStartTime = performance.now()
         console.log(" [UI Update] Updating existing note:", editingNote.id)
 
@@ -212,7 +208,6 @@ function SidePanel() {
           ` [UI Update] Breakdown: Embedding=${embeddingTime.toFixed(2)}ms, Background=${messageTime.toFixed(2)}ms`
         )
       } else {
-
         const saveStartTime = performance.now()
         console.log(" [UI Save] Creating new note...")
 
@@ -308,7 +303,6 @@ function SidePanel() {
     console.log(" [SidePanel] Persona activated:", persona?.name || "None")
 
     try {
-
       const agent = await getGlobalAgent()
       await agent.setPersona(persona)
 
@@ -341,7 +335,6 @@ function SidePanel() {
   const handleSearchInput = (value: string) => {
     console.log(" [Search] Query changed to:", value)
     setSearchQuery(value)
-
   }
 
   const handleAISearch = async (
@@ -359,23 +352,32 @@ function SidePanel() {
       if (onStreamChunk) {
         console.log(" [LangChain Agent] Using streaming mode")
 
-        let finalResponse: import("~services/langchain-agent").AgentResponse | null = null
+        let finalResponse:
+          | import("~services/langchain-agent").AgentResponse
+          | null = null
 
         for await (const event of agent.runStream(query, conversationHistory)) {
           if (event.type === "chunk") {
-
             onStreamChunk(event.data as string)
           } else if (event.type === "complete") {
-
-            finalResponse = event.data as import("~services/langchain-agent").AgentResponse
+            finalResponse =
+              event.data as import("~services/langchain-agent").AgentResponse
           }
         }
 
         const totalTime = performance.now() - startTime
-        console.log(` [LangChain Agent] TOTAL stream time: ${totalTime.toFixed(2)}ms`)
+        console.log(
+          ` [LangChain Agent] TOTAL stream time: ${totalTime.toFixed(2)}ms`
+        )
         console.log(` [LangChain Agent] Final response:`, finalResponse)
 
-        return finalResponse || { aiResponse: "", extractedData: null, referenceNotes: [] }
+        return (
+          finalResponse || {
+            aiResponse: "",
+            extractedData: null,
+            referenceNotes: []
+          }
+        )
       }
 
       const response = await agent.run(query, conversationHistory)
@@ -457,7 +459,6 @@ function SidePanel() {
               </div>
             </div>
           ) : (
-
             <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-no-visible-scrollbar plasmo-p-4 plasmo-pb-8">
               <NoteEditor
                 title={noteTitle}

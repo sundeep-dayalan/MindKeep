@@ -1,5 +1,3 @@
-
-
 import { DynamicStructuredTool } from "@langchain/core/tools"
 import { z } from "zod"
 
@@ -114,7 +112,6 @@ export const searchNotesTool = new DynamicStructuredTool({
           `[Tool: search_notes] Vector search unavailable: ${embeddingError.message}`
         )
         console.warn(`[Tool: search_notes] Falling back to title-only search`)
-
       }
 
       const titleResults = await dbService.searchNotesByTitle(query)
@@ -432,7 +429,6 @@ export const createNoteFromChatTool = new DynamicStructuredTool({
         !skipClarification &&
         (missingParams.title || missingParams.category)
       ) {
-
         const existingCategories = await dbService.getAllCategories()
 
         return JSON.stringify({
@@ -461,7 +457,6 @@ export const createNoteFromChatTool = new DynamicStructuredTool({
 
       if (title && category && content) {
         try {
-
           const embedding = await aiService.generateEmbedding(content)
 
           const createdNote = await dbService.addNote({

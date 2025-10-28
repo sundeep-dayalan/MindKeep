@@ -105,7 +105,6 @@ export function NoteEditor({
 
     setIsSummarizing(true)
     try {
-
       const markdownSummary = await summarizeText(contentPlaintext)
 
       const richHTML = await markdownToTipTapHTML(markdownSummary)

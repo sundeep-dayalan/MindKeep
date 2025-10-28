@@ -1,5 +1,3 @@
-
-
 export type HealthCheckStatus = {
   api: string
   available: boolean
@@ -14,7 +12,6 @@ export type {
 } from "~types/chrome-ai"
 
 export type PromptOptions = {
-
   initialPrompts?: PromptMessage[]
   temperature?: number
   topK?: number
@@ -326,7 +323,6 @@ export async function createSession(
   console.log(` [Session] Creating new session: ${sessionId}`)
 
   try {
-
     const initialPrompts: PromptMessage[] = options.initialPrompts || []
     if (options.systemPrompt) {
       initialPrompts.unshift({
@@ -594,13 +590,11 @@ export async function saveSessionState(
   sessionId: string,
   metadata?: Record<string, any>
 ): Promise<void> {
-
   throw new Error("Session persistence not yet implemented")
 }
 
 export async function restoreSession(
   savedState: Record<string, any>
 ): Promise<string> {
-
   throw new Error("Session restoration not yet implemented")
 }

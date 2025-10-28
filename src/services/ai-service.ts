@@ -1,5 +1,3 @@
-
-
 import type { FeatureExtractionPipeline } from "@xenova/transformers"
 import { env, pipeline } from "@xenova/transformers"
 
@@ -85,7 +83,6 @@ export async function generateBatchEmbeddings(
   texts: string[]
 ): Promise<number[][]> {
   try {
-
     const embeddingPromises = texts.map((text) => generateEmbedding(text))
     const embeddings = await Promise.all(embeddingPromises)
     return embeddings
@@ -168,7 +165,6 @@ export async function generateTitle(
   console.log(` [Generate Title] Starting title generation...`)
 
   try {
-
     const textToProcess = titleContent.trim() || noteContent.trim()
 
     if (!textToProcess) {
@@ -203,7 +199,6 @@ export async function generateTitle(
  `
 
     const options: PromptOptions = {
-
       initialPrompts: initialPrompts,
       temperature: 0.5,
       topK: 1,
