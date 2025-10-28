@@ -1,4 +1,4 @@
-import { BlurFade } from "@/components/ui/blur-fade"
+import { BlurFade } from "~components/ui/blur-fade"
 import { Color } from "@tiptap/extension-color"
 import Highlight from "@tiptap/extension-highlight"
 import Image from "@tiptap/extension-image"
