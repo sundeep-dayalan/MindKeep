@@ -691,6 +691,8 @@ CRITICAL INSTRUCTIONS:
 - Be contextually aware and maintain conversation flow
 - If asked "do you know why...", check if the reason was mentioned in the conversation context above
 - **If user expresses INTENT to create/add/save a note WITHOUT providing content**, ask what they'd like to save
+- NEVER output JSON objects or structured data formats
+- DO NOT use quotes around your entire response
 
 Examples:
 - "Hello" → "Hi! I'm MindKeep AI. I can help you search your notes, create new notes, or answer questions about your saved information."
@@ -715,21 +717,43 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
 
         let cleanResponse = responseText?.trim() || ""
 
-        if (cleanResponse.startsWith("{")) {
+        // Remove any markdown code blocks
+        cleanResponse = cleanResponse.replace(/```json\s*/g, "").replace(/```/g, "").trim()
+
+        // Check if response is JSON and extract the message
+        if (cleanResponse.startsWith("{") || cleanResponse.startsWith("[")) {
           logger.warn(
             "[Agent] Response contains JSON, attempting to extract message"
           )
           try {
             const parsed = JSON.parse(cleanResponse)
 
+            // Try various common JSON response fields
             cleanResponse =
               parsed.aiResponse ||
               parsed.message ||
+              parsed.response ||
+              parsed.text ||
+              parsed.content ||
               parsed.note_content ||
+              // If it's the tool selection JSON accidentally returned, provide a fallback
+              (parsed.tool ? "Hi! How can I help you with your notes today?" : null) ||
               cleanResponse
+
+            logger.log("[Agent] Extracted message from JSON:", cleanResponse)
           } catch (e) {
             logger.error("[Agent] Failed to parse JSON response:", e)
+            // If JSON parsing fails but it looks like JSON, give a friendly fallback
+            if (cleanResponse.includes('"tool"') || cleanResponse.includes('"search_query"')) {
+              cleanResponse = "Hi! How can I help you with your notes today?"
+            }
           }
+        }
+
+        // Final safety check: if response still looks like JSON structure, replace it
+        if (cleanResponse.includes('"tool":') || cleanResponse.includes('"note_content":')) {
+          logger.warn("[Agent] Response still contains tool selection JSON, using fallback")
+          cleanResponse = "Hi! How can I help you with your notes today?"
         }
 
         return {
@@ -949,6 +973,8 @@ CRITICAL INSTRUCTIONS:
 - Write as if you're speaking directly to the user
 - **If user expresses INTENT to create/add/save a note WITHOUT providing content**, ask what they'd like to save
 - Examples: "I need to create a note" → "I can create a note for you! What would you like the note to contain?"
+- NEVER output JSON objects or structured data formats
+- DO NOT use quotes around your entire response
 
 Your response (PLAIN TEXT ONLY, NO JSON):`
 
@@ -965,21 +991,43 @@ Your response (PLAIN TEXT ONLY, NO JSON):`
 
         let cleanResponse = fullResponse.trim()
 
-        if (cleanResponse.startsWith("{")) {
+        // Remove any markdown code blocks
+        cleanResponse = cleanResponse.replace(/```json\s*/g, "").replace(/```/g, "").trim()
+
+        // Check if response is JSON and extract the message
+        if (cleanResponse.startsWith("{") || cleanResponse.startsWith("[")) {
           logger.warn(
             "[Agent Stream] Response contains JSON, attempting to extract message"
           )
           try {
             const parsed = JSON.parse(cleanResponse)
 
+            // Try various common JSON response fields
             cleanResponse =
               parsed.aiResponse ||
               parsed.message ||
+              parsed.response ||
+              parsed.text ||
+              parsed.content ||
               parsed.note_content ||
+              // If it's the tool selection JSON accidentally returned, provide a fallback
+              (parsed.tool ? "Hi! How can I help you with your notes today?" : null) ||
               cleanResponse
+
+            logger.log("[Agent Stream] Extracted message from JSON:", cleanResponse)
           } catch (e) {
             logger.error("[Agent Stream] Failed to parse JSON response:", e)
+            // If JSON parsing fails but it looks like JSON, give a friendly fallback
+            if (cleanResponse.includes('"tool"') || cleanResponse.includes('"search_query"')) {
+              cleanResponse = "Hi! How can I help you with your notes today?"
+            }
           }
+        }
+
+        // Final safety check: if response still looks like JSON structure, replace it
+        if (cleanResponse.includes('"tool":') || cleanResponse.includes('"note_content":')) {
+          logger.warn("[Agent Stream] Response still contains tool selection JSON, using fallback")
+          cleanResponse = "Hi! How can I help you with your notes today?"
         }
 
         yield {

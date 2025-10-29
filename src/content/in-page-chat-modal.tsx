@@ -148,6 +148,7 @@ export function InPageChatModal({
           `💬 [In-Page Chat] TOTAL stream time: ${totalTime.toFixed(2)}ms`
         )
 
+        // Return the structured response
         return (
           finalResponse || {
             aiResponse: "",
@@ -162,6 +163,7 @@ export function InPageChatModal({
       const totalTime = performance.now() - startTime
       logger.log(`💬 [In-Page Chat] TOTAL time: ${totalTime.toFixed(2)}ms`)
 
+      // Return the structured response
       return response
     } catch (error) {
       const totalTime = performance.now() - startTime
