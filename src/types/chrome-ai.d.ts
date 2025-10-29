@@ -1,11 +1,4 @@
-/**
- * Type definitions for Chrome's experimental built-in AI APIs (Gemini Nano).
- * Based on official documentation for Chrome 138+.
- * These are experimental features and subject to change.
- */
-
 declare global {
-  // Common types for Progress Monitoring
   type AIProgressEvent = ProgressEvent & { loaded: number; total: number }
   interface AIModel {
     addEventListener(
@@ -15,9 +8,6 @@ declare global {
   }
   type AIModelMonitor = (model: AIModel) => void
 
-  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  // Summarizer API
-  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   interface Summarizer {
     summarize(
       text: string,
@@ -45,9 +35,6 @@ declare global {
 
   const Summarizer: SummarizerStatic
 
-  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  // Rewriter API
-  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   interface Rewriter {
     rewrite(
       text: string,
@@ -76,9 +63,6 @@ declare global {
 
   const Rewriter: RewriterStatic
 
-  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  // Prompt API (LanguageModel)
-  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   type PromptRole = "system" | "user" | "assistant"
 
   type PromptContentPart =
@@ -140,7 +124,6 @@ declare global {
   const LanguageModel: LanguageModelStatic
 }
 
-// Export types for use in other modules
 export type PromptRole = "system" | "user" | "assistant"
 
 export type PromptContentPart =

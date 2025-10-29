@@ -17,8 +17,8 @@ import {
   saveChatMessages
 } from "~util/session-storage"
 import { tiptapToMarkdown } from "~util/tiptap-to-markdown"
+import { logger } from "~utils/logger"
 
-// Helper function to get dynamic greeting based on time of day
 function getTimeBasedGreeting(): string {
   const hour = new Date().getHours()
 
@@ -35,12 +35,12 @@ function getTimeBasedGreeting(): string {
 
 interface Message {
   id: string
-  type: "user" | "ai" | "system" // Added "system" for compaction notices
+  type: "user" | "ai" | "system"
   content: string
   timestamp: number
   clarificationOptions?: AgentResponse["clarificationOptions"]
   pendingNoteData?: AgentResponse["pendingNoteData"]
-  referenceNotes?: Note[] // Full note objects for display
+  referenceNotes?: Note[]
 }
 
 interface AISearchBarProps {
@@ -50,19 +50,18 @@ interface AISearchBarProps {
     conversationHistory?: Array<{ role: string; content: string }>,
     onStreamChunk?: (chunk: string) => void
   ) => Promise<string | AgentResponse>
-  onNoteCreated?: () => void // Callback when a note is successfully created
-  onNotesChange?: () => Promise<void> // Callback when notes are modified (e.g., category changed)
-  onMessagesChange?: (hasMessages: boolean) => void // Callback when messages are added/cleared
-  onNoteClick?: (note: Note) => void // Callback when a reference note is clicked
-  onManagePersonas?: () => void // Callback to open Personas management page
+  onNoteCreated?: () => void
+  onNotesChange?: () => Promise<void>
+  onMessagesChange?: (hasMessages: boolean) => void
+  onNoteClick?: (note: Note) => void
+  onManagePersonas?: () => void
   className?: string
-  maxInputHeight?: string // Maximum height for the input area (default: "150px")
-  personaDropdownUpward?: boolean // Control persona dropdown direction (default: true)
-  enableInsertMode?: boolean // Enable insert button transformation (for in-page chat)
-  onInsert?: (text: string) => void // Callback when insert button is clicked
+  maxInputHeight?: string
+  personaDropdownUpward?: boolean
+  enableInsertMode?: boolean
+  onInsert?: (text: string) => void
 }
 
-// Reference Notes Component - Collapsible chip design
 function ReferenceNotesSection({
   notes,
   onNoteClick
@@ -75,7 +74,7 @@ function ReferenceNotesSection({
   return (
     <div className="plasmo-flex plasmo-justify-start plasmo-pl-4">
       <div className="plasmo-max-w-[80%] plasmo-space-y-2">
-        {/* Collapsed View - Chips */}
+        {}
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className="plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-px-3 plasmo-py-1.5 plasmo-bg-slate-100 hover:plasmo-bg-slate-200 plasmo-rounded-full plasmo-transition-colors plasmo-cursor-pointer">
@@ -110,7 +109,7 @@ function ReferenceNotesSection({
           </svg>
         </button>
 
-        {/* Expanded View - Note Chips (Clickable) */}
+        {}
         {isExpanded && (
           <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-2 plasmo-mt-2">
             {notes.map((note) => (
@@ -151,65 +150,57 @@ export function AISearchBar({
 }: AISearchBarProps) {
   const [messages, setMessages] = React.useState<Message[]>([])
   const [isSearching, setIsSearching] = React.useState(false)
-  const [isStreaming, setIsStreaming] = React.useState(false) // Track if actively streaming
+  const [isStreaming, setIsStreaming] = React.useState(false)
   const [isChatExpanded, setIsChatExpanded] = React.useState(true)
   const [isInputDisabled, setIsInputDisabled] = React.useState(false)
-  const [isPersonaInitializing, setIsPersonaInitializing] = React.useState(true) // Track persona loading
+  const [isPersonaInitializing, setIsPersonaInitializing] = React.useState(true)
   const [greeting, setGreeting] = React.useState(getTimeBasedGreeting())
-  const [isLoadingFromStorage, setIsLoadingFromStorage] = React.useState(true) // Track if we're loading from storage
-  const [showInsertButton, setShowInsertButton] = React.useState(false) // Track if insert button should be shown (for in-page chat)
+  const [isLoadingFromStorage, setIsLoadingFromStorage] = React.useState(true)
+  const [showInsertButton, setShowInsertButton] = React.useState(false)
 
-  // Track which messages have had their clarifications handled (to hide buttons after click)
   const [handledClarifications, setHandledClarifications] = React.useState<
     Set<string>
   >(new Set())
 
-  // Track token usage for warning banner
   const [tokenUsage, setTokenUsage] = React.useState<{
     usage: number
     quota: number
     percentage: number
   } | null>(null)
 
-  // Track current input length for real-time validation
   const [currentInputLength, setCurrentInputLength] = React.useState(0)
 
-  // Track manual input flow state
   const [pendingManualInput, setPendingManualInput] = React.useState<{
     type: "title" | "category" | null
     pendingNoteData?: AgentResponse["pendingNoteData"]
   }>({ type: null })
 
-  // Track which user messages are expanded
   const [expandedMessages, setExpandedMessages] = React.useState<Set<string>>(
     new Set()
   )
 
-  // Track copied message ID for visual feedback
   const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(
     null
   )
 
-  // Store the rich content JSON when user submits (to preserve formatting)
   const [lastSubmittedContentJSON, setLastSubmittedContentJSON] =
     React.useState<any>(null)
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const editorRef = React.useRef<RichTextEditorRef>(null)
 
-  // Load messages from session storage on mount
   React.useEffect(() => {
     const loadStoredMessages = async () => {
       try {
         const storedMessages = await loadChatMessages()
         if (storedMessages.length > 0) {
-          console.log(
-            `🔄 [AISearchBar] Restored ${storedMessages.length} messages from session storage`
+          logger.log(
+            ` [AISearchBar] Restored ${storedMessages.length} messages from session storage`
           )
           setMessages(storedMessages)
         }
       } catch (error) {
-        console.error("Failed to load messages from storage:", error)
+        logger.error("Failed to load messages from storage:", error)
       } finally {
         setIsLoadingFromStorage(false)
       }
@@ -218,31 +209,26 @@ export function AISearchBar({
     loadStoredMessages()
   }, [])
 
-  // Save messages to session storage whenever they change
   React.useEffect(() => {
-    // Don't save during initial load
     if (isLoadingFromStorage) {
       return
     }
 
-    // Save to session storage
     saveChatMessages(messages).catch((error) => {
-      console.error("Failed to save messages to storage:", error)
+      logger.error("Failed to save messages to storage:", error)
     })
   }, [messages, isLoadingFromStorage])
 
-  // Notify parent when messages change
   React.useEffect(() => {
     if (onMessagesChange) {
       onMessagesChange(messages.length > 0)
     }
   }, [messages.length, onMessagesChange])
 
-  // Update greeting every minute to keep it current
   React.useEffect(() => {
     const interval = setInterval(() => {
       setGreeting(getTimeBasedGreeting())
-    }, 60000) // Update every minute
+    }, 60000)
 
     return () => clearInterval(interval)
   }, [])
@@ -255,65 +241,55 @@ export function AISearchBar({
     scrollToBottom()
   }, [messages])
 
-  // Handle copying AI message content
   const handleCopyMessage = async (messageId: string, content: string) => {
     try {
       await navigator.clipboard.writeText(content)
       setCopiedMessageId(messageId)
 
-      // Reset copied state after 2 seconds
       setTimeout(() => {
         setCopiedMessageId(null)
       }, 2000)
 
-      console.log("📋 [AISearchBar] Message copied to clipboard")
+      logger.log(" [AISearchBar] Message copied to clipboard")
     } catch (error) {
-      console.error("❌ [AISearchBar] Failed to copy message:", error)
+      logger.error(" [AISearchBar] Failed to copy message:", error)
     }
   }
 
-  // Handle persona changes
   const handlePersonaChange = async (
     persona: Persona | null,
     isManualChange: boolean = true
   ) => {
-    console.log(
+    logger.log(
       "[AISearchBar] handlePersonaChange called:",
       persona?.name || "Default Mode",
       isManualChange ? "(manual)" : "(auto-restored)"
     )
 
     try {
-      // Update the global agent with the new persona
-      // Pass the persona during agent creation to avoid double initialization
-      console.log("[AISearchBar] Getting global agent with persona...")
+      logger.log("[AISearchBar] Getting global agent with persona...")
       const agent = await getGlobalAgent(persona)
 
-      console.log("[AISearchBar] Verifying persona was set...")
+      logger.log("[AISearchBar] Verifying persona was set...")
       const currentPersona = agent.getPersona()
       const currentMode = agent.getMode()
-      console.log("[AISearchBar] Agent state after initialization:", {
+      logger.log("[AISearchBar] Agent state after initialization:", {
         personaName: currentPersona?.name || "None",
         mode: currentMode,
         sessionId: agent.getSessionId()
       })
 
-      // If agent already existed and persona changed, update it
-      // Compare IDs, handling null/undefined cases
       const currentId = currentPersona?.id || null
       const newId = persona?.id || null
       if (currentId !== newId) {
-        console.log("[AISearchBar] Persona mismatch, calling setPersona()...")
+        logger.log("[AISearchBar] Persona mismatch, calling setPersona()...")
         await agent.setPersona(persona)
       }
 
-      // Clear chat history when switching personas
       setMessages([])
 
-      // Clear handled clarifications
       setHandledClarifications(new Set())
 
-      // Only show system message if this is a manual change (not auto-restoration)
       if (isManualChange) {
         const systemMessage: Message = {
           id: `system-${Date.now()}`,
@@ -326,48 +302,37 @@ export function AISearchBar({
         setMessages([systemMessage])
       }
 
-      console.log("[AISearchBar] Agent persona updated successfully")
+      logger.log("[AISearchBar] Agent persona updated successfully")
     } catch (error) {
-      console.error("[AISearchBar] Error updating agent persona:", error)
+      logger.error("[AISearchBar] Error updating agent persona:", error)
     }
   }
 
-  // Handle clearing the conversation
   const handleClearChat = async () => {
-    console.log(" [AISearchBar] Clearing chat...")
+    logger.log(" [AISearchBar] Clearing chat...")
 
-    // Clear local messages
     setMessages([])
 
-    // Clear session storage
     await clearChatMessages()
 
-    // Clear handled clarifications
     setHandledClarifications(new Set())
 
-    // Clear the agent's session
     const agent = await getGlobalAgent()
     await agent.clearSession()
 
-    // Clear any pending input state
     setPendingManualInput({ type: null })
 
-    // Clear the editor
     editorRef.current?.setContent("")
 
-    // Clear last submitted content
     setLastSubmittedContentJSON(null)
 
-    // Clear token usage warning
     setTokenUsage(null)
 
-    // Clear input length tracker
     setCurrentInputLength(0)
 
-    console.log(" [AISearchBar] Chat cleared (including session storage)")
+    logger.log(" [AISearchBar] Chat cleared (including session storage)")
   }
 
-  // Check and update token usage
   const checkTokenUsage = async () => {
     try {
       const { getSessionTokenUsage } = await import(
@@ -381,31 +346,26 @@ export function AISearchBar({
         if (usage) {
           setTokenUsage(usage)
 
-          // Log token usage for debugging
-          console.log(
+          logger.log(
             ` [Token Usage] ${usage.usage}/${usage.quota} tokens (${usage.percentage.toFixed(1)}% used) - ${(usage.quota - usage.usage).toFixed(0)} remaining`
           )
 
-          // Warn if approaching limit
           if (usage.percentage >= 80) {
-            console.warn(
+            logger.warn(
               ` [Token Warning] Approaching token limit! ${usage.percentage.toFixed(1)}% used`
             )
           }
         }
       }
     } catch (error) {
-      console.error("Failed to check token usage:", error)
+      logger.error("Failed to check token usage:", error)
     }
   }
 
-  // Estimate token count (rough approximation: ~4 chars per token)
   const estimateTokens = (text: string): number => {
-    // Rule of thumb: 1 token ≈ 4 characters or 0.75 words
     return Math.ceil(text.length / 4)
   }
 
-  // Validate if input would exceed safe token limits
   const validateInputSize = (
     inputText: string
   ): {
@@ -415,10 +375,9 @@ export function AISearchBar({
     compactionThreshold?: number
   } => {
     const estimatedInputTokens = estimateTokens(inputText)
-    const MAX_INPUT_TOKENS = 2000 // Safe threshold for single message (leaves room for response)
-    const COMPACTION_THRESHOLD = 0.7 // Auto-compact at 70% usage (before 80% critical threshold)
+    const MAX_INPUT_TOKENS = 2000
+    const COMPACTION_THRESHOLD = 0.7
 
-    // Check 1: Input itself is too large
     if (estimatedInputTokens > MAX_INPUT_TOKENS) {
       return {
         valid: false,
@@ -426,15 +385,13 @@ export function AISearchBar({
       }
     }
 
-    // Check 2: Session approaching limit - trigger auto-compaction instead of blocking
     if (tokenUsage) {
       const currentUsagePercent = tokenUsage.usage / tokenUsage.quota
-      const projectedTotal = tokenUsage.usage + estimatedInputTokens + 500 // +500 for response
+      const projectedTotal = tokenUsage.usage + estimatedInputTokens + 500
 
-      // If we're at 70%+ usage, suggest compaction (seamless, non-blocking)
       if (currentUsagePercent >= COMPACTION_THRESHOLD) {
-        console.log(
-          `🔄 [Token Management] Session at ${(currentUsagePercent * 100).toFixed(1)}% - auto-compaction recommended`
+        logger.log(
+          ` [Token Management] Session at ${(currentUsagePercent * 100).toFixed(1)}% - auto-compaction recommended`
         )
         return {
           valid: true,
@@ -443,9 +400,7 @@ export function AISearchBar({
         }
       }
 
-      // If input would exceed quota even after compaction, block it
       if (projectedTotal > tokenUsage.quota * 1.2) {
-        // Allow 20% overshoot for safety
         return {
           valid: false,
           reason: `Input too large for current session. Try a shorter message or start a new chat.`
@@ -459,41 +414,35 @@ export function AISearchBar({
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault()
 
-    // Get both text and JSON from TipTap editor
     const query = editorRef.current?.getText()?.trim() || ""
-    const contentJSON = editorRef.current?.getJSON() // Capture rich formatting
+    const contentJSON = editorRef.current?.getJSON()
 
-    // Validate input size before proceeding
     const validation = validateInputSize(query)
     if (!validation.valid) {
-      console.warn("Input validation failed:", validation.reason)
+      logger.warn("Input validation failed:", validation.reason)
 
-      // Show error message to user
       const errorMessage: Message = {
         id: `ai-validation-error-${Date.now()}`,
         type: "ai",
-        content: `⚠️ ${validation.reason}`,
+        content: ` ${validation.reason}`,
         timestamp: Date.now()
       }
       setMessages((prev) => [...prev, errorMessage])
 
-      // Clear the input
       editorRef.current?.setContent("")
       setCurrentInputLength(0)
 
-      return // Block submission if validation fails
+      return
     }
 
-    // Auto-compact session if approaching token limit
     if (validation.needsCompaction) {
       const compactionPercent = (
         (validation.compactionThreshold || 0) * 100
       ).toFixed(1)
-      console.log(
-        `🔄 [Auto-Compaction] Session at ${compactionPercent}% usage - compacting now...`
+      logger.log(
+        ` [Auto-Compaction] Session at ${compactionPercent}% usage - compacting now...`
       )
 
-      // Show compaction notice to user (non-blocking)
       const compactionNotice: Message = {
         id: `compaction-notice-${Date.now()}`,
         type: "system",
@@ -503,11 +452,9 @@ export function AISearchBar({
       setMessages((prev) => [...prev, compactionNotice])
 
       try {
-        // Get agent instance and trigger session rotation with summary
         const agent = await getGlobalAgent()
         await agent.rotateSessionWithSummary()
 
-        // Update success message
         const successMessage: Message = {
           id: `compaction-success-${Date.now()}`,
           type: "system",
@@ -516,11 +463,10 @@ export function AISearchBar({
         }
         setMessages((prev) => [...prev, successMessage])
 
-        console.log(
-          `✅ [Auto-Compaction] Session compacted successfully. Ready to continue.`
+        logger.log(
+          ` [Auto-Compaction] Session compacted successfully. Ready to continue.`
         )
 
-        // Refresh token usage after compaction
         const { getSessionTokenUsage } = await import(
           "~services/gemini-nano-service"
         )
@@ -529,15 +475,14 @@ export function AISearchBar({
           const newUsage = getSessionTokenUsage(sessionId)
           if (newUsage) {
             setTokenUsage(newUsage)
-            console.log(
+            logger.log(
               ` [Token Usage] After compaction: ${newUsage.usage}/${newUsage.quota} tokens (${newUsage.percentage.toFixed(1)}%)`
             )
           }
         }
       } catch (error) {
-        console.error(`❌ [Auto-Compaction] Failed:`, error)
+        logger.error(` [Auto-Compaction] Failed:`, error)
 
-        // Fallback to simple clear if compaction fails
         const fallbackMessage: Message = {
           id: `compaction-fallback-${Date.now()}`,
           type: "system",
@@ -550,7 +495,6 @@ export function AISearchBar({
           const agent = await getGlobalAgent()
           await agent.clearSession()
 
-          // Refresh token usage after clear
           const { getSessionTokenUsage } = await import(
             "~services/gemini-nano-service"
           )
@@ -562,28 +506,24 @@ export function AISearchBar({
             }
           }
         } catch (clearError) {
-          console.error(`❌ [Session Clear] Failed:`, clearError)
+          logger.error(` [Session Clear] Failed:`, clearError)
         }
       }
     }
 
     if (query && onSearch && !isSearching) {
-      // Store the rich content JSON for later use when saving
       setLastSubmittedContentJSON(contentJSON)
 
-      // Check if we're waiting for manual input (title or category)
       if (pendingManualInput.type && pendingManualInput.pendingNoteData) {
-        console.log("Processing manual input:", pendingManualInput.type, query)
+        logger.log("Processing manual input:", pendingManualInput.type, query)
 
         if (pendingManualInput.type === "category") {
-          // User provided manual category
           await handleClarificationOption(
             "select_category",
             query,
             pendingManualInput.pendingNoteData
           )
         } else if (pendingManualInput.type === "title") {
-          // User provided manual title
           await handleClarificationOption(
             "use_manual_title",
             query,
@@ -591,13 +531,11 @@ export function AISearchBar({
           )
         }
 
-        // Clear pending state and editor
         setPendingManualInput({ type: null })
         editorRef.current?.setContent("")
         return
       }
 
-      // Normal search/query flow
       const userMessage: Message = {
         id: `user-${Date.now()}`,
         type: "user",
@@ -606,11 +544,10 @@ export function AISearchBar({
       }
 
       setMessages((prev) => [...prev, userMessage])
-      editorRef.current?.setContent("") // Clear editor
-      setCurrentInputLength(0) // Clear input length tracker
+      editorRef.current?.setContent("")
+      setCurrentInputLength(0)
       setIsSearching(true)
 
-      // Create a placeholder message for streaming response
       const streamingMessageId = `ai-streaming-${Date.now()}`
       const streamingMessage: Message = {
         id: streamingMessageId,
@@ -621,7 +558,6 @@ export function AISearchBar({
       setMessages((prev) => [...prev, streamingMessage])
 
       try {
-        // Build conversation history (exclude system messages)
         const conversationHistory = messages
           .filter((m) => m.type === "user" || m.type === "ai")
           .map((m) => ({
@@ -629,27 +565,24 @@ export function AISearchBar({
             content: m.content
           }))
 
-        // Add current query
         conversationHistory.push({ role: "user", content: query })
 
-        // Create a streaming callback to update the message content
         let accumulatedText = ""
         let isFirstChunk = true
-        let didReceiveChunks = false // Track if we actually received any chunks
+        let didReceiveChunks = false
         const handleStreamChunk = (chunk: string) => {
-          // Mark as streaming on first chunk
           if (isFirstChunk) {
-            console.log(`📡 [Streaming] First chunk received, starting stream`)
+            logger.log(` [Streaming] First chunk received, starting stream`)
             setIsStreaming(true)
             isFirstChunk = false
             didReceiveChunks = true
           }
 
           accumulatedText += chunk
-          console.log(
-            `📡 [Streaming] Chunk received (${chunk.length} chars), total: ${accumulatedText.length}`
+          logger.log(
+            ` [Streaming] Chunk received (${chunk.length} chars), total: ${accumulatedText.length}`
           )
-          // Update the streaming message with accumulated text
+
           setMessages((prev) =>
             prev.map((m) =>
               m.id === streamingMessageId
@@ -665,30 +598,24 @@ export function AISearchBar({
           handleStreamChunk
         )
 
-        // Stop streaming when complete
         setIsStreaming(false)
 
-        // Remove the streaming placeholder message only if we received chunks
-        // (for non-streaming responses like clarifications, we never created a visible streaming message)
         if (didReceiveChunks) {
           setMessages((prev) => prev.filter((m) => m.id !== streamingMessageId))
         } else {
-          // No chunks received, remove the empty placeholder
           setMessages((prev) => prev.filter((m) => m.id !== streamingMessageId))
         }
 
-        // Check if response is an AgentResponse object (has aiResponse field or referenceNotes)
         if (
           typeof aiResponse === "object" &&
           ("aiResponse" in aiResponse || "referenceNotes" in aiResponse)
         ) {
-          // Fetch full note details for reference notes if available
           let fullReferenceNotes: Note[] = []
           if (
             aiResponse.referenceNotes &&
             aiResponse.referenceNotes.length > 0
           ) {
-            console.log("Fetching reference notes:", aiResponse.referenceNotes)
+            logger.log("Fetching reference notes:", aiResponse.referenceNotes)
             const { getNote } = await import("~services/db-service")
             const notePromises = aiResponse.referenceNotes.map((noteId) =>
               getNote(noteId)
@@ -697,7 +624,7 @@ export function AISearchBar({
             fullReferenceNotes = notes.filter(
               (note): note is Note => note !== null
             )
-            console.log("Fetched full reference notes:", fullReferenceNotes)
+            logger.log("Fetched full reference notes:", fullReferenceNotes)
           }
 
           const aiMessage: Message = {
@@ -710,9 +637,8 @@ export function AISearchBar({
             referenceNotes: fullReferenceNotes
           }
 
-          // Debug logging
-          console.log(
-            "🔍 [AISearchBar] Creating AI message with clarifications:",
+          logger.log(
+            " [AISearchBar] Creating AI message with clarifications:",
             {
               hasClarificationOptions: !!aiResponse.clarificationOptions,
               clarificationCount: aiResponse.clarificationOptions?.length || 0,
@@ -723,26 +649,21 @@ export function AISearchBar({
 
           setMessages((prev) => [...prev, aiMessage])
 
-          // Disable input if clarification is needed
           if (aiResponse.needsClarification) {
             setIsInputDisabled(true)
           }
 
-          // Enable insert button for in-page chat after AI response
           if (enableInsertMode && !aiResponse.needsClarification) {
             setShowInsertButton(true)
           }
 
-          // If a note was created, refresh the notes list
           if (aiResponse.noteCreated && onNoteCreated) {
-            console.log("Note created, calling onNoteCreated callback")
+            logger.log("Note created, calling onNoteCreated callback")
             onNoteCreated()
           }
 
-          // Check token usage after AI response
           await checkTokenUsage()
         } else {
-          // String response (legacy support - should not happen with new agent)
           const aiMessage: Message = {
             id: `ai-${Date.now()}`,
             type: "ai",
@@ -752,17 +673,15 @@ export function AISearchBar({
           }
           setMessages((prev) => [...prev, aiMessage])
 
-          // Enable insert button for in-page chat after AI response
           if (enableInsertMode) {
             setShowInsertButton(true)
           }
 
-          // Check token usage after AI response
           await checkTokenUsage()
         }
       } catch (error) {
-        console.error("Search error:", error)
-        // Remove streaming message on error
+        logger.error("Search error:", error)
+
         setMessages((prev) => prev.filter((m) => m.id !== streamingMessageId))
 
         const errorMessage: Message = {
@@ -774,7 +693,7 @@ export function AISearchBar({
         setMessages((prev) => [...prev, errorMessage])
       } finally {
         setIsSearching(false)
-        setIsStreaming(false) // Always reset streaming state
+        setIsStreaming(false)
       }
     }
   }
@@ -786,37 +705,34 @@ export function AISearchBar({
     messageId?: string
   ) => {
     const callId = `${action}-${Date.now()}`
-    console.log(`[${callId}] Clarification option selected:`, {
+    logger.log(`[${callId}] Clarification option selected:`, {
       action,
       value,
       pendingNoteData,
       messageId
     })
 
-    // Mark this message's clarification as handled (hide buttons)
     if (messageId) {
       setHandledClarifications((prev) => new Set(prev).add(messageId))
     }
 
     if (!pendingNoteData) {
-      console.error(`[${callId}] No pending note data found`)
+      logger.error(`[${callId}] No pending note data found`)
       setIsInputDisabled(false)
       return
     }
 
-    // Prevent duplicate executions
     if (isSearching) {
-      console.warn(
+      logger.warn(
         `[${callId}] Already processing clarification, ignoring duplicate call`
       )
       return
     }
 
-    console.log(`[${callId}] Setting isSearching to true`)
+    logger.log(`[${callId}] Setting isSearching to true`)
     setIsSearching(true)
 
     try {
-      // Import necessary services
       const { generateTitle, generateCategory } = await import(
         "~services/ai-service"
       )
@@ -826,10 +742,8 @@ export function AISearchBar({
       let finalCategory = pendingNoteData.category || ""
       const noteContent = pendingNoteData.content || ""
 
-      // Handle different actions
       switch (action) {
         case "cancel_note_creation": {
-          // User chose to cancel the note creation flow
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
@@ -847,17 +761,14 @@ export function AISearchBar({
           }
           setMessages((prev) => [...prev, cancelMessage])
 
-          // Clear pending manual input state
           setPendingManualInput({ type: null })
 
-          // Re-enable input
           setIsSearching(false)
           setIsInputDisabled(false)
           return
         }
 
         case "auto_generate_both": {
-          // User chose to auto-generate both title and category
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
@@ -874,7 +785,6 @@ export function AISearchBar({
           }
           setMessages((prev) => [...prev, loadingMessage])
 
-          // Generate both in parallel
           const [generatedTitle, generatedCategory] = await Promise.all([
             generateTitle("", noteContent),
             generateCategory(noteContent)
@@ -883,7 +793,6 @@ export function AISearchBar({
           finalTitle = generatedTitle
           finalCategory = generatedCategory
 
-          // Remove loading message
           setMessages((prev) => prev.filter((m) => m.id !== loadingMessage.id))
 
           const confirmMessage: Message = {
@@ -894,12 +803,10 @@ export function AISearchBar({
           }
           setMessages((prev) => [...prev, confirmMessage])
 
-          // Continue to note creation below
           break
         }
 
         case "start_manual_flow": {
-          // User chose to manually provide title and/or category
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
@@ -908,7 +815,6 @@ export function AISearchBar({
           }
           setMessages((prev) => [...prev, userMessage])
 
-          // Show options to start with title or category
           const clarificationMessage: Message = {
             id: `ai-${Date.now()}`,
             type: "ai",
@@ -953,7 +859,6 @@ export function AISearchBar({
         }
 
         case "auto_generate_title": {
-          // User chose to auto-generate title
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
@@ -972,12 +877,10 @@ export function AISearchBar({
 
           finalTitle = await generateTitle("", noteContent)
 
-          // Remove loading message
           setMessages((prev) =>
             prev.filter((msg) => msg.id !== loadingMessage.id)
           )
 
-          // If category is still missing, ask for it
           if (!finalCategory) {
             const clarificationMessage: Message = {
               id: `ai-${Date.now()}`,
@@ -1012,7 +915,6 @@ export function AISearchBar({
         }
 
         case "manual_title": {
-          // User wants to provide title manually
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
@@ -1029,7 +931,6 @@ export function AISearchBar({
           }
           setMessages((prev) => [...prev, promptMessage])
 
-          // Set pending state to capture next user input as title
           setPendingManualInput({
             type: "title",
             pendingNoteData: {
@@ -1045,7 +946,6 @@ export function AISearchBar({
         }
 
         case "auto_generate_category": {
-          // User chose to auto-generate category
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
@@ -1064,12 +964,10 @@ export function AISearchBar({
 
           finalCategory = await generateCategory(noteContent)
 
-          // Remove loading message
           setMessages((prev) =>
             prev.filter((msg) => msg.id !== loadingMessage.id)
           )
 
-          // If title is still missing, ask for it
           if (!finalTitle) {
             const clarificationMessage: Message = {
               id: `ai-${Date.now()}`,
@@ -1104,7 +1002,6 @@ export function AISearchBar({
         }
 
         case "select_category": {
-          // User selected an existing category
           finalCategory = value
           const userMessage: Message = {
             id: `user-${Date.now()}`,
@@ -1114,7 +1011,6 @@ export function AISearchBar({
           }
           setMessages((prev) => [...prev, userMessage])
 
-          // If title is still missing, ask for it
           if (!finalTitle) {
             const clarificationMessage: Message = {
               id: `ai-${Date.now()}`,
@@ -1149,7 +1045,6 @@ export function AISearchBar({
         }
 
         case "manual_category": {
-          // User wants to provide category manually
           const userMessage: Message = {
             id: `user-${Date.now()}`,
             type: "user",
@@ -1166,7 +1061,6 @@ export function AISearchBar({
           }
           setMessages((prev) => [...prev, promptMessage])
 
-          // Set pending state to capture next user input as category
           setPendingManualInput({
             type: "category",
             pendingNoteData: {
@@ -1182,7 +1076,6 @@ export function AISearchBar({
         }
 
         case "use_manual_title": {
-          // User provided a manual title (comes from handleSubmit)
           finalTitle = value
           const userMessage: Message = {
             id: `user-${Date.now()}`,
@@ -1192,7 +1085,6 @@ export function AISearchBar({
           }
           setMessages((prev) => [...prev, userMessage])
 
-          // If category is still missing, ask for it
           if (!finalCategory) {
             const clarificationMessage: Message = {
               id: `ai-${Date.now()}`,
@@ -1228,8 +1120,7 @@ export function AISearchBar({
         }
 
         case "confirm_organize": {
-          // Handle organization confirmation
-          console.log(`[${callId}] Organization confirmation:`, value)
+          logger.log(`[${callId}] Organization confirmation:`, value)
 
           const userMessage: Message = {
             id: `user-${Date.now()}`,
@@ -1239,11 +1130,9 @@ export function AISearchBar({
           }
           setMessages((prev) => [...prev, userMessage])
 
-          // Call the confirm_organize_note tool
           const { getGlobalAgent } = await import("~services/langchain-agent")
           const agent = await getGlobalAgent()
 
-          // Get the confirm tool directly
           const { confirmOrganizeNoteTool } = await import(
             "~services/langchain-tools"
           )
@@ -1267,7 +1156,6 @@ export function AISearchBar({
           setIsInputDisabled(false)
           setIsSearching(false)
 
-          // Refresh notes if category was changed
           if (parsedResult.action === "moved" && onNotesChange) {
             await onNotesChange()
           }
@@ -1276,37 +1164,33 @@ export function AISearchBar({
         }
 
         default:
-          console.warn("Unknown clarification action:", action)
+          logger.warn("Unknown clarification action:", action)
           setIsInputDisabled(false)
           setIsSearching(false)
           return
       }
 
-      // If we have both title and category, create the note
       if (finalTitle && finalCategory && noteContent) {
         const noteCreationId = `note-${Date.now()}`
-        console.log(`[${callId}] [${noteCreationId}] Creating note with:`, {
+        logger.log(`[${callId}] [${noteCreationId}] Creating note with:`, {
           finalTitle,
           finalCategory,
           noteContent: noteContent.substring(0, 100) + "..."
         })
 
-        // Generate embedding (same as in sidepanel.tsx handleSaveNote)
         const saveStartTime = performance.now()
-        console.log(
+        logger.log(
           `[${noteCreationId}] [AI Chat] Creating new note via agent...`
         )
 
-        // Step 1: Generate embedding from plaintext content
         const embeddingStartTime = performance.now()
         const { generateEmbedding } = await import("~services/ai-service")
         const embedding = await generateEmbedding(noteContent)
         const embeddingTime = performance.now() - embeddingStartTime
-        console.log(
-          `⏱ [AI Chat] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embedding.length} dimensions)`
+        logger.log(
+          ` [AI Chat] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embedding.length} dimensions)`
         )
 
-        // Get current tab URL for sourceUrl
         let sourceUrl: string | undefined
         try {
           const tabs = await chrome.tabs.query({
@@ -1315,28 +1199,23 @@ export function AISearchBar({
           })
           sourceUrl = tabs[0]?.url
         } catch (e) {
-          console.warn("Could not get tab URL:", e)
+          logger.warn("Could not get tab URL:", e)
         }
 
-        // Step 2: Use the stored TipTap JSON (with rich formatting) or convert plain text
         let contentJSONString: string
         if (lastSubmittedContentJSON && noteContent) {
-          // Extract only the portion of TipTap JSON that matches the agent's extracted content
-          console.log(" Extracting relevant portion from rich content JSON...")
+          logger.log(" Extracting relevant portion from rich content JSON...")
 
-          // Get the full markdown from the stored JSON to compare
           const fullMarkdown = tiptapToMarkdown(lastSubmittedContentJSON)
 
-          // Check if noteContent is a subset of fullMarkdown (agent extracted only part)
           if (
             fullMarkdown.includes(noteContent) &&
             fullMarkdown.length > noteContent.length
           ) {
-            console.log(
+            logger.log(
               " Agent extracted partial content, filtering TipTap nodes..."
             )
 
-            // Filter TipTap nodes to only include those that are part of noteContent
             const filteredNodes: any[] = []
             let accumulatedMarkdown = ""
 
@@ -1346,12 +1225,10 @@ export function AISearchBar({
                 content: [node]
               })
 
-              // Check if this node is part of the extracted content
               if (noteContent.includes(nodeMarkdown.trim())) {
                 filteredNodes.push(node)
                 accumulatedMarkdown += nodeMarkdown + "\n"
 
-                // Stop if we've accumulated enough content
                 if (accumulatedMarkdown.trim().length >= noteContent.length) {
                   break
                 }
@@ -1363,22 +1240,19 @@ export function AISearchBar({
                 type: "doc",
                 content: filteredNodes
               })
-              console.log(
+              logger.log(
                 ` Filtered to ${filteredNodes.length} nodes (removed prompt)`
               )
             } else {
-              // Fallback: use the full content if filtering failed
               contentJSONString = JSON.stringify(lastSubmittedContentJSON)
-              console.log(" Filtering failed, using full content")
+              logger.log(" Filtering failed, using full content")
             }
           } else {
-            // Content matches exactly, use full JSON
-            console.log(" Content matches exactly, using full rich JSON")
+            logger.log(" Content matches exactly, using full rich JSON")
             contentJSONString = JSON.stringify(lastSubmittedContentJSON)
           }
         } else {
-          // Fallback: Convert plain text to TipTap JSON format (for backward compatibility)
-          console.log(" No rich content found, converting plain text to JSON")
+          logger.log(" No rich content found, converting plain text to JSON")
           const contentJSON = {
             type: "doc",
             content: noteContent
@@ -1397,14 +1271,12 @@ export function AISearchBar({
           contentJSONString = JSON.stringify(contentJSON)
         }
 
-        // Step 3: Send to background script with pre-generated embedding
-        // (Same pattern as sidepanel.tsx)
         const messageStartTime = performance.now()
         const response = await chrome.runtime.sendMessage({
           type: "SAVE_NOTE",
           data: {
             title: finalTitle,
-            content: contentJSONString, // Now properly formatted as TipTap JSON
+            content: contentJSONString,
             contentPlaintext: noteContent,
             category: finalCategory,
             sourceUrl,
@@ -1412,8 +1284,8 @@ export function AISearchBar({
           }
         })
         const messageTime = performance.now() - messageStartTime
-        console.log(
-          `⏱ [AI Chat] Background processing (encrypt + DB): ${messageTime.toFixed(2)}ms`
+        logger.log(
+          ` [AI Chat] Background processing (encrypt + DB): ${messageTime.toFixed(2)}ms`
         )
 
         if (!response.success) {
@@ -1421,8 +1293,8 @@ export function AISearchBar({
         }
 
         const totalTime = performance.now() - saveStartTime
-        console.log(` [AI Chat] TOTAL save time: ${totalTime.toFixed(2)}ms`)
-        console.log(
+        logger.log(` [AI Chat] TOTAL save time: ${totalTime.toFixed(2)}ms`)
+        logger.log(
           ` [AI Chat] Breakdown: Embedding=${embeddingTime.toFixed(2)}ms, Background=${messageTime.toFixed(2)}ms`
         )
 
@@ -1434,24 +1306,20 @@ export function AISearchBar({
         }
         setMessages((prev) => [...prev, successMessage])
 
-        // Clear the stored content JSON after successful save
         setLastSubmittedContentJSON(null)
 
-        // Notify parent component to refresh notes list
         if (onNoteCreated) {
           onNoteCreated()
         }
 
-        // Now check if we should organize the note
         const noteId = response.note?.id
         if (noteId) {
-          console.log(
+          logger.log(
             `[${callId}] Running organize_note tool for newly created note:`,
             noteId
           )
 
           try {
-            // Import and call the organize note tool
             const { organizeNoteTool } = await import(
               "~services/langchain-tools"
             )
@@ -1461,19 +1329,17 @@ export function AISearchBar({
             })
 
             const organizeData = JSON.parse(organizeResult)
-            console.log(`[${callId}] Organize result:`, organizeData)
+            logger.log(`[${callId}] Organize result:`, organizeData)
 
-            // Check if reorganization is needed
             if (
               organizeData.needsReorganization &&
               organizeData.suggestedCategory
             ) {
-              console.log(
+              logger.log(
                 `[${callId}] Reorganization suggested:`,
                 organizeData.suggestedCategory
               )
 
-              // Show organization suggestion message
               const organizeMessage: Message = {
                 id: `ai-organize-${Date.now()}`,
                 type: "ai",
@@ -1510,25 +1376,23 @@ export function AISearchBar({
                 }
               }
               setMessages((prev) => [...prev, organizeMessage])
-              setIsInputDisabled(true) // Keep input disabled until user responds
+              setIsInputDisabled(true)
               setIsSearching(false)
-              return // Exit early to wait for user response
+              return
             } else {
-              console.log(
+              logger.log(
                 `[${callId}] No reorganization needed or no similar notes found`
               )
             }
           } catch (error) {
-            console.error(`[${callId}] Error running organize_note:`, error)
-            // Don't fail the entire operation, just log and continue
+            logger.error(`[${callId}] Error running organize_note:`, error)
           }
         }
 
-        // Re-enable input
         setIsInputDisabled(false)
       }
     } catch (error) {
-      console.error("Error handling clarification:", error)
+      logger.error("Error handling clarification:", error)
       const errorMessage: Message = {
         id: `ai-error-${Date.now()}`,
         type: "ai",
@@ -1543,7 +1407,6 @@ export function AISearchBar({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Allow Shift+Enter for new line, Enter alone submits
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       handleSubmit(e)
@@ -1552,12 +1415,12 @@ export function AISearchBar({
 
   return (
     <div className={`plasmo-flex plasmo-flex-col plasmo-h-full ${className}`}>
-      {/* Header Section - Dynamic Greeting and Controls */}
+      {}
       <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-py-2 plasmo-px-3 plasmo-border-b plasmo-border-slate-200">
-        {/* Left: MIND KEEP label with Lottie Logo and greeting (hide greeting in insert mode) */}
+        {}
         <div
           className={`plasmo-flex ${enableInsertMode ? "plasmo-flex-row plasmo-items-center" : "plasmo-flex-col"} plasmo-gap-1`}>
-          {/* Logo + Mind Keep Label Row */}
+          {}
           <div className="plasmo-flex plasmo-items-center plasmo-gap-2">
             <div className="plasmo-flex-shrink-0 plasmo-w-6 plasmo-h-6">
               <DotLottieReact
@@ -1572,7 +1435,7 @@ export function AISearchBar({
             </span>
           </div>
 
-          {/* Greeting Text - Below Logo and Label (only in side panel mode) */}
+          {}
           {!enableInsertMode && (
             <div className="plasmo-flex plasmo-flex-col plasmo-gap-0.5">
               <span className="plasmo-text-base plasmo-font-light plasmo-text-slate-700">
@@ -1585,10 +1448,10 @@ export function AISearchBar({
           )}
         </div>
 
-        {/* Right: Clear & Toggle buttons */}
+        {}
         {messages.length > 0 && (
           <div className="plasmo-flex-shrink-0 plasmo-flex plasmo-items-center plasmo-gap-2">
-            {/* Clear chat button */}
+            {}
             <button
               onClick={handleClearChat}
               className="plasmo-p-1.5 plasmo-rounded-lg plasmo-text-slate-500 hover:plasmo-text-red-600 hover:plasmo-bg-red-50 plasmo-transition-colors"
@@ -1607,7 +1470,7 @@ export function AISearchBar({
               </svg>
             </button>
 
-            {/* Toggle chat history button - hide in insert mode */}
+            {}
             {!enableInsertMode && (
               <button
                 onClick={() => setIsChatExpanded(!isChatExpanded)}
@@ -1648,7 +1511,7 @@ export function AISearchBar({
         )}
       </div>
 
-      {/* Token Limit Warning Banner */}
+      {}
       {tokenUsage && tokenUsage.percentage >= 90 && (
         <div
           className={`plasmo-px-4 plasmo-py-3 plasmo-rounded-lg plasmo-border plasmo-flex plasmo-items-start plasmo-gap-3 ${
@@ -1660,34 +1523,24 @@ export function AISearchBar({
             <div className="plasmo-text-xs plasmo-mb-2">
               {"Summarizing conversation history"}
             </div>
-            {/* <button
- onClick={handleClearChat}
- className={`plasmo-px-3 plasmo-py-1.5 plasmo-rounded plasmo-text-xs plasmo-font-medium plasmo-transition-colors ${
- tokenUsage.percentage >= 95
- ? "plasmo-bg-red-600 hover:plasmo-bg-red-700 plasmo-text-white"
- : "plasmo-bg-amber-600 hover:plasmo-bg-amber-700 plasmo-text-white"
- }`}>
- Start New Chat
- </button> */}
+            {}
           </div>
         </div>
       )}
 
-      {/* Chat Messages */}
+      {}
       {messages.length > 0 && isChatExpanded && (
         <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-overflow-x-hidden plasmo-no-visible-scrollbar plasmo-space-y-4 plasmo-px-4 plasmo-py-4 plasmo-max-h-[500px] plasmo-bg-white/10 plasmo-backdrop-blur-lg plasmo-rounded-2xl plasmo-border plasmo-border-white/30 plasmo-mb-4">
           {messages
             .filter((message) => {
-              // Filter out empty AI messages (streaming placeholders before content arrives)
               if (message.type === "ai" && !message.content.trim()) {
                 return false
               }
               return true
             })
-            // In insert mode, only show the last AI message
+
             .filter((_, index, arr) => {
               if (enableInsertMode) {
-                // Find the last AI message
                 const lastAiIndex = arr
                   .map((m, i) => ({ m, i }))
                   .reverse()
@@ -1700,7 +1553,6 @@ export function AISearchBar({
               const isExpanded = expandedMessages.has(message.id)
               const isSystemMessage = message.type === "system"
 
-              // System messages get special centered styling
               if (isSystemMessage) {
                 return (
                   <div
@@ -1766,7 +1618,7 @@ export function AISearchBar({
                         <div className="plasmo-relative plasmo-group">
                           <MarkdownRenderer content={message.content} />
 
-                          {/* Copy Button - Appears on hover */}
+                          {}
                           <button
                             onClick={() =>
                               handleCopyMessage(message.id, message.content)
@@ -1778,7 +1630,6 @@ export function AISearchBar({
                                 : "Copy response"
                             }>
                             {copiedMessageId === message.id ? (
-                              // Checkmark icon (copied state)
                               <svg
                                 className="plasmo-w-3.5 plasmo-h-3.5 plasmo-text-green-600"
                                 fill="none"
@@ -1792,7 +1643,6 @@ export function AISearchBar({
                                 />
                               </svg>
                             ) : (
-                              // Copy icon (default state)
                               <svg
                                 className="plasmo-w-3.5 plasmo-h-3.5 plasmo-text-slate-600"
                                 fill="none"
@@ -1812,7 +1662,7 @@ export function AISearchBar({
                     </div>
                   </div>
 
-                  {/* Clarification Options - Only show if not handled */}
+                  {}
                   {message.clarificationOptions &&
                     message.clarificationOptions.length > 0 &&
                     !handledClarifications.has(message.id) && (
@@ -1823,10 +1673,9 @@ export function AISearchBar({
                           </div>
                           <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-2">
                             {message.clarificationOptions.map((option, idx) => {
-                              // Debug logging
                               if (idx === 0) {
-                                console.log(
-                                  "🎨 [AISearchBar] Rendering clarification buttons for message:",
+                                logger.log(
+                                  " [AISearchBar] Rendering clarification buttons for message:",
                                   {
                                     messageId: message.id,
                                     optionCount:
@@ -1864,7 +1713,7 @@ export function AISearchBar({
                       </div>
                     )}
 
-                  {/* Reference Notes */}
+                  {}
                   {message.referenceNotes &&
                     message.referenceNotes.length > 0 && (
                       <ReferenceNotesSection
@@ -1875,7 +1724,7 @@ export function AISearchBar({
                 </div>
               )
             })}
-          {/* Show loading dots only when searching but NOT streaming */}
+          {}
           {isSearching && !isStreaming && (
             <div className="plasmo-flex plasmo-justify-start">
               <div className="plasmo-max-w-[80%] plasmo-px-4 plasmo-py-2 plasmo-rounded-lg plasmo-bg-white/20 plasmo-backdrop-blur-md plasmo-text-slate-900 plasmo-border plasmo-border-white/40">
@@ -1897,9 +1746,9 @@ export function AISearchBar({
         </div>
       )}
 
-      {/* Search Input */}
+      {}
       <form onSubmit={handleSubmit} className="plasmo-mt-auto">
-        {/* Input length indicator - show if getting close to limit */}
+        {}
         {currentInputLength > 4000 && (
           <div
             className={`plasmo-px-3 plasmo-py-1 plasmo-text-xs plasmo-mb-2 plasmo-rounded-lg ${
@@ -1915,7 +1764,7 @@ export function AISearchBar({
         )}
 
         <div className="plasmo-bg-white/90 plasmo-backdrop-blur-sm plasmo-rounded-[10px] plasmo-px-4 plasmo-py-3 plasmo-border plasmo-border-slate-200/80 hover:plasmo-border-slate-300 plasmo-transition-all focus-within:plasmo-border-slate-400 plasmo-shadow-sm plasmo-space-y-3">
-          {/* Rich Text Editor - Full Width on Top */}
+          {}
           <div
             className="plasmo-w-full plasmo-overflow-y-auto plasmo-no-visible-scrollbar"
             style={{ minHeight: "2.5em", maxHeight: maxInputHeight }}>
@@ -1930,11 +1779,9 @@ export function AISearchBar({
               compact={true}
               onSubmit={handleSubmit}
               onUpdate={() => {
-                // Track input length for validation feedback
                 const currentText = editorRef.current?.getText() || ""
                 setCurrentInputLength(currentText.length)
 
-                // Reset insert button when user starts typing (back to send mode)
                 if (
                   enableInsertMode &&
                   showInsertButton &&
@@ -1946,9 +1793,9 @@ export function AISearchBar({
             />
           </div>
 
-          {/* Bottom Row: Persona Selector + Submit Button */}
+          {}
           <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-gap-3 plasmo-pt-2 plasmo-border-t plasmo-border-slate-100">
-            {/* Persona Selector - Left Side */}
+            {}
             <div className="plasmo-flex-shrink-0">
               <PersonaSelector
                 onPersonaChange={handlePersonaChange}
@@ -1958,13 +1805,12 @@ export function AISearchBar({
               />
             </div>
 
-            {/* Submit Button - Right Side (transforms to Insert button in insert mode) */}
+            {}
             <button
               type={showInsertButton && enableInsertMode ? "button" : "submit"}
               onClick={
                 showInsertButton && enableInsertMode && onInsert
                   ? () => {
-                      // Get last AI message
                       const lastAiMessage = messages
                         .slice()
                         .reverse()
@@ -1994,7 +1840,6 @@ export function AISearchBar({
                 currentInputLength > 8000
               }>
               {showInsertButton && enableInsertMode ? (
-                // Insert button with text and Enter symbol
                 <>
                   <span className="plasmo-text-xs plasmo-font-medium">
                     Insert
@@ -2004,7 +1849,6 @@ export function AISearchBar({
                   </span>
                 </>
               ) : (
-                // Send button with text and arrow icon
                 <>
                   <span className="plasmo-text-xs plasmo-font-medium">
                     Send

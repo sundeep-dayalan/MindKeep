@@ -45,7 +45,7 @@ export function Header({
   return (
     <div className="plasmo-bg-gradient-to-r plasmo-from-sky-100 plasmo-via-indigo-50 plasmo-to-white plasmo-border-b plasmo-border-slate-200 plasmo-p-4">
       <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-gap-2">
-        {/* Left: Logo with Lottie Animation */}
+        {}
         <div className="plasmo-flex plasmo-items-center plasmo-gap-2">
           <div className="plasmo-w-10 plasmo-h-10">
             <DotLottieReact
@@ -59,9 +59,9 @@ export function Header({
           </AnimatedShinyText>
         </div>
 
-        {/* Center/Right: Search, Personas, Close */}
+        {}
         <div className="plasmo-flex plasmo-items-center plasmo-gap-2 plasmo-flex-1 plasmo-justify-end">
-          {/* Collapsible Search Bar - only show in list view */}
+          {}
           {view === "list" && (
             <div
               className={`plasmo-flex plasmo-items-center plasmo-transition-all plasmo-duration-300 ${
@@ -131,7 +131,7 @@ export function Header({
             </div>
           )}
 
-          {/* Create Note Button - only show in list view when search not expanded */}
+          {}
           {view === "list" && onCreateNote && !searchExpanded && (
             <HoverBorderGradient
               onClick={onCreateNote}
@@ -154,7 +154,7 @@ export function Header({
             </HoverBorderGradient>
           )}
 
-          {/* Close Button - always show when search not expanded */}
+          {}
           {!searchExpanded && (
             <button
               onClick={onClose}

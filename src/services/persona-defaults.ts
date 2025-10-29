@@ -1,10 +1,5 @@
-/**
- * Default Persona Templates
- *
- * Pre-built personas that provide common use cases out of the box
- */
-
 import type { PersonaTemplate } from "~types/persona"
+import { logger } from "~utils/logger"
 
 import { addPersona, getAllPersonas } from "./db-service"
 
@@ -155,7 +150,7 @@ Best regards,
 
 **Key Points:**
 • [Main point 1]
-• [Main point 2] 
+• [Main point 2]
 • [Main point 3]
 
 **Details:** [2-3 sentences of context]
@@ -180,12 +175,8 @@ Best regards,
   }
 ]
 
-/**
- * Initialize default personas in the database
- * Only creates them if they don't already exist (checked by name)
- */
 export async function initializeDefaultPersonas(): Promise<void> {
-  console.log(" [DefaultPersonas] Initializing default personas")
+  logger.log(" [DefaultPersonas] Initializing default personas")
 
   try {
     const existingPersonas = await getAllPersonas()
@@ -193,7 +184,7 @@ export async function initializeDefaultPersonas(): Promise<void> {
       existingPersonas.map((p) => p.name.toLowerCase())
     )
 
-    console.log(
+    logger.log(
       ` [DefaultPersonas] Found ${existingPersonas.length} existing personas:`,
       Array.from(existingNames)
     )
@@ -202,7 +193,7 @@ export async function initializeDefaultPersonas(): Promise<void> {
       const templateNameLower = template.name.toLowerCase()
 
       if (!existingNames.has(templateNameLower)) {
-        console.log(
+        logger.log(
           ` [DefaultPersonas] Creating default persona: ${template.name}`
         )
 
@@ -214,17 +205,17 @@ export async function initializeDefaultPersonas(): Promise<void> {
           isDefault: true
         })
 
-        console.log(` [DefaultPersonas] Created: ${template.name}`)
+        logger.log(` [DefaultPersonas] Created: ${template.name}`)
       } else {
-        console.log(
+        logger.log(
           ` [DefaultPersonas] Skipping existing persona: ${template.name}`
         )
       }
     }
 
-    console.log(" [DefaultPersonas] Default personas initialization complete")
+    logger.log(" [DefaultPersonas] Default personas initialization complete")
   } catch (error) {
-    console.error(
+    logger.error(
       " [DefaultPersonas] Error initializing default personas:",
       error
     )

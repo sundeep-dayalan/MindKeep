@@ -4,14 +4,11 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Apply Poppins font family only to extension UI components (side panel, etc.) */
-/* DO NOT apply to all elements - this would affect the host webpage! */
 #plasmo-shadow-container,
 #plasmo-shadow-container * {
   font-family: "Poppins", sans-serif;
 }
 
-/* Only apply to the extension's own pages (side panel, options, etc.) */
 body.extension-page,
 html.extension-page {
   font-family: "Poppins", sans-serif;
@@ -23,7 +20,6 @@ html.extension-page {
   font-family: "Poppins", sans-serif;
 }
 
-/* Image optimization for high-quality rendering - scoped to extension only */
 #plasmo-shadow-container img {
   image-rendering: -webkit-optimize-contrast;
   image-rendering: -moz-crisp-edges;
@@ -36,7 +32,6 @@ html.extension-page {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Force maximum quality for note card images */
 .plasmo-object-cover {
   image-rendering: -webkit-optimize-contrast !important;
   image-rendering: optimizeQuality !important;
@@ -46,7 +41,6 @@ html.extension-page {
   -webkit-transform: translate3d(0, 0, 0) !important;
 }
 
-/* Hide scrollbar for Aceternity tabs */
 .no-visible-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -57,7 +51,6 @@ html.extension-page {
   display: none;
 }
 
-/* Hide scrollbar utility class */
 .scrollbar-hide {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -67,14 +60,12 @@ html.extension-page {
   display: none;
 }
 
-/* React Bento Grid - Remove extra padding/background from grid items */
 [class*="bento"] > div,
 [style*="grid"] > div {
   padding: 0 !important;
   background: transparent !important;
 }
 
-/* Additional scrollbar hiding with Plasmo prefix */
 .plasmo-no-visible-scrollbar {
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
@@ -95,7 +86,6 @@ html.extension-page {
   display: none !important;
 }
 
-/* Force hide scrollbar on overflow-x-auto elements */
 .plasmo-overflow-x-auto::-webkit-scrollbar {
   display: none !important;
   height: 0 !important;
@@ -106,7 +96,6 @@ html.extension-page {
   -ms-overflow-style: none !important;
 }
 
-/* Custom scrollbar for tabs content */
 .scrollbar-thin {
   scrollbar-width: thin;
 }
@@ -128,17 +117,14 @@ html.extension-page {
   background-color: transparent;
 }
 
-/* Prevent scroll when content doesn't overflow */
 .plasmo-overflow-y-auto {
   overflow-y: auto !important;
 }
 
-/* Tiptap Editor Styles */
 .ProseMirror {
   outline: none;
 }
 
-/* Compact editor styling for chat input */
 .compact-editor .ProseMirror {
   min-height: 2.5em !important;
   padding: 0 !important;
@@ -276,7 +262,6 @@ html.extension-page {
   height: 0;
 }
 
-/* Table Styles */
 .ProseMirror table {
   border-collapse: collapse;
   table-layout: fixed;
@@ -322,7 +307,6 @@ html.extension-page {
   margin: 0;
 }
 
-/* Toolbar Slide-Up Animation */
 @keyframes slideUp {
   from {
     transform: translateY(100%);
@@ -338,7 +322,6 @@ html.extension-page {
   animation: slideUp 0.3s ease-out forwards;
 }
 
-/* Chat message overflow prevention */
 .plasmo-break-words {
   word-break: break-word;
   overflow-wrap: break-word;
@@ -349,7 +332,6 @@ html.extension-page {
   overflow-wrap: anywhere;
 }
 
-/* Line clamping utility */
 .plasmo-line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;

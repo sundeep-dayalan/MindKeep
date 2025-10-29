@@ -1,18 +1,7 @@
-/**
- * Extension Context Utilities
- *
- * Helpers for detecting and handling invalidated extension contexts.
- * When an extension is reloaded while content scripts are running,
- * any chrome.runtime or chrome.storage API calls will fail.
- */
+import { logger } from "~utils/logger"
 
-/**
- * Check if the extension context is still valid
- * Returns false if the extension has been reloaded/updated
- */
 export function isExtensionContextValid(): boolean {
   try {
-    // Try to access chrome.runtime.id - this will throw if context is invalid
     if (!chrome?.runtime?.id) {
       return false
     }
@@ -22,42 +11,35 @@ export function isExtensionContextValid(): boolean {
   }
 }
 
-/**
- * Safely execute a function that uses chrome extension APIs
- * Returns null if the extension context is invalid
- */
 export async function safeExtensionCall<T>(
   fn: () => Promise<T>,
   fallback?: T
 ): Promise<T | null> {
   if (!isExtensionContextValid()) {
-    console.warn("⚠️  [ExtensionContext] Extension context is invalid, skipping API call")
+    logger.warn(
+      " [ExtensionContext] Extension context is invalid, skipping API call"
+    )
     return fallback ?? null
   }
 
   try {
     return await fn()
   } catch (error) {
-    // Check if error is due to invalidated context
     if (
       error instanceof Error &&
       error.message.includes("Extension context invalidated")
     ) {
-      console.warn(
-        "⚠️  [ExtensionContext] Extension context invalidated during API call:",
+      logger.warn(
+        " [ExtensionContext] Extension context invalidated during API call:",
         error.message
       )
       return fallback ?? null
     }
-    // Re-throw other errors
+
     throw error
   }
 }
 
-/**
- * Safely add a chrome.storage listener
- * Returns a cleanup function, or null if context is invalid
- */
 export function safeAddStorageListener(
   listener: (
     changes: { [key: string]: chrome.storage.StorageChange },
@@ -65,8 +47,8 @@ export function safeAddStorageListener(
   ) => void
 ): (() => void) | null {
   if (!isExtensionContextValid()) {
-    console.warn(
-      "⚠️  [ExtensionContext] Cannot add storage listener - context invalid"
+    logger.warn(
+      " [ExtensionContext] Cannot add storage listener - context invalid"
     )
     return null
   }
@@ -79,21 +61,18 @@ export function safeAddStorageListener(
           chrome.storage.onChanged.removeListener(listener)
         }
       } catch (error) {
-        // Silently ignore cleanup errors
-        console.debug("Failed to remove storage listener (context may be invalid)")
+        logger.debug(
+          "Failed to remove storage listener (context may be invalid)"
+        )
       }
     }
   } catch (error) {
-    console.warn("⚠️  [ExtensionContext] Failed to add storage listener:", error)
+    logger.warn(" [ExtensionContext] Failed to add storage listener:", error)
     return null
   }
 }
 
-/**
- * Show a user-friendly message when extension context is invalidated
- */
 export function showExtensionReloadMessage() {
-  // Only show in content script contexts (not in extension pages)
   const isContentScript =
     typeof window !== "undefined" &&
     (window.location.protocol === "http:" ||
@@ -103,8 +82,8 @@ export function showExtensionReloadMessage() {
     return
   }
 
-  console.log(
-    "%c🔄 Extension Updated",
+  logger.log(
+    "%c Extension Updated",
     "color: #3B82F6; font-size: 14px; font-weight: bold;",
     "\nThe MindKeep extension has been updated. Please refresh the page to use the latest version."
   )

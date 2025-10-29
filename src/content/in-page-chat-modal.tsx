@@ -1,15 +1,9 @@
-/**
- * In-Page Chat Modal
- *
- * Wraps the AISearchBar component in a draggable floating modal.
- * Reuses the same component as the side panel for consistency.
- */
-
 import React, { useEffect, useRef, useState, type CSSProperties } from "react"
 
 import { AISearchBar } from "~components/AISearchBar"
 import type { AgentResponse } from "~services/langchain-agent"
 import { getGlobalAgent } from "~services/langchain-agent"
+import { logger } from "~utils/logger"
 
 interface InPageChatModalProps {
   position: { top: number; left: number }
@@ -27,7 +21,6 @@ export function InPageChatModal({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
   const modalRef = useRef<HTMLDivElement>(null)
 
-  // Click outside to close
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
@@ -35,7 +28,6 @@ export function InPageChatModal({
       }
     }
 
-    // Add listener after a short delay to avoid immediate closure
     const timeoutId = setTimeout(() => {
       document.addEventListener("mousedown", handleClickOutside)
     }, 100)
@@ -46,7 +38,6 @@ export function InPageChatModal({
     }
   }, [onClose])
 
-  // Handle dragging
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isDragging) {
@@ -73,14 +64,13 @@ export function InPageChatModal({
   }, [isDragging, dragOffset])
 
   const handleDragStart = (e: React.MouseEvent) => {
-    // Don't drag if clicking on interactive elements (input, button, textarea, etc.)
     const target = e.target as HTMLElement
     const isInteractive =
       target.tagName === "INPUT" ||
       target.tagName === "TEXTAREA" ||
       target.tagName === "BUTTON" ||
       target.closest("button") ||
-      target.closest(".ProseMirror") || // TipTap editor
+      target.closest(".ProseMirror") ||
       target.closest('[contenteditable="true"]') ||
       target.hasAttribute("contenteditable")
 
@@ -88,7 +78,6 @@ export function InPageChatModal({
       return
     }
 
-    // Allow dragging from anywhere else on the modal
     if (modalRef.current) {
       const rect = modalRef.current.getBoundingClientRect()
       setDragOffset({
@@ -99,7 +88,6 @@ export function InPageChatModal({
     }
   }
 
-  // Handle AI search - same as side panel
   const handleAISearch = async (
     query: string,
     conversationHistory?: Array<{ role: string; content: string }>,
@@ -108,14 +96,12 @@ export function InPageChatModal({
     const startTime = performance.now()
 
     try {
-      console.log("💬 [In-Page Chat] Processing query:", query)
+      logger.log("💬 [In-Page Chat] Processing query:", query)
 
-      // Use the LangChain agent (same as side panel)
       const agent = await getGlobalAgent()
 
-      // Use streaming if callback is provided
       if (onStreamChunk) {
-        console.log("💬 [In-Page Chat] Using streaming mode")
+        logger.log("💬 [In-Page Chat] Using streaming mode")
 
         let finalResponse: AgentResponse | null = null
 
@@ -128,7 +114,7 @@ export function InPageChatModal({
         }
 
         const totalTime = performance.now() - startTime
-        console.log(
+        logger.log(
           `💬 [In-Page Chat] TOTAL stream time: ${totalTime.toFixed(2)}ms`
         )
 
@@ -141,16 +127,15 @@ export function InPageChatModal({
         )
       }
 
-      // Fallback to non-streaming mode
       const response = await agent.run(query, conversationHistory)
 
       const totalTime = performance.now() - startTime
-      console.log(`💬 [In-Page Chat] TOTAL time: ${totalTime.toFixed(2)}ms`)
+      logger.log(`💬 [In-Page Chat] TOTAL time: ${totalTime.toFixed(2)}ms`)
 
       return response
     } catch (error) {
       const totalTime = performance.now() - startTime
-      console.error(
+      logger.error(
         `💬 [In-Page Chat] Failed after ${totalTime.toFixed(2)}ms:`,
         error
       )
@@ -162,7 +147,7 @@ export function InPageChatModal({
     position: "fixed",
     top: `${currentPosition.top}px`,
     left: `${currentPosition.left}px`,
-    zIndex: 2147483647, // Max z-index
+    zIndex: 2147483647,
     pointerEvents: "auto",
     width: "450px",
     maxHeight: "600px",
@@ -185,7 +170,7 @@ export function InPageChatModal({
           overflow: "visible",
           border: "1px solid rgba(255, 255, 255, 0.3)"
         }}>
-        {/* AISearchBar - reused from side panel */}
+        {}
         <div style={{ flex: 1, overflow: "visible", padding: "16px" }}>
           <AISearchBar
             placeholder="Ask me anything..."

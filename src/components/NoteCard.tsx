@@ -1,4 +1,3 @@
-import { BlurFade } from "@/components/ui/blur-fade"
 import { Color } from "@tiptap/extension-color"
 import Highlight from "@tiptap/extension-highlight"
 import Image from "@tiptap/extension-image"
@@ -13,7 +12,9 @@ import { EditorContent, useEditor } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import React from "react"
 
+import { BlurFade } from "~components/ui/blur-fade"
 import type { Note } from "~services/db-service"
+import { logger } from "~utils/logger"
 
 import { LinkPreview } from "./ui/LinkPreview"
 
@@ -23,35 +24,30 @@ interface NoteCardProps {
   onDelete: (id: string) => void
 }
 
-// Fresh, vibrant color palette for note cards
 const COLOR_PALETTE = [
-  { bg: "#E0F2FE", border: "#7DD3FC", text: "#0C4A6E" }, // Sky Blue
-  { bg: "#FCE7F3", border: "#F9A8D4", text: "#831843" }, // Pink
-  { bg: "#FEF3C7", border: "#FCD34D", text: "#78350F" }, // Amber
-  { bg: "#DCFCE7", border: "#86EFAC", text: "#14532D" }, // Green
-  { bg: "#E9D5FF", border: "#D8B4FE", text: "#581C87" }, // Purple
-  { bg: "#FFEDD5", border: "#FDBA74", text: "#7C2D12" } // Orange
+  { bg: "#E0F2FE", border: "#7DD3FC", text: "#0C4A6E" },
+  { bg: "#FCE7F3", border: "#F9A8D4", text: "#831843" },
+  { bg: "#FEF3C7", border: "#FCD34D", text: "#78350F" },
+  { bg: "#DCFCE7", border: "#86EFAC", text: "#14532D" },
+  { bg: "#E9D5FF", border: "#D8B4FE", text: "#581C87" },
+  { bg: "#FFEDD5", border: "#FDBA74", text: "#7C2D12" }
 ]
 
-// Generate consistent color based on note ID
 const getColorForNote = (noteId: string): (typeof COLOR_PALETTE)[0] => {
-  // Simple hash function to get consistent index
   let hash = 0
   for (let i = 0; i < noteId.length; i++) {
     hash = (hash << 5) - hash + noteId.charCodeAt(i)
-    hash = hash & hash // Convert to 32bit integer
+    hash = hash & hash
   }
   const index = Math.abs(hash) % COLOR_PALETTE.length
   return COLOR_PALETTE[index]
 }
 
-// Extract ALL image URLs from TipTap JSON
 const extractImagesFromTipTap = (content: string): string[] => {
   try {
     const json = JSON.parse(content)
     const images: string[] = []
 
-    // Recursively search for image nodes
     const findImages = (node: any): void => {
       if (node.type === "image" && node.attrs?.src) {
         images.push(node.attrs.src)
@@ -70,7 +66,6 @@ const extractImagesFromTipTap = (content: string): string[] => {
   }
 }
 
-// Format time ago (just now, Xm ago, Oct 12)
 const formatTimeAgo = (timestamp: number): string => {
   const now = Date.now()
   const diffMs = now - timestamp
@@ -84,7 +79,6 @@ const formatTimeAgo = (timestamp: number): string => {
   } else if (diffHours < 24) {
     return `${diffHours}h`
   } else {
-    // More than 24 hours - show month and date
     const date = new Date(timestamp)
     return date.toLocaleDateString("en-US", {
       month: "short",
@@ -93,9 +87,7 @@ const formatTimeAgo = (timestamp: number): string => {
   }
 }
 
-// Truncate text with ellipsis
 const truncateText = (text: string, maxWidthPercent: number): string => {
-  // Simple character-based truncation (max ~40 chars for 80%, ~15 chars for 25%)
   const maxChars = maxWidthPercent === 80 ? 40 : 15
   if (text.length > maxChars) {
     return text.slice(0, maxChars - 3) + "..."
@@ -103,7 +95,6 @@ const truncateText = (text: string, maxWidthPercent: number): string => {
   return text
 }
 
-// TipTap Read-Only Preview Component
 const TipTapPreview = ({
   content,
   textColor
@@ -111,14 +102,13 @@ const TipTapPreview = ({
   content: string
   textColor?: string
 }) => {
-  // Parse content immediately (synchronously)
   const parsedContent = React.useMemo(() => {
     try {
       const parsed = JSON.parse(content)
-      console.log(" TipTapPreview - Parsed JSON:", parsed)
+      logger.log(" TipTapPreview - Parsed JSON:", parsed)
       return parsed
     } catch (error) {
-      console.log(" TipTapPreview - Plain text:", content)
+      logger.log(" TipTapPreview - Plain text:", content)
       return content
     }
   }, [content])
@@ -139,7 +129,7 @@ const TipTapPreview = ({
       Image.configure({
         inline: true,
         HTMLAttributes: {
-          class: "plasmo-hidden" // Hide images in preview
+          class: "plasmo-hidden"
         }
       }),
       Table.configure({
@@ -162,17 +152,15 @@ const TipTapPreview = ({
       }
     },
     onUpdate: ({ editor }) => {
-      console.log(" TipTapPreview - Editor updated, content:", editor.getJSON())
+      logger.log(" TipTapPreview - Editor updated, content:", editor.getJSON())
     },
     onCreate: ({ editor }) => {
-      console.log(" TipTapPreview - Editor created, content:", editor.getJSON())
+      logger.log(" TipTapPreview - Editor created, content:", editor.getJSON())
     }
   })
 
-  // Ensure content is updated when it changes
   React.useEffect(() => {
     if (editor && parsedContent) {
-      // Small delay to ensure editor is fully initialized
       const timer = setTimeout(() => {
         editor.commands.setContent(parsedContent)
       }, 0)
@@ -261,7 +249,6 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
   const truncatedCategory = truncateText(note.category, 25)
   const noteColor = getColorForNote(note.id)
 
-  // Show up to 4 images in avatar circles
   const displayImages = imageUrls.slice(0, 4)
   const remainingCount = imageUrls.length > 4 ? imageUrls.length - 4 : 0
 
@@ -278,7 +265,7 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
           height: "100%",
           width: "100%"
         }}>
-        {/* Delete button - only show on hover */}
+        {}
         <button
           onClick={handleDelete}
           className="plasmo-absolute plasmo-top-2 plasmo-right-2 plasmo-z-30 plasmo-opacity-0 group-hover:plasmo-opacity-100 plasmo-transition-opacity plasmo-duration-200 plasmo-p-2 plasmo-bg-red-500/80 plasmo-backdrop-blur-md plasmo-rounded-full plasmo-text-white hover:plasmo-bg-red-600/90"
@@ -297,7 +284,7 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
           </svg>
         </button>
 
-        {/* TipTap preview - fills all space except bottom 65px */}
+        {}
         <div
           className="plasmo-absolute plasmo-top-0 plasmo-left-0 plasmo-right-0 plasmo-p-3 plasmo-overflow-hidden"
           style={{
@@ -309,7 +296,7 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
           <TipTapPreview content={note.content} textColor={noteColor.text} />
         </div>
 
-        {/* Image avatars in bottom-right corner (if images exist) */}
+        {}
         {displayImages.length > 0 && (
           <div className="plasmo-absolute plasmo-bottom-[70px] plasmo-right-2 plasmo-z-20 plasmo-flex plasmo-items-center plasmo-flex-row-reverse">
             {remainingCount > 0 && (
@@ -343,7 +330,7 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
           </div>
         )}
 
-        {/* Fixed title section at bottom - always visible */}
+        {}
         <div
           className="plasmo-absolute plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-z-10"
           style={{
@@ -365,7 +352,7 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
               <div
                 className="plasmo-font-medium plasmo-truncate plasmo-max-w-[60%] plasmo-px-2 plasmo-py-1 plasmo-rounded-full"
                 style={{
-                  backgroundColor: noteColor.border + "40", // 25% opacity
+                  backgroundColor: noteColor.border + "40",
                   color: noteColor.text
                 }}>
                 {truncatedCategory}
