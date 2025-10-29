@@ -180,7 +180,7 @@ export const inPageAssistantTourSteps: Step[] = [
   {
     target: '[data-tour="in-page-modal"]',
     content:
-      "👋 Welcome! This is your In-Page AI Assistant. Let me show you how it works! You can drag this modal anywhere on the page.",
+      "👋 Welcome! This is your In-Page AI Assistant by MindKeep. Let me show you how it works! You can drag this modal anywhere on the page.",
     placement: "top",
     disableBeacon: true,
     spotlightClicks: false

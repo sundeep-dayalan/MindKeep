@@ -520,6 +520,7 @@ function SidePanel() {
                   onNotesChange={loadData}
                   onNoteClick={handleEditNote}
                   onManagePersonas={handlePersonasClick}
+                  onStartTour={handleStartTour}
                 />
               </div>
             )}
