@@ -1767,7 +1767,8 @@ export function AISearchBar({
           {}
           <div
             className="plasmo-w-full plasmo-overflow-y-auto plasmo-no-visible-scrollbar"
-            style={{ minHeight: "2.5em", maxHeight: maxInputHeight }}>
+            style={{ minHeight: "2.5em", maxHeight: maxInputHeight }}
+            data-tour="ai-search-input">
             <RichTextEditor
               ref={editorRef}
               placeholder={
@@ -1796,7 +1797,7 @@ export function AISearchBar({
           {}
           <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-gap-3 plasmo-pt-2 plasmo-border-t plasmo-border-slate-100">
             {}
-            <div className="plasmo-flex-shrink-0">
+            <div className="plasmo-flex-shrink-0" data-tour="persona-selector">
               <PersonaSelector
                 onPersonaChange={handlePersonaChange}
                 onInitializationChange={setIsPersonaInitializing}
@@ -1838,7 +1839,8 @@ export function AISearchBar({
                 isSearching ||
                 isInputDisabled ||
                 currentInputLength > 8000
-              }>
+              }
+              data-tour="insert-button">
               {showInsertButton && enableInsertMode ? (
                 <>
                   <span className="plasmo-text-xs plasmo-font-medium">

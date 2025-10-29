@@ -8,6 +8,8 @@ import { AnimatedCategoryTabs } from "~components/AnimatedCategoryTabs"
 import { Header } from "~components/Header"
 import { NoteEditor, type RichTextEditorRef } from "~components/NoteEditor"
 import { PersonaManager } from "~components/PersonaManager"
+import { TourGuide, useTourState } from "~components/TourGuide"
+import { sidePanelTourSteps } from "~config/tour-steps"
 import {
   checkAllAIServices,
   generateEmbedding,
@@ -44,6 +46,10 @@ function SidePanel() {
 
   const editorRef = useRef<RichTextEditorRef | null>(null)
 
+  // Tour state
+  const { hasCompletedTour, runTour, startTour, completeTour, skipTour } =
+    useTourState("sidepanel")
+
   useEffect(() => {
     loadData()
 
@@ -54,6 +60,15 @@ function SidePanel() {
     })
 
     chrome.runtime.sendMessage({ type: "SIDE_PANEL_OPENED" })
+
+    // Auto-start tour for first-time users
+    if (!hasCompletedTour && view === "list") {
+      logger.log("🎯 [Tour] First time user detected, starting tour...")
+      // Delay tour start slightly to ensure all elements are rendered
+      setTimeout(() => {
+        startTour()
+      }, 200)
+    }
 
     const handleMessage = (
       message: any,
@@ -89,7 +104,7 @@ function SidePanel() {
     return () => {
       chrome.runtime.onMessage.removeListener(handleMessage)
     }
-  }, [])
+  }, [hasCompletedTour, view, startTour])
 
   const loadData = async () => {
     setLoading(true)
@@ -316,6 +331,16 @@ function SidePanel() {
     setView("list")
   }
 
+  const handleStartTour = () => {
+    logger.log("🎯 [SidePanel] Help button clicked - starting tour manually")
+    logger.log("🎯 [SidePanel] Current state:", {
+      hasCompletedTour,
+      runTour,
+      view
+    })
+    startTour()
+  }
+
   const handleSearch = async () => {
     if (searchQuery.trim()) {
       setLoading(true)
@@ -418,6 +443,7 @@ function SidePanel() {
           onClose={handleClose}
           onPersonasClick={handlePersonasClick}
           onCreateNote={handleCreateNew}
+          onStartTour={handleStartTour}
           view={view}
           searchValue={searchQuery}
           onSearchChange={handleSearchInput}
@@ -436,13 +462,17 @@ function SidePanel() {
           ) : view === "list" ? (
             <div className="plasmo-flex-1 plasmo-flex plasmo-flex-col plasmo-overflow-hidden plasmo-relative">
               {}
-              <div className="plasmo-flex-shrink-0">
+              <div
+                className="plasmo-flex-shrink-0"
+                data-tour="ai-status-banner">
                 {}
                 <AIStatusBanner />
               </div>
 
               {}
-              <div className="plasmo-flex-1 plasmo-min-h-0">
+              <div
+                className="plasmo-flex-1 plasmo-min-h-0"
+                data-tour="category-tabs">
                 <AnimatedCategoryTabs
                   categories={categories}
                   notes={filteredNotes}
@@ -480,7 +510,9 @@ function SidePanel() {
             view !== "editor" &&
             aiStatus.length > 0 &&
             aiStatus.every((service) => service.available) && (
-              <div className="plasmo-fixed plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-bg-transparent plasmo-backdrop-blur-xl plasmo-border-t plasmo-border-white/20 plasmo-shadow-lg plasmo-p-3 plasmo-z-50">
+              <div
+                className="plasmo-fixed plasmo-bottom-0 plasmo-left-0 plasmo-right-0 plasmo-bg-transparent plasmo-backdrop-blur-xl plasmo-border-t plasmo-border-white/20 plasmo-shadow-lg plasmo-p-3 plasmo-z-50"
+                data-tour="ai-search-bar">
                 <AISearchBar
                   placeholder="Ask me anything..."
                   onSearch={handleAISearch}
@@ -492,6 +524,20 @@ function SidePanel() {
               </div>
             )}
         </div>
+
+        {}
+        {runTour && (
+          <TourGuide
+            key={`tour-${Date.now()}`}
+            steps={sidePanelTourSteps}
+            run={runTour}
+            onComplete={completeTour}
+            onSkip={skipTour}
+            continuous={true}
+            showProgress={true}
+            showSkipButton={true}
+          />
+        )}
       </div>
     </div>
   )

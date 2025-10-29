@@ -125,6 +125,7 @@ export function createInjectedIcon(
 
   const button = document.createElement("button")
   button.type = "button"
+  button.setAttribute("data-tour", "in-page-icon")
   button.style.cssText = `
  width: 24px !important;
  height: 24px !important;
