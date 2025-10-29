@@ -171,16 +171,20 @@ export const RichTextEditor = forwardRef<
           try {
             if (typeof content === "string") {
               try {
+                // Try parsing as JSON first (for saved notes)
                 const parsed = JSON.parse(content)
-                editor.commands.setContent(parsed)
+                editor.commands.setContent(parsed, { emitUpdate: false })
               } catch {
-                editor.commands.setContent(content)
+                // Not JSON, treat as HTML string
+                logger.log(" [RichTextEditor] Setting HTML content")
+                editor.commands.setContent(content, { emitUpdate: false })
               }
             } else {
-              editor.commands.setContent(content)
+              // Already an object (TipTap JSON)
+              editor.commands.setContent(content, { emitUpdate: false })
             }
           } catch (error) {
-            logger.error("Error setting content:", error)
+            logger.error(" [RichTextEditor] Error setting content:", error)
           }
         }
       },

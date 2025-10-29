@@ -43,6 +43,9 @@ function SidePanel() {
   const [noteTitle, setNoteTitle] = useState("")
   const [noteContent, setNoteContent] = useState("")
   const [noteCategory, setNoteCategory] = useState("general")
+  const [noteSourceUrl, setNoteSourceUrl] = useState<string | undefined>(
+    undefined
+  )
 
   const editorRef = useRef<RichTextEditorRef | null>(null)
 
@@ -79,20 +82,24 @@ function SidePanel() {
       } else if (message.type === "FILL_EDITOR") {
         const content = message.data.content || ""
         const isHtml = message.data.isHtml || false
+        const sourceUrl = message.data.sourceUrl
 
         setNoteTitle("")
         setNoteCategory("general")
+        setNoteSourceUrl(sourceUrl)
         setEditingNote(null)
         setView("editor")
 
         if (isHtml) {
-          setNoteContent(content)
-
+          // For HTML content, clear the state first to avoid conflicts
+          setNoteContent("")
+          
+          // Wait for editor to be ready and then set the HTML content
           setTimeout(() => {
             if (editorRef.current) {
               editorRef.current.setContent(content)
             }
-          }, 100)
+          }, 200)
         } else {
           setNoteContent(content)
         }
@@ -131,6 +138,7 @@ function SidePanel() {
     setNoteTitle("")
     setNoteContent("")
     setNoteCategory("general")
+    setNoteSourceUrl(undefined)
     clearSearchQuery()
     setView("editor")
   }
@@ -140,6 +148,7 @@ function SidePanel() {
     setNoteTitle(note.title)
     setNoteContent(note.content)
     setNoteCategory(note.category)
+    setNoteSourceUrl(note.sourceUrl)
     clearSearchQuery()
     setView("editor")
   }
@@ -232,15 +241,18 @@ function SidePanel() {
           ` [UI Save] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embedding.length} dimensions)`
         )
 
-        let sourceUrl: string | undefined
-        try {
-          const tabs = await chrome.tabs.query({
-            active: true,
-            currentWindow: true
-          })
-          sourceUrl = tabs[0]?.url
-        } catch (e) {
-          logger.warn("Could not get tab URL:", e)
+        // Use stored sourceUrl if available (from context menu), otherwise get from active tab
+        let sourceUrl: string | undefined = noteSourceUrl
+        if (!sourceUrl) {
+          try {
+            const tabs = await chrome.tabs.query({
+              active: true,
+              currentWindow: true
+            })
+            sourceUrl = tabs[0]?.url
+          } catch (e) {
+            logger.warn("Could not get tab URL:", e)
+          }
         }
 
         const messageStartTime = performance.now()
@@ -279,6 +291,7 @@ function SidePanel() {
       logger.log("Reloading data...")
       await loadData()
       clearSearchQuery()
+      setNoteSourceUrl(undefined)
       logger.log("Switching to list view")
       setView("list")
     } catch (error) {
