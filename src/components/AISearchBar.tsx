@@ -55,6 +55,7 @@ interface AISearchBarProps {
   onMessagesChange?: (hasMessages: boolean) => void
   onNoteClick?: (note: Note) => void
   onManagePersonas?: () => void
+  onStartTour?: () => void
   className?: string
   maxInputHeight?: string
   personaDropdownUpward?: boolean
@@ -142,6 +143,7 @@ export function AISearchBar({
   onMessagesChange,
   onNoteClick,
   onManagePersonas,
+  onStartTour,
   className = "",
   maxInputHeight = "150px",
   personaDropdownUpward = true,
@@ -1433,6 +1435,35 @@ export function AISearchBar({
               className={`${enableInsertMode ? "plasmo-text-xs" : "plasmo-text-[8px]"} plasmo-font-medium plasmo-text-slate-500 plasmo-uppercase plasmo-tracking-wider`}>
               Mind Keep
             </span>
+            {}
+            {onStartTour && (
+              <button
+                onClick={onStartTour}
+                className="plasmo-p-0.5 plasmo-rounded plasmo-text-slate-400 hover:plasmo-text-slate-600 hover:plasmo-bg-slate-100 plasmo-transition-colors"
+                title="Show tour">
+                <svg
+                  className="plasmo-w-3.5 plasmo-h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="10" strokeWidth="2" />
+                  <path
+                    d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <line
+                    x1="12"
+                    y1="17"
+                    x2="12.01"
+                    y2="17"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+            )}
           </div>
 
           {}
@@ -1767,7 +1798,8 @@ export function AISearchBar({
           {}
           <div
             className="plasmo-w-full plasmo-overflow-y-auto plasmo-no-visible-scrollbar"
-            style={{ minHeight: "2.5em", maxHeight: maxInputHeight }}>
+            style={{ minHeight: "2.5em", maxHeight: maxInputHeight }}
+            data-tour="ai-search-input">
             <RichTextEditor
               ref={editorRef}
               placeholder={
@@ -1796,7 +1828,7 @@ export function AISearchBar({
           {}
           <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-gap-3 plasmo-pt-2 plasmo-border-t plasmo-border-slate-100">
             {}
-            <div className="plasmo-flex-shrink-0">
+            <div className="plasmo-flex-shrink-0" data-tour="persona-selector">
               <PersonaSelector
                 onPersonaChange={handlePersonaChange}
                 onInitializationChange={setIsPersonaInitializing}
@@ -1838,7 +1870,8 @@ export function AISearchBar({
                 isSearching ||
                 isInputDisabled ||
                 currentInputLength > 8000
-              }>
+              }
+              data-tour="insert-button">
               {showInsertButton && enableInsertMode ? (
                 <>
                   <span className="plasmo-text-xs plasmo-font-medium">

@@ -8,6 +8,7 @@ interface HeaderProps {
   onClose: () => void
   onPersonasClick?: () => void
   onCreateNote?: () => void
+  onStartTour?: () => void
   view?: string
   searchValue?: string
   onSearchChange?: (value: string) => void
@@ -18,6 +19,7 @@ export function Header({
   onClose,
   onPersonasClick,
   onCreateNote,
+  onStartTour,
   view,
   searchValue = "",
   onSearchChange,
@@ -46,7 +48,9 @@ export function Header({
     <div className="plasmo-bg-gradient-to-r plasmo-from-sky-100 plasmo-via-indigo-50 plasmo-to-white plasmo-border-b plasmo-border-slate-200 plasmo-p-4">
       <div className="plasmo-flex plasmo-items-center plasmo-justify-between plasmo-gap-2">
         {}
-        <div className="plasmo-flex plasmo-items-center plasmo-gap-2">
+        <div
+          className="plasmo-flex plasmo-items-center plasmo-gap-2"
+          data-tour="header-logo">
           <div className="plasmo-w-10 plasmo-h-10">
             <DotLottieReact
               src="https://lottie.host/523463c6-9440-4e42-bc0a-318978a9b8a2/S2YUnZFAfy.lottie"
@@ -113,7 +117,8 @@ export function Header({
                 <button
                   onClick={handleSearchClick}
                   className="plasmo-p-2 plasmo-rounded-lg plasmo-text-slate-500 hover:plasmo-text-slate-900 hover:plasmo-bg-slate-100 plasmo-transition-colors"
-                  title="Search notes">
+                  title="Search notes"
+                  data-tour="search-button">
                   <svg
                     className="plasmo-w-5 plasmo-h-5"
                     fill="none"
@@ -133,25 +138,48 @@ export function Header({
 
           {}
           {view === "list" && onCreateNote && !searchExpanded && (
-            <HoverBorderGradient
-              onClick={onCreateNote}
-              containerClassName="rounded-full"
-              as="button"
-              className="plasmo-dark:bg-black plasmo-bg-blue-300 plasmo-text-white plasmo-dark:text-white flex plasmo-items-center plasmo-space-x-2">
+            <div data-tour="new-note-button">
+              <HoverBorderGradient
+                onClick={onCreateNote}
+                containerClassName="rounded-full"
+                as="button"
+                className="plasmo-dark:bg-black plasmo-bg-blue-300 plasmo-text-white plasmo-dark:text-white flex plasmo-items-center plasmo-space-x-2">
+                <svg
+                  className="plasmo-w-4 plasmo-h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2.5}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                <span>New Note</span>
+              </HoverBorderGradient>
+            </div>
+          )}
+
+          {}
+          {view === "list" && onStartTour && !searchExpanded && (
+            <button
+              onClick={onStartTour}
+              className="plasmo-p-2 plasmo-rounded-lg plasmo-text-slate-500 hover:plasmo-text-slate-900 hover:plasmo-bg-slate-100 plasmo-transition-colors plasmo-flex-shrink-0"
+              title="Start Tour">
               <svg
-                className="plasmo-w-4 plasmo-h-4"
+                className="plasmo-w-5 plasmo-h-5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  strokeWidth={2.5}
-                  d="M12 4v16m8-8H4"
+                  strokeWidth={2}
+                  d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
-              <span>New Note</span>
-            </HoverBorderGradient>
+            </button>
           )}
 
           {}
@@ -159,7 +187,8 @@ export function Header({
             <button
               onClick={onClose}
               className="plasmo-p-2 plasmo-rounded-lg plasmo-text-slate-500 hover:plasmo-text-slate-900 hover:plasmo-bg-slate-100 plasmo-transition-colors plasmo-flex-shrink-0"
-              title="Close">
+              title="Close"
+              data-tour="close-button">
               <svg
                 className="plasmo-w-5 plasmo-h-5"
                 fill="none"

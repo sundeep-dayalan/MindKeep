@@ -264,7 +264,8 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
           boxShadow: `inset 0 0 0 1.5px ${noteColor.border}, 0 1px 2px 0 rgb(0 0 0 / 0.05)`,
           height: "100%",
           width: "100%"
-        }}>
+        }}
+        data-tour="note-card">
         {}
         <button
           onClick={handleDelete}
