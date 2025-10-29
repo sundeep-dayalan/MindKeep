@@ -1,4 +1,3 @@
-import { BlurFade } from "~components/ui/blur-fade"
 import { Color } from "@tiptap/extension-color"
 import Highlight from "@tiptap/extension-highlight"
 import Image from "@tiptap/extension-image"
@@ -13,7 +12,9 @@ import { EditorContent, useEditor } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import React from "react"
 
+import { BlurFade } from "~components/ui/blur-fade"
 import type { Note } from "~services/db-service"
+import { logger } from "~utils/logger"
 
 import { LinkPreview } from "./ui/LinkPreview"
 
@@ -104,10 +105,10 @@ const TipTapPreview = ({
   const parsedContent = React.useMemo(() => {
     try {
       const parsed = JSON.parse(content)
-      console.log(" TipTapPreview - Parsed JSON:", parsed)
+      logger.log(" TipTapPreview - Parsed JSON:", parsed)
       return parsed
     } catch (error) {
-      console.log(" TipTapPreview - Plain text:", content)
+      logger.log(" TipTapPreview - Plain text:", content)
       return content
     }
   }, [content])
@@ -151,10 +152,10 @@ const TipTapPreview = ({
       }
     },
     onUpdate: ({ editor }) => {
-      console.log(" TipTapPreview - Editor updated, content:", editor.getJSON())
+      logger.log(" TipTapPreview - Editor updated, content:", editor.getJSON())
     },
     onCreate: ({ editor }) => {
-      console.log(" TipTapPreview - Editor created, content:", editor.getJSON())
+      logger.log(" TipTapPreview - Editor created, content:", editor.getJSON())
     }
   })
 

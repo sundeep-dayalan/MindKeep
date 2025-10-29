@@ -1,3 +1,5 @@
+import { logger } from "~utils/logger"
+
 interface TipTapNode {
   type: string
   attrs?: Record<string, any>
@@ -24,7 +26,7 @@ export function tiptapToMarkdown(json: string | TipTapDoc): string {
 
     return convertNodes(doc.content).trim()
   } catch (error) {
-    console.error("Failed to convert TipTap to Markdown:", error)
+    logger.error("Failed to convert TipTap to Markdown:", error)
     return ""
   }
 }
@@ -249,7 +251,7 @@ export function tiptapToPlainText(json: string | TipTapDoc): string {
 
     return extractText(doc.content).trim()
   } catch (error) {
-    console.error("Failed to extract plain text from TipTap:", error)
+    logger.error("Failed to extract plain text from TipTap:", error)
     return ""
   }
 }

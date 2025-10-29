@@ -1,3 +1,5 @@
+import { logger } from "~utils/logger"
+
 export function isExtensionContextValid(): boolean {
   try {
     if (!chrome?.runtime?.id) {
@@ -14,8 +16,8 @@ export async function safeExtensionCall<T>(
   fallback?: T
 ): Promise<T | null> {
   if (!isExtensionContextValid()) {
-    console.warn(
-      "⚠️  [ExtensionContext] Extension context is invalid, skipping API call"
+    logger.warn(
+      " [ExtensionContext] Extension context is invalid, skipping API call"
     )
     return fallback ?? null
   }
@@ -27,8 +29,8 @@ export async function safeExtensionCall<T>(
       error instanceof Error &&
       error.message.includes("Extension context invalidated")
     ) {
-      console.warn(
-        "⚠️  [ExtensionContext] Extension context invalidated during API call:",
+      logger.warn(
+        " [ExtensionContext] Extension context invalidated during API call:",
         error.message
       )
       return fallback ?? null
@@ -45,8 +47,8 @@ export function safeAddStorageListener(
   ) => void
 ): (() => void) | null {
   if (!isExtensionContextValid()) {
-    console.warn(
-      "⚠️  [ExtensionContext] Cannot add storage listener - context invalid"
+    logger.warn(
+      " [ExtensionContext] Cannot add storage listener - context invalid"
     )
     return null
   }
@@ -59,16 +61,13 @@ export function safeAddStorageListener(
           chrome.storage.onChanged.removeListener(listener)
         }
       } catch (error) {
-        console.debug(
+        logger.debug(
           "Failed to remove storage listener (context may be invalid)"
         )
       }
     }
   } catch (error) {
-    console.warn(
-      "⚠️  [ExtensionContext] Failed to add storage listener:",
-      error
-    )
+    logger.warn(" [ExtensionContext] Failed to add storage listener:", error)
     return null
   }
 }
@@ -83,8 +82,8 @@ export function showExtensionReloadMessage() {
     return
   }
 
-  console.log(
-    "%c🔄 Extension Updated",
+  logger.log(
+    "%c Extension Updated",
     "color: #3B82F6; font-size: 14px; font-weight: bold;",
     "\nThe MindKeep extension has been updated. Please refresh the page to use the latest version."
   )

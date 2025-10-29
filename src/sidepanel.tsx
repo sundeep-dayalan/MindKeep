@@ -24,6 +24,7 @@ import {
 import { getGlobalAgent } from "~services/langchain-agent"
 import { initializeDefaultPersonas } from "~services/persona-defaults"
 import type { Persona } from "~types/persona"
+import { logger } from "~utils/logger"
 
 type View = "list" | "editor" | "personas"
 
@@ -49,7 +50,7 @@ function SidePanel() {
     checkAllAIServices().then(setAiStatus)
 
     initializeDefaultPersonas().catch((error) => {
-      console.error("Failed to initialize default personas:", error)
+      logger.error("Failed to initialize default personas:", error)
     })
 
     chrome.runtime.sendMessage({ type: "SIDE_PANEL_OPENED" })
@@ -100,7 +101,7 @@ function SidePanel() {
       setNotes(allNotes)
       setCategories(allCategories)
     } catch (error) {
-      console.error("Error loading data:", error)
+      logger.error("Error loading data:", error)
     }
     setLoading(false)
   }
@@ -146,20 +147,20 @@ function SidePanel() {
     try {
       let finalTitle = noteTitle.trim()
       if (!finalTitle) {
-        console.log(
+        logger.log(
           " [Auto Title] No title provided, generating automatically..."
         )
         const titleGenerationStart = performance.now()
 
         try {
           finalTitle = await generateTitle("", contentPlaintext)
-          console.log(
+          logger.log(
             ` [Auto Title] Generated: "${finalTitle}" in ${(performance.now() - titleGenerationStart).toFixed(2)}ms`
           )
 
           setNoteTitle(finalTitle)
         } catch (error) {
-          console.error(" [Auto Title] Generation failed:", error)
+          logger.error(" [Auto Title] Generation failed:", error)
 
           finalTitle = "Untitled Note"
           setNoteTitle(finalTitle)
@@ -170,13 +171,13 @@ function SidePanel() {
 
       if (editingNote) {
         const updateStartTime = performance.now()
-        console.log(" [UI Update] Updating existing note:", editingNote.id)
+        logger.log(" [UI Update] Updating existing note:", editingNote.id)
 
         const embeddingStartTime = performance.now()
         const embedding = await generateEmbedding(contentPlaintext)
         const embeddingTime = performance.now() - embeddingStartTime
-        console.log(
-          `⏱ [UI Update] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embedding.length} dimensions)`
+        logger.log(
+          ` [UI Update] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embedding.length} dimensions)`
         )
 
         const messageStartTime = performance.now()
@@ -192,8 +193,8 @@ function SidePanel() {
           }
         })
         const messageTime = performance.now() - messageStartTime
-        console.log(
-          `⏱ [UI Update] Background processing (encrypt + DB): ${messageTime.toFixed(2)}ms`
+        logger.log(
+          ` [UI Update] Background processing (encrypt + DB): ${messageTime.toFixed(2)}ms`
         )
 
         if (!response.success) {
@@ -201,21 +202,19 @@ function SidePanel() {
         }
 
         const totalTime = performance.now() - updateStartTime
-        console.log(
-          `⏱ [UI Update] TOTAL update time: ${totalTime.toFixed(2)}ms`
-        )
-        console.log(
+        logger.log(` [UI Update] TOTAL update time: ${totalTime.toFixed(2)}ms`)
+        logger.log(
           ` [UI Update] Breakdown: Embedding=${embeddingTime.toFixed(2)}ms, Background=${messageTime.toFixed(2)}ms`
         )
       } else {
         const saveStartTime = performance.now()
-        console.log(" [UI Save] Creating new note...")
+        logger.log(" [UI Save] Creating new note...")
 
         const embeddingStartTime = performance.now()
         const embedding = await generateEmbedding(contentPlaintext)
         const embeddingTime = performance.now() - embeddingStartTime
-        console.log(
-          `⏱ [UI Save] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embedding.length} dimensions)`
+        logger.log(
+          ` [UI Save] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embedding.length} dimensions)`
         )
 
         let sourceUrl: string | undefined
@@ -226,12 +225,12 @@ function SidePanel() {
           })
           sourceUrl = tabs[0]?.url
         } catch (e) {
-          console.warn("Could not get tab URL:", e)
+          logger.warn("Could not get tab URL:", e)
         }
 
         const messageStartTime = performance.now()
         const saveId = `save_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
-        console.log(
+        logger.log(
           ` [UI Save ${saveId}] Sending SAVE_NOTE message to background`
         )
         const response = await chrome.runtime.sendMessage({
@@ -247,8 +246,8 @@ function SidePanel() {
           }
         })
         const messageTime = performance.now() - messageStartTime
-        console.log(
-          `⏱ [UI Save] Background processing (encrypt + DB): ${messageTime.toFixed(2)}ms`
+        logger.log(
+          ` [UI Save] Background processing (encrypt + DB): ${messageTime.toFixed(2)}ms`
         )
 
         if (!response.success) {
@@ -256,19 +255,19 @@ function SidePanel() {
         }
 
         const totalTime = performance.now() - saveStartTime
-        console.log(` [UI Save] TOTAL save time: ${totalTime.toFixed(2)}ms`)
-        console.log(
+        logger.log(` [UI Save] TOTAL save time: ${totalTime.toFixed(2)}ms`)
+        logger.log(
           ` [UI Save] Breakdown: Embedding=${embeddingTime.toFixed(2)}ms, Background=${messageTime.toFixed(2)}ms`
         )
       }
 
-      console.log("Reloading data...")
+      logger.log("Reloading data...")
       await loadData()
       clearSearchQuery()
-      console.log("Switching to list view")
+      logger.log("Switching to list view")
       setView("list")
     } catch (error) {
-      console.error(" Error saving note:", error)
+      logger.error(" Error saving note:", error)
       alert(`Failed to save note: ${error.message || error}`)
     }
     setLoading(false)
@@ -284,7 +283,7 @@ function SidePanel() {
       await deleteNote(id)
       await loadData()
     } catch (error) {
-      console.error("Error deleting note:", error)
+      logger.error("Error deleting note:", error)
       alert("Failed to delete note")
     }
     setLoading(false)
@@ -295,25 +294,25 @@ function SidePanel() {
   }
 
   const handlePersonasClick = () => {
-    console.log(" [SidePanel] Switching to personas view")
+    logger.log(" [SidePanel] Switching to personas view")
     setView("personas")
   }
 
   const handlePersonaActivated = async (persona: Persona | null) => {
-    console.log(" [SidePanel] Persona activated:", persona?.name || "None")
+    logger.log(" [SidePanel] Persona activated:", persona?.name || "None")
 
     try {
       const agent = await getGlobalAgent()
       await agent.setPersona(persona)
 
-      console.log(" [SidePanel] Global agent updated with persona")
+      logger.log(" [SidePanel] Global agent updated with persona")
     } catch (error) {
-      console.error(" [SidePanel] Error updating agent persona:", error)
+      logger.error(" [SidePanel] Error updating agent persona:", error)
     }
   }
 
   const handleBackToList = () => {
-    console.log(" [SidePanel] Switching back to list view")
+    logger.log(" [SidePanel] Switching back to list view")
     setView("list")
   }
 
@@ -324,7 +323,7 @@ function SidePanel() {
         const results = await searchNotesByTitle(searchQuery)
         setNotes(results)
       } catch (error) {
-        console.error("Error searching:", error)
+        logger.error("Error searching:", error)
       }
       setLoading(false)
     } else {
@@ -333,7 +332,7 @@ function SidePanel() {
   }
 
   const handleSearchInput = (value: string) => {
-    console.log(" [Search] Query changed to:", value)
+    logger.log(" [Search] Query changed to:", value)
     setSearchQuery(value)
   }
 
@@ -345,12 +344,12 @@ function SidePanel() {
     const startTime = performance.now()
 
     try {
-      console.log(" [LangChain Agent] Processing query:", query)
+      logger.log(" [LangChain Agent] Processing query:", query)
 
       const agent = await getGlobalAgent()
 
       if (onStreamChunk) {
-        console.log(" [LangChain Agent] Using streaming mode")
+        logger.log(" [LangChain Agent] Using streaming mode")
 
         let finalResponse:
           | import("~services/langchain-agent").AgentResponse
@@ -366,10 +365,10 @@ function SidePanel() {
         }
 
         const totalTime = performance.now() - startTime
-        console.log(
+        logger.log(
           ` [LangChain Agent] TOTAL stream time: ${totalTime.toFixed(2)}ms`
         )
-        console.log(` [LangChain Agent] Final response:`, finalResponse)
+        logger.log(` [LangChain Agent] Final response:`, finalResponse)
 
         return (
           finalResponse || {
@@ -383,13 +382,13 @@ function SidePanel() {
       const response = await agent.run(query, conversationHistory)
 
       const totalTime = performance.now() - startTime
-      console.log(` [LangChain Agent] TOTAL time: ${totalTime.toFixed(2)}ms`)
-      console.log(` [LangChain Agent] Structured response:`, response)
+      logger.log(` [LangChain Agent] TOTAL time: ${totalTime.toFixed(2)}ms`)
+      logger.log(` [LangChain Agent] Structured response:`, response)
 
       return response
     } catch (error) {
       const totalTime = performance.now() - startTime
-      console.error(
+      logger.error(
         ` [LangChain Agent] Failed after ${totalTime.toFixed(2)}ms:`,
         error
       )
@@ -406,7 +405,7 @@ function SidePanel() {
   })
 
   if (searchQuery) {
-    console.log(
+    logger.log(
       ` [Search] Query: "${searchQuery}", Total notes: ${notes.length}, Filtered: ${filteredNotes.length}`
     )
   }

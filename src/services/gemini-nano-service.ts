@@ -1,3 +1,5 @@
+import { logger } from "~utils/logger"
+
 export type HealthCheckStatus = {
   api: string
   available: boolean
@@ -161,7 +163,7 @@ export async function checkAllNanoServices(): Promise<HealthCheckStatus[]> {
       checkPromptApiAvailability()
     ])
   } catch (error) {
-    console.error("A critical error occurred during AI health checks:", error)
+    logger.error("A critical error occurred during AI health checks:", error)
     return [
       {
         api: "System",
@@ -205,7 +207,7 @@ export async function summarizeText(
       signal: options.signal
     })
   } catch (error) {
-    console.error(`[Summarizer] Failed:`, error)
+    logger.error(`[Summarizer] Failed:`, error)
     throw new Error(`Failed to summarize text. Reason: ${error}`)
   } finally {
     summarizer?.destroy()
@@ -234,8 +236,8 @@ export async function rewriteText(
       signal: options.signal
     })
   } catch (error) {
-    if (error.name === "AbortError") console.log("[Rewriter] Aborted.")
-    else console.error(`[Rewriter] Failed:`, error)
+    if (error.name === "AbortError") logger.log("[Rewriter] Aborted.")
+    else logger.error(`[Rewriter] Failed:`, error)
     throw error
   } finally {
     rewriter?.destroy()
@@ -264,8 +266,8 @@ export async function executePrompt(
       omitResponseConstraintInput: options.omitResponseConstraintInput
     })
   } catch (error) {
-    if (error.name === "AbortError") console.log("[Prompt] Aborted.")
-    else console.error(`[Prompt] Failed:`, error)
+    if (error.name === "AbortError") logger.log("[Prompt] Aborted.")
+    else logger.error(`[Prompt] Failed:`, error)
     throw error
   } finally {
     session?.destroy()
@@ -297,8 +299,8 @@ export async function* executePromptStream(
       yield chunk
     }
   } catch (error) {
-    if (error.name === "AbortError") console.log("[Prompt Stream] Aborted.")
-    else console.error(`[Prompt Stream] Failed:`, error)
+    if (error.name === "AbortError") logger.log("[Prompt Stream] Aborted.")
+    else logger.error(`[Prompt Stream] Failed:`, error)
     throw error
   } finally {
     session?.destroy()
@@ -320,7 +322,7 @@ export async function createSession(
   }
 
   const sessionId = generateSessionId()
-  console.log(` [Session] Creating new session: ${sessionId}`)
+  logger.log(` [Session] Creating new session: ${sessionId}`)
 
   try {
     const initialPrompts: PromptMessage[] = options.initialPrompts || []
@@ -349,14 +351,14 @@ export async function createSession(
       inputQuota: session.inputQuota || 0
     })
 
-    console.log(` [Session] Session created successfully: ${sessionId}`)
-    console.log(
+    logger.log(` [Session] Session created successfully: ${sessionId}`)
+    logger.log(
       ` [Session] Quota: ${session.inputUsage || 0}/${session.inputQuota || 0} tokens`
     )
 
     return sessionId
   } catch (error) {
-    console.error(` [Session] Failed to create session: ${error}`)
+    logger.error(` [Session] Failed to create session: ${error}`)
     throw error
   }
 }
@@ -366,11 +368,11 @@ export async function getOrCreateSession(
   options: SessionOptions = {}
 ): Promise<string> {
   if (sessionId && sessionStore.has(sessionId)) {
-    console.log(` [Session] Using existing session: ${sessionId}`)
+    logger.log(` [Session] Using existing session: ${sessionId}`)
     return sessionId
   }
 
-  console.log(" [Session] Creating new session (none provided or not found)")
+  logger.log(" [Session] Creating new session (none provided or not found)")
   return await createSession(options)
 }
 
@@ -391,7 +393,7 @@ export async function promptWithSession(
   }
 
   try {
-    console.log(` [Session] Prompting session: ${sessionId}`)
+    logger.log(` [Session] Prompting session: ${sessionId}`)
 
     const metadata = sessionMetadata.get(sessionId)
     if (metadata) {
@@ -403,10 +405,10 @@ export async function promptWithSession(
     const usagePercent = (currentUsage / quota) * 100
 
     if (usagePercent >= 90) {
-      console.warn(
+      logger.warn(
         ` [Session] Token limit nearly reached: ${currentUsage}/${quota} tokens (${usagePercent.toFixed(1)}%)`
       )
-      console.warn(
+      logger.warn(
         ` [Session] Consider calling agent.clearSession() to reset conversation history`
       )
     }
@@ -421,16 +423,16 @@ export async function promptWithSession(
       metadata.inputUsage = session.inputUsage || 0
     }
 
-    console.log(
+    logger.log(
       ` [Session] Response received (${response.length} chars, ${session.inputUsage || 0}/${session.inputQuota || 0} tokens used)`
     )
 
     return response
   } catch (error) {
     if (error.name === "AbortError") {
-      console.log(` [Session] Prompt aborted: ${sessionId}`)
+      logger.log(` [Session] Prompt aborted: ${sessionId}`)
     } else {
-      console.error(` [Session] Prompt failed: ${error}`)
+      logger.error(` [Session] Prompt failed: ${error}`)
     }
     throw error
   }
@@ -453,7 +455,7 @@ export async function* promptStreamWithSession(
   }
 
   try {
-    console.log(` [Session] Streaming prompt for session: ${sessionId}`)
+    logger.log(` [Session] Streaming prompt for session: ${sessionId}`)
 
     const metadata = sessionMetadata.get(sessionId)
     if (metadata) {
@@ -474,14 +476,14 @@ export async function* promptStreamWithSession(
       metadata.inputUsage = session.inputUsage || 0
     }
 
-    console.log(
+    logger.log(
       ` [Session] Stream completed (${session.inputUsage || 0}/${session.inputQuota || 0} tokens used)`
     )
   } catch (error) {
     if (error.name === "AbortError") {
-      console.log(` [Session] Stream aborted: ${sessionId}`)
+      logger.log(` [Session] Stream aborted: ${sessionId}`)
     } else {
-      console.error(` [Session] Stream failed: ${error}`)
+      logger.error(` [Session] Stream failed: ${error}`)
     }
     throw error
   }
@@ -534,7 +536,7 @@ export async function cloneSession(
     throw new Error(`Session not found: ${sourceSessionId}`)
   }
 
-  console.log(` [Session] Cloning session: ${sourceSessionId}`)
+  logger.log(` [Session] Cloning session: ${sourceSessionId}`)
 
   const newSessionId = await createSession({
     systemPrompt: options.systemPrompt || sourceMetadata.systemPrompt,
@@ -543,7 +545,7 @@ export async function cloneSession(
     onDownloadProgress: options.onDownloadProgress
   })
 
-  console.log(` [Session] Cloned to new session: ${newSessionId}`)
+  logger.log(` [Session] Cloned to new session: ${newSessionId}`)
   return newSessionId
 }
 
@@ -558,32 +560,32 @@ export function getActiveSessions(): string[] {
 export async function destroySession(sessionId: string): Promise<void> {
   const session = sessionStore.get(sessionId)
   if (!session) {
-    console.warn(` [Session] Session not found: ${sessionId}`)
+    logger.warn(` [Session] Session not found: ${sessionId}`)
     return
   }
 
-  console.log(` [Session] Destroying session: ${sessionId}`)
+  logger.log(` [Session] Destroying session: ${sessionId}`)
 
   try {
     session.destroy()
     sessionStore.delete(sessionId)
     sessionMetadata.delete(sessionId)
-    console.log(` [Session] Session destroyed: ${sessionId}`)
+    logger.log(` [Session] Session destroyed: ${sessionId}`)
   } catch (error) {
-    console.error(` [Session] Failed to destroy session: ${error}`)
+    logger.error(` [Session] Failed to destroy session: ${error}`)
     throw error
   }
 }
 
 export async function destroyAllSessions(): Promise<void> {
-  console.log(` [Session] Destroying all ${sessionStore.size} sessions`)
+  logger.log(` [Session] Destroying all ${sessionStore.size} sessions`)
 
   const sessionIds = Array.from(sessionStore.keys())
   for (const sessionId of sessionIds) {
     await destroySession(sessionId)
   }
 
-  console.log(" [Session] All sessions destroyed")
+  logger.log(" [Session] All sessions destroyed")
 }
 
 export async function saveSessionState(

@@ -1,5 +1,7 @@
 import { marked } from "marked"
 
+import { logger } from "~utils/logger"
+
 export async function markdownToTipTapHTML(markdown: string): Promise<string> {
   try {
     const html = await marked.parse(markdown, {
@@ -7,10 +9,10 @@ export async function markdownToTipTapHTML(markdown: string): Promise<string> {
       breaks: true
     })
 
-    console.log(" [Markdown→HTML] Conversion successful")
+    logger.log(" [Markdown→HTML] Conversion successful")
     return html
   } catch (error) {
-    console.error(" [Markdown→HTML] Conversion failed:", error)
+    logger.error(" [Markdown→HTML] Conversion failed:", error)
 
     return `<p>${markdown}</p>`
   }

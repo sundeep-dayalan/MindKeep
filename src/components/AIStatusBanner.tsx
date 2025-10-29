@@ -4,6 +4,7 @@ import {
   checkAllAIServices,
   type HealthCheckStatus
 } from "~services/ai-service"
+import { logger } from "~utils/logger"
 
 export function AIStatusBanner() {
   const [aiStatus, setAiStatus] = useState<HealthCheckStatus[]>(null)
@@ -17,7 +18,7 @@ export function AIStatusBanner() {
   const recheckStatus = async () => {
     const status = await checkAllAIServices()
     setAiStatus(status)
-    console.log("AI Status:", status)
+    logger.log("AI Status:", status)
   }
 
   if (
@@ -91,7 +92,7 @@ export function AIStatusBanner() {
               <div className="plasmo-space-y-3 plasmo-text-xs plasmo-text-blue-800">
                 <div className="plasmo-bg-white plasmo-rounded-md plasmo-p-3 plasmo-border plasmo-border-blue-100">
                   <p className="plasmo-font-medium plasmo-mb-2 plasmo-text-blue-900">
-                    📋 Step 1: Enable Required Flags
+                    Step 1: Enable Required Flags
                   </p>
                   <p className="plasmo-mb-2 plasmo-text-blue-700">
                     Copy and paste these URLs into your Chrome address bar:
@@ -126,7 +127,7 @@ export function AIStatusBanner() {
 
                 <div className="plasmo-bg-white plasmo-rounded-md plasmo-p-3 plasmo-border plasmo-border-blue-100">
                   <p className="plasmo-font-medium plasmo-mb-2 plasmo-text-blue-900">
-                    🔄 Step 2: Restart Chrome
+                    Step 2: Restart Chrome
                   </p>
                   <p className="plasmo-text-blue-700">
                     After enabling flags, click "Relaunch" button in Chrome or
@@ -136,7 +137,7 @@ export function AIStatusBanner() {
 
                 <div className="plasmo-bg-white plasmo-rounded-md plasmo-p-3 plasmo-border plasmo-border-blue-100">
                   <p className="plasmo-font-medium plasmo-mb-2 plasmo-text-blue-900">
-                    ⬇️ Step 3: Download AI Model
+                    ⬇ Step 3: Download AI Model
                   </p>
                   <p className="plasmo-text-blue-700 plasmo-mb-2">
                     After restart, Chrome will download the AI model
@@ -154,7 +155,7 @@ export function AIStatusBanner() {
 
                 <div className="plasmo-bg-amber-50 plasmo-rounded-md plasmo-p-3 plasmo-border plasmo-border-amber-200">
                   <p className="plasmo-font-medium plasmo-mb-1 plasmo-text-amber-900 plasmo-flex plasmo-items-center plasmo-gap-1.5">
-                    <span>💡</span>
+                    <span></span>
                     <span>Alternative: Use Chrome Dev/Canary</span>
                   </p>
                   <p className="plasmo-text-amber-800 plasmo-text-[11px]">

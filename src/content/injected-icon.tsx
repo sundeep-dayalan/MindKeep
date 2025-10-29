@@ -1,3 +1,5 @@
+import { logger } from "~utils/logger"
+
 interface InjectedIconProps {
   onClick: () => void
   isActive: boolean
@@ -57,8 +59,8 @@ export function createInjectedIcon(
   }
 
   if (!isVisible(inputElement)) {
-    console.log(
-      "⚠️ [InjectedIcon] Input field not visible, delaying icon creation"
+    logger.log(
+      " [InjectedIcon] Input field not visible, delaying icon creation"
     )
 
     const placeholder = document.createElement("div")
@@ -69,21 +71,21 @@ export function createInjectedIcon(
   const iconContainer = document.createElement("div")
   iconContainer.className = "mindkeep-icon-container"
   iconContainer.style.cssText = `
-    position: fixed !important;
-    z-index: 999999 !important;
-    pointer-events: auto !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    opacity: 0;
-    transition: opacity 0.2s ease, transform 0.2s ease;
-    transform: translateY(-2px);
-  `
+ position: fixed !important;
+ z-index: 999999 !important;
+ pointer-events: auto !important;
+ display: flex !important;
+ align-items: center !important;
+ justify-content: center !important;
+ opacity: 0;
+ transition: opacity 0.2s ease, transform 0.2s ease;
+ transform: translateY(-2px);
+ `
 
   const updateInitialPosition = () => {
     const inputRect = inputElement.getBoundingClientRect()
 
-    console.log("[InjectedIcon] Input rect:", {
+    logger.log("[InjectedIcon] Input rect:", {
       top: inputRect.top,
       bottom: inputRect.bottom,
       left: inputRect.left,
@@ -98,7 +100,7 @@ export function createInjectedIcon(
     iconContainer.style.top = `${iconTop}px`
     iconContainer.style.left = `${iconLeft}px`
 
-    console.log("[InjectedIcon] Icon position set to:", {
+    logger.log("[InjectedIcon] Icon position set to:", {
       top: iconTop,
       left: iconLeft,
       viewport: { width: window.innerWidth, height: window.innerHeight }
@@ -124,31 +126,31 @@ export function createInjectedIcon(
   const button = document.createElement("button")
   button.type = "button"
   button.style.cssText = `
-    width: 24px !important;
-    height: 24px !important;
-    border-radius: 50% !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    background: #F59E0B !important;
-    border: none !important;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12) !important;
-    cursor: pointer !important;
-    transition: all 0.2s ease !important;
-    padding: 5px !important;
-    margin: 0 !important;
-    z-index: 999999 !important;
-  `
+ width: 24px !important;
+ height: 24px !important;
+ border-radius: 50% !important;
+ display: flex !important;
+ align-items: center !important;
+ justify-content: center !important;
+ background: #F59E0B !important;
+ border: none !important;
+ box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12) !important;
+ cursor: pointer !important;
+ transition: all 0.2s ease !important;
+ padding: 5px !important;
+ margin: 0 !important;
+ z-index: 999999 !important;
+ `
 
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg")
   svg.setAttribute("viewBox", "0 0 24 24")
   svg.setAttribute("fill", "white")
   svg.style.cssText = `
-    width: 14px !important;
-    height: 14px !important;
-    display: block !important;
-    pointer-events: none !important;
-  `
+ width: 14px !important;
+ height: 14px !important;
+ display: block !important;
+ pointer-events: none !important;
+ `
 
   const path = document.createElementNS("http://www.w3.org/2000/svg", "path")
   path.setAttribute(
@@ -162,26 +164,26 @@ export function createInjectedIcon(
   const tooltip = document.createElement("div")
   tooltip.className = "mindkeep-tooltip"
   tooltip.style.cssText = `
-    position: absolute !important;
-    right: 100% !important;
-    top: 50% !important;
-    transform: translateY(-50%) translateX(-8px) !important;
-    background: #1F2937 !important;
-    color: white !important;
-    padding: 6px 12px !important;
-    border-radius: 6px !important;
-    font-size: 13px !important;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-    white-space: nowrap !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-    transition: opacity 0.2s ease, transform 0.2s ease !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
-    z-index: 999999 !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-  `
+ position: absolute !important;
+ right: 100% !important;
+ top: 50% !important;
+ transform: translateY(-50%) translateX(-8px) !important;
+ background: #1F2937 !important;
+ color: white !important;
+ padding: 6px 12px !important;
+ border-radius: 6px !important;
+ font-size: 13px !important;
+ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+ white-space: nowrap !important;
+ opacity: 0 !important;
+ pointer-events: none !important;
+ transition: opacity 0.2s ease, transform 0.2s ease !important;
+ box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+ z-index: 999999 !important;
+ display: flex !important;
+ align-items: center !important;
+ gap: 6px !important;
+ `
 
   tooltip.textContent = "Search your notes"
 
@@ -203,20 +205,20 @@ export function createInjectedIcon(
   button.addEventListener("click", (e) => {
     e.preventDefault()
     e.stopPropagation()
-    console.log("🎯 [InjectedIcon] Corner badge clicked!")
+    logger.log(" [InjectedIcon] Corner badge clicked!")
     onClick()
   })
 
   iconContainer.appendChild(button)
 
-  console.log("[InjectedIcon] Preparing to show icon with animation")
+  logger.log("[InjectedIcon] Preparing to show icon with animation")
   requestAnimationFrame(() => {
-    console.log(
+    logger.log(
       "[InjectedIcon] Setting opacity to 1 and transform to translateY(0)"
     )
     iconContainer.style.opacity = "1"
     iconContainer.style.transform = "translateY(0)"
-    console.log(
+    logger.log(
       "[InjectedIcon] Icon should now be visible, opacity:",
       iconContainer.style.opacity
     )
@@ -240,9 +242,7 @@ export function createInjectedIcon(
     inputElement.style.borderRadius = originalBorderRadius
   }
 
-  console.log(
-    "✨ [InjectedIcon] MindKeep icon badge created and attached to DOM"
-  )
+  logger.log(" [InjectedIcon] MindKeep icon badge created and attached to DOM")
 
   return iconContainer
 }
@@ -261,6 +261,6 @@ export function removeInjectedIcon(
 
     iconElement.remove()
 
-    console.log("🗑️  [InjectedIcon] Corner badge removed from input")
+    logger.log(" [InjectedIcon] Corner badge removed from input")
   }, 200)
 }

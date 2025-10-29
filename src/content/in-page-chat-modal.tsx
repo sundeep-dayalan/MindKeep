@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState, type CSSProperties } from "react"
 import { AISearchBar } from "~components/AISearchBar"
 import type { AgentResponse } from "~services/langchain-agent"
 import { getGlobalAgent } from "~services/langchain-agent"
+import { logger } from "~utils/logger"
 
 interface InPageChatModalProps {
   position: { top: number; left: number }
@@ -95,12 +96,12 @@ export function InPageChatModal({
     const startTime = performance.now()
 
     try {
-      console.log("💬 [In-Page Chat] Processing query:", query)
+      logger.log("💬 [In-Page Chat] Processing query:", query)
 
       const agent = await getGlobalAgent()
 
       if (onStreamChunk) {
-        console.log("💬 [In-Page Chat] Using streaming mode")
+        logger.log("💬 [In-Page Chat] Using streaming mode")
 
         let finalResponse: AgentResponse | null = null
 
@@ -113,7 +114,7 @@ export function InPageChatModal({
         }
 
         const totalTime = performance.now() - startTime
-        console.log(
+        logger.log(
           `💬 [In-Page Chat] TOTAL stream time: ${totalTime.toFixed(2)}ms`
         )
 
@@ -129,12 +130,12 @@ export function InPageChatModal({
       const response = await agent.run(query, conversationHistory)
 
       const totalTime = performance.now() - startTime
-      console.log(`💬 [In-Page Chat] TOTAL time: ${totalTime.toFixed(2)}ms`)
+      logger.log(`💬 [In-Page Chat] TOTAL time: ${totalTime.toFixed(2)}ms`)
 
       return response
     } catch (error) {
       const totalTime = performance.now() - startTime
-      console.error(
+      logger.error(
         `💬 [In-Page Chat] Failed after ${totalTime.toFixed(2)}ms:`,
         error
       )

@@ -3,6 +3,7 @@ import Dexie, { type Table } from "dexie"
 import { setSelectedPersona } from "~services/persona-settings"
 import type { Persona, PersonaInput } from "~types/persona"
 import { decrypt } from "~util/crypto"
+import { logger } from "~utils/logger"
 
 export interface Note {
   id: string
@@ -85,7 +86,7 @@ export async function addNote(noteData: {
     const id = generateId()
     const now = Date.now()
 
-    console.log(
+    logger.log(
       ` [DB Service] addNote() called for title: "${noteData.title}"`,
       {
         id,
@@ -108,7 +109,7 @@ export async function addNote(noteData: {
     await db.notes.add(storedNote)
     return storedNote
   } catch (error) {
-    console.error("Error adding note:", error)
+    logger.error("Error adding note:", error)
     throw new Error("Failed to add note")
   }
 }
@@ -136,7 +137,7 @@ export async function getNote(id: string): Promise<Note | null> {
       sourceUrl: storedNote.sourceUrl
     }
   } catch (error) {
-    console.error("Error getting note:", error)
+    logger.error("Error getting note:", error)
     return null
   }
 }
@@ -188,7 +189,7 @@ export async function updateNote(
       sourceUrl: updatedNote.sourceUrl
     }
   } catch (error) {
-    console.error("Error updating note:", error)
+    logger.error("Error updating note:", error)
     return null
   }
 }
@@ -198,7 +199,7 @@ export async function deleteNote(id: string): Promise<boolean> {
     await db.notes.delete(id)
     return true
   } catch (error) {
-    console.error("Error deleting note:", error)
+    logger.error("Error deleting note:", error)
     return false
   }
 }
@@ -207,7 +208,7 @@ async function getAllStoredNotes(): Promise<StoredNote[]> {
   try {
     return await db.notes.toArray()
   } catch (error) {
-    console.error("Error getting stored notes:", error)
+    logger.error("Error getting stored notes:", error)
     return []
   }
 }
@@ -233,14 +234,14 @@ export async function getAllNotes(): Promise<Note[]> {
           sourceUrl: storedNote.sourceUrl
         })
       } catch (error) {
-        console.error(`Error decrypting note ${storedNote.id}:`, error)
+        logger.error(`Error decrypting note ${storedNote.id}:`, error)
       }
     }
 
     notes.sort((a, b) => b.updatedAt - a.updatedAt)
     return notes
   } catch (error) {
-    console.error("Error getting all notes:", error)
+    logger.error("Error getting all notes:", error)
     return []
   }
 }
@@ -257,12 +258,12 @@ export async function searchNotesByVector(
       .filter((note) => note.embedding && note.embedding.length > 0)
       .toArray()
     const fetchTime = performance.now() - fetchStartTime
-    console.log(
-      `⏱ [DB Vector Search] Fetch notes from DB: ${fetchTime.toFixed(2)}ms (${storedNotes.length} notes)`
+    logger.log(
+      ` [DB Vector Search] Fetch notes from DB: ${fetchTime.toFixed(2)}ms (${storedNotes.length} notes)`
     )
 
     if (storedNotes.length === 0) {
-      console.log(` [DB Vector Search] No notes with embeddings found`)
+      logger.log(` [DB Vector Search] No notes with embeddings found`)
       return []
     }
 
@@ -272,16 +273,16 @@ export async function searchNotesByVector(
       score: cosineSimilarity(vector, note.embedding!)
     }))
     const scoreTime = performance.now() - scoreStartTime
-    console.log(
-      `⏱ [DB Vector Search] Calculate similarity scores: ${scoreTime.toFixed(2)}ms`
+    logger.log(
+      ` [DB Vector Search] Calculate similarity scores: ${scoreTime.toFixed(2)}ms`
     )
 
     const sortStartTime = performance.now()
     scored.sort((a, b) => b.score - a.score)
     const topResults = scored.slice(0, limit)
     const sortTime = performance.now() - sortStartTime
-    console.log(
-      `⏱ [DB Vector Search] Sort and slice top ${limit} results: ${sortTime.toFixed(2)}ms`
+    logger.log(
+      ` [DB Vector Search] Sort and slice top ${limit} results: ${sortTime.toFixed(2)}ms`
     )
 
     const decryptStartTime = performance.now()
@@ -304,23 +305,23 @@ export async function searchNotesByVector(
           },
           score
         })
-        console.log(` Note "${note.title}" (score: ${score.toFixed(4)})`)
+        logger.log(` Note "${note.title}" (score: ${score.toFixed(4)})`)
       } catch (error) {
-        console.error(`Error decrypting note ${note.id}:`, error)
+        logger.error(`Error decrypting note ${note.id}:`, error)
       }
     }
     const decryptTime = performance.now() - decryptStartTime
-    console.log(
-      `⏱ [DB Vector Search] Decrypt top ${limit} notes: ${decryptTime.toFixed(2)}ms`
+    logger.log(
+      ` [DB Vector Search] Decrypt top ${limit} notes: ${decryptTime.toFixed(2)}ms`
     )
 
     const totalTime = performance.now() - startTime
-    console.log(` [DB Vector Search] TOTAL time: ${totalTime.toFixed(2)}ms`)
+    logger.log(` [DB Vector Search] TOTAL time: ${totalTime.toFixed(2)}ms`)
 
     return decryptedResults
   } catch (error) {
     const totalTime = performance.now() - startTime
-    console.error(
+    logger.error(
       ` [DB Vector Search] Failed after ${totalTime.toFixed(2)}ms:`,
       error
     )
@@ -338,12 +339,12 @@ export async function searchNotesSemanticWithContent(
     const searchStartTime = performance.now()
     const matchingNotes = await searchNotesByVector(vector, limit)
     const searchTime = performance.now() - searchStartTime
-    console.log(
-      `⏱ [Semantic Search With Content] Vector search: ${searchTime.toFixed(2)}ms`
+    logger.log(
+      ` [Semantic Search With Content] Vector search: ${searchTime.toFixed(2)}ms`
     )
 
     if (matchingNotes.length === 0) {
-      console.log(` [Semantic Search With Content] No matching notes found`)
+      logger.log(` [Semantic Search With Content] No matching notes found`)
       return { notes: [], combinedContent: "" }
     }
 
@@ -354,13 +355,13 @@ export async function searchNotesSemanticWithContent(
       })
       .join("\n\n")
     const combineTime = performance.now() - combineStartTime
-    console.log(
-      `⏱ [Semantic Search With Content] Combine content: ${combineTime.toFixed(2)}ms (${combinedContent.length} chars)`
+    logger.log(
+      ` [Semantic Search With Content] Combine content: ${combineTime.toFixed(2)}ms (${combinedContent.length} chars)`
     )
 
     const totalTime = performance.now() - startTime
-    console.log(
-      `⏱ [Semantic Search With Content] TOTAL time: ${totalTime.toFixed(2)}ms`
+    logger.log(
+      ` [Semantic Search With Content] TOTAL time: ${totalTime.toFixed(2)}ms`
     )
 
     return {
@@ -369,7 +370,7 @@ export async function searchNotesSemanticWithContent(
     }
   } catch (error) {
     const totalTime = performance.now() - startTime
-    console.error(
+    logger.error(
       ` [Semantic Search With Content] Failed after ${totalTime.toFixed(2)}ms:`,
       error
     )
@@ -416,7 +417,7 @@ export async function searchNotesByTitle(query: string): Promise<Note[]> {
           sourceUrl: storedNote.sourceUrl
         })
       } catch (error) {
-        console.error(`Error decrypting note ${storedNote.id}:`, error)
+        logger.error(`Error decrypting note ${storedNote.id}:`, error)
       }
     }
 
@@ -443,14 +444,14 @@ export async function searchNotesByTitle(query: string): Promise<Note[]> {
             })
           }
         } catch (error) {
-          console.error(`Error decrypting note ${storedNote.id}:`, error)
+          logger.error(`Error decrypting note ${storedNote.id}:`, error)
         }
       }
     }
 
     return Array.from(results.values())
   } catch (error) {
-    console.error("Error searching notes by title:", error)
+    logger.error("Error searching notes by title:", error)
     return []
   }
 }
@@ -479,13 +480,13 @@ export async function getNotesByCategory(category: string): Promise<Note[]> {
           sourceUrl: storedNote.sourceUrl
         })
       } catch (error) {
-        console.error(`Error decrypting note ${storedNote.id}:`, error)
+        logger.error(`Error decrypting note ${storedNote.id}:`, error)
       }
     }
 
     return notes
   } catch (error) {
-    console.error("Error getting notes by category:", error)
+    logger.error("Error getting notes by category:", error)
     return []
   }
 }
@@ -495,7 +496,7 @@ export async function getAllCategories(): Promise<string[]> {
     const categories = await db.notes.orderBy("category").uniqueKeys()
     return categories as string[]
   } catch (error) {
-    console.error("Error getting categories:", error)
+    logger.error("Error getting categories:", error)
     return []
   }
 }
@@ -524,7 +525,7 @@ export async function getCategoryStatistics(): Promise<
 
     return stats
   } catch (error) {
-    console.error("Error getting category statistics:", error)
+    logger.error("Error getting category statistics:", error)
     return []
   }
 }
@@ -557,7 +558,7 @@ export async function getDatabaseStatistics(): Promise<{
       lastModifiedDate
     }
   } catch (error) {
-    console.error("Error getting database statistics:", error)
+    logger.error("Error getting database statistics:", error)
     return {
       totalNotes: 0,
       categories: [],
@@ -599,7 +600,7 @@ export async function updateCategory(
 
     return updatedCount
   } catch (error) {
-    console.error("Error updating category:", error)
+    logger.error("Error updating category:", error)
     return 0
   }
 }
@@ -621,7 +622,7 @@ export async function deleteCategory(
 
     return deletedCount
   } catch (error) {
-    console.error("Error deleting category:", error)
+    logger.error("Error deleting category:", error)
     return 0
   }
 }
@@ -629,36 +630,36 @@ export async function deleteCategory(
 export async function clearAllNotes(): Promise<void> {
   try {
     await db.notes.clear()
-    console.log("All notes cleared")
+    logger.log("All notes cleared")
   } catch (error) {
-    console.error("Error clearing notes:", error)
+    logger.error("Error clearing notes:", error)
     throw new Error("Failed to clear notes")
   }
 }
 
 export async function debugIndexedDB(): Promise<void> {
-  console.log("=== IndexedDB Debug Info ===")
+  logger.log("=== IndexedDB Debug Info ===")
 
   try {
     const databases = await indexedDB.databases()
-    console.log("Available databases:", databases)
+    logger.log("Available databases:", databases)
 
-    console.log("Connected to database:", db.name)
-    console.log("Database version:", db.verno)
-    console.log(
+    logger.log("Connected to database:", db.name)
+    logger.log("Database version:", db.verno)
+    logger.log(
       "Tables:",
       db.tables.map((t) => t.name)
     )
 
     const count = await db.notes.count()
-    console.log(`Total notes in database: ${count}`)
+    logger.log(`Total notes in database: ${count}`)
 
     const rawNotes = await db.notes.toArray()
-    console.log("Raw stored notes (encrypted):", rawNotes)
+    logger.log("Raw stored notes (encrypted):", rawNotes)
 
-    console.log("=== End Debug Info ===")
+    logger.log("=== End Debug Info ===")
   } catch (error) {
-    console.error("Debug error:", error)
+    logger.error("Debug error:", error)
   }
 }
 
@@ -667,7 +668,7 @@ function generatePersonaId(): string {
 }
 
 export async function addPersona(personaData: PersonaInput): Promise<Persona> {
-  console.log(" [DB] addPersona called with:", personaData)
+  logger.log(" [DB] addPersona called with:", personaData)
 
   const now = Date.now()
   const persona: Persona = {
@@ -682,34 +683,34 @@ export async function addPersona(personaData: PersonaInput): Promise<Persona> {
     updatedAt: now
   }
 
-  console.log(" [DB] Generated persona object:", persona)
+  logger.log(" [DB] Generated persona object:", persona)
 
   await db.personas.add(persona)
-  console.log(" [DB] Persona added successfully with ID:", persona.id)
+  logger.log(" [DB] Persona added successfully with ID:", persona.id)
 
   return persona
 }
 
 export async function getPersona(id: string): Promise<Persona | undefined> {
-  console.log(" [DB] getPersona called with ID:", id)
+  logger.log(" [DB] getPersona called with ID:", id)
 
   const persona = await db.personas.get(id)
 
   if (persona) {
-    console.log(" [DB] Persona found:", persona.name)
+    logger.log(" [DB] Persona found:", persona.name)
   } else {
-    console.log(" [DB] Persona not found with ID:", id)
+    logger.log(" [DB] Persona not found with ID:", id)
   }
 
   return persona
 }
 
 export async function getAllPersonas(): Promise<Persona[]> {
-  console.log(" [DB] getAllPersonas called")
+  logger.log(" [DB] getAllPersonas called")
 
   const personas = await db.personas.orderBy("name").toArray()
 
-  console.log(
+  logger.log(
     ` [DB] Retrieved ${personas.length} personas (before deduplication):`,
     personas.map((p) => ({ id: p.id, name: p.name }))
   )
@@ -719,12 +720,12 @@ export async function getAllPersonas(): Promise<Persona[]> {
   )
 
   if (uniquePersonas.length < personas.length) {
-    console.warn(
+    logger.warn(
       ` [DB] Found ${personas.length - uniquePersonas.length} duplicate personas, removed them from results`
     )
   }
 
-  console.log(` [DB] Returning ${uniquePersonas.length} unique personas`)
+  logger.log(` [DB] Returning ${uniquePersonas.length} unique personas`)
 
   return uniquePersonas
 }
@@ -733,16 +734,11 @@ export async function updatePersona(
   id: string,
   updates: Partial<PersonaInput>
 ): Promise<Persona | undefined> {
-  console.log(
-    " [DB] updatePersona called for ID:",
-    id,
-    "with updates:",
-    updates
-  )
+  logger.log(" [DB] updatePersona called for ID:", id, "with updates:", updates)
 
   const existing = await db.personas.get(id)
   if (!existing) {
-    console.log(" [DB] Persona not found for update:", id)
+    logger.log(" [DB] Persona not found for update:", id)
     return undefined
   }
 
@@ -753,111 +749,111 @@ export async function updatePersona(
   }
 
   await db.personas.update(id, updated)
-  console.log(" [DB] Persona updated successfully:", updated.name)
+  logger.log(" [DB] Persona updated successfully:", updated.name)
 
   return updated
 }
 
 export async function deletePersona(id: string): Promise<boolean> {
-  console.log(" [DB] deletePersona called for ID:", id)
+  logger.log(" [DB] deletePersona called for ID:", id)
 
   const persona = await db.personas.get(id)
 
   if (!persona) {
-    console.log(" [DB] Persona not found for deletion:", id)
+    logger.log(" [DB] Persona not found for deletion:", id)
     return false
   }
 
   if (persona.isDefault) {
-    console.log(" [DB] Cannot delete default persona:", persona.name)
+    logger.log(" [DB] Cannot delete default persona:", persona.name)
     return false
   }
 
   await db.personas.delete(id)
-  console.log(" [DB] Persona deleted successfully:", persona.name)
+  logger.log(" [DB] Persona deleted successfully:", persona.name)
 
   return true
 }
 
 export async function getActivePersonas(): Promise<Persona[]> {
-  console.log(" [DB] getActivePersonas called")
+  logger.log(" [DB] getActivePersonas called")
 
   const personas = await db.personas.where("isActive").equals(1).toArray()
 
-  console.log(` [DB] Found ${personas.length} active personas`)
+  logger.log(` [DB] Found ${personas.length} active personas`)
 
   return personas
 }
 
 export async function setActivePersona(id: string | null): Promise<boolean> {
-  console.log(" [DB] setActivePersona called with ID:", id)
+  logger.log(" [DB] setActivePersona called with ID:", id)
 
   try {
-    console.log(" [DB] Fetching all personas...")
+    logger.log(" [DB] Fetching all personas...")
     const allPersonas = await db.personas.toArray()
-    console.log(` [DB] Found ${allPersonas.length} personas in database`)
-    console.log(
+    logger.log(` [DB] Found ${allPersonas.length} personas in database`)
+    logger.log(
       " [DB] Persona IDs:",
       allPersonas.map((p) => p.id)
     )
 
-    console.log(" [DB] Deactivating all personas...")
+    logger.log(" [DB] Deactivating all personas...")
     await Promise.all(
       allPersonas.map((p) => db.personas.update(p.id, { isActive: false }))
     )
-    console.log(" [DB] All personas deactivated")
+    logger.log(" [DB] All personas deactivated")
 
     if (id) {
-      console.log(" [DB] Looking for persona with ID:", id)
+      logger.log(" [DB] Looking for persona with ID:", id)
       const persona = await db.personas.get(id)
       if (!persona) {
-        console.error(" [DB] Persona not found for activation:", id)
-        console.error(
+        logger.error(" [DB] Persona not found for activation:", id)
+        logger.error(
           " [DB] Available persona IDs:",
           allPersonas.map((p) => p.id)
         )
         return false
       }
 
-      console.log(" [DB] Found persona:", persona.name, "- Activating...")
+      logger.log(" [DB] Found persona:", persona.name, "- Activating...")
       await db.personas.update(id, { isActive: true })
-      console.log(" [DB] Activated persona:", persona.name)
+      logger.log(" [DB] Activated persona:", persona.name)
     } else {
-      console.log(" [DB] All personas deactivated (default mode)")
+      logger.log(" [DB] All personas deactivated (default mode)")
     }
 
-    console.log(" [DB] Persisting selection to chrome.storage...")
+    logger.log(" [DB] Persisting selection to chrome.storage...")
     await setSelectedPersona(id)
-    console.log(" [DB] Saved persona selection to chrome.storage")
+    logger.log(" [DB] Saved persona selection to chrome.storage")
 
     return true
   } catch (error) {
-    console.error(" [DB] Error setting active persona:", error)
-    console.error(" [DB] Error stack:", error?.stack)
+    logger.error(" [DB] Error setting active persona:", error)
+    logger.error(" [DB] Error stack:", error?.stack)
     return false
   }
 }
 
 export async function getActivePersona(): Promise<Persona | null> {
-  console.log(" [DB] getActivePersona called")
+  logger.log(" [DB] getActivePersona called")
 
   const personas = await db.personas.where("isActive").equals(1).toArray()
 
   if (personas.length > 0) {
-    console.log(" [DB] Active persona found:", personas[0].name)
+    logger.log(" [DB] Active persona found:", personas[0].name)
     return personas[0]
   }
 
-  console.log(" [DB] No active persona (default mode)")
+  logger.log(" [DB] No active persona (default mode)")
   return null
 }
 
 export async function cleanupDuplicatePersonas(): Promise<number> {
-  console.log(" [DB] cleanupDuplicatePersonas called")
+  logger.log(" [DB] cleanupDuplicatePersonas called")
 
   try {
     const allPersonas = await db.personas.toArray()
-    console.log(` [DB] Found ${allPersonas.length} total personas in database`)
+    logger.log(` [DB] Found ${allPersonas.length} total personas in database`)
 
     const personasByName = new Map<string, Persona[]>()
     for (const persona of allPersonas) {
@@ -870,33 +866,33 @@ export async function cleanupDuplicatePersonas(): Promise<number> {
 
     for (const [name, personas] of personasByName.entries()) {
       if (personas.length > 1) {
-        console.log(` [DB] Found ${personas.length} duplicates of "${name}"`)
+        logger.log(` [DB] Found ${personas.length} duplicates of "${name}"`)
 
         personas.sort((a, b) => b.updatedAt - a.updatedAt)
 
         const toKeep = personas[0]
         const toDelete = personas.slice(1)
 
-        console.log(
+        logger.log(
           ` [DB] Keeping persona "${name}" with ID: ${toKeep.id} (updated: ${new Date(toKeep.updatedAt).toISOString()})`
         )
 
         for (const duplicate of toDelete) {
           await db.personas.delete(duplicate.id)
           removedCount++
-          console.log(
+          logger.log(
             ` [DB] Deleted duplicate "${name}" with ID: ${duplicate.id}`
           )
         }
       }
     }
 
-    console.log(
+    logger.log(
       ` [DB] Cleanup complete. Removed ${removedCount} duplicate personas`
     )
     return removedCount
   } catch (error) {
-    console.error(" [DB] Error during cleanup:", error)
+    logger.error(" [DB] Error during cleanup:", error)
     return 0
   }
 }

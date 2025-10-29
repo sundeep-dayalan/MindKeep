@@ -1,3 +1,5 @@
+import { logger } from "~utils/logger"
+
 const ALGORITHM = "AES-GCM"
 const KEY_LENGTH = 256
 const IV_LENGTH = 12
@@ -45,14 +47,14 @@ function generateIV(): Uint8Array {
 
 async function getMasterKey(): Promise<CryptoKey> {
   try {
-    console.log(" Getting master key...")
+    logger.log(" Getting master key...")
 
     const stored = await new Promise<any>((resolve) => {
       chrome.storage.local.get(ENCRYPTION_KEY_STORAGE_KEY, resolve)
     })
 
     if (stored[ENCRYPTION_KEY_STORAGE_KEY]) {
-      console.log(" Found existing key in storage, importing...")
+      logger.log(" Found existing key in storage, importing...")
       const keyData = stored[ENCRYPTION_KEY_STORAGE_KEY]
 
       const importedKey = await crypto.subtle.importKey(
@@ -62,11 +64,11 @@ async function getMasterKey(): Promise<CryptoKey> {
         true,
         ["encrypt", "decrypt"]
       )
-      console.log(" Key imported successfully:", importedKey.type)
+      logger.log(" Key imported successfully:", importedKey.type)
       return importedKey
     }
 
-    console.log(" No existing key found, generating new one...")
+    logger.log(" No existing key found, generating new one...")
 
     const salt = generateSalt()
     const randomPassword = crypto.getRandomValues(new Uint8Array(32))
@@ -74,11 +76,11 @@ async function getMasterKey(): Promise<CryptoKey> {
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("")
 
-    console.log(" Deriving new key from random password...")
+    logger.log(" Deriving new key from random password...")
     const key = await deriveKey(passwordString, salt)
-    console.log(" Key derived successfully:", key.type)
+    logger.log(" Key derived successfully:", key.type)
 
-    console.log(" Exporting and storing key...")
+    logger.log(" Exporting and storing key...")
     const exportedKey = await crypto.subtle.exportKey("jwk", key)
     await new Promise<void>((resolve) => {
       chrome.storage.local.set(
@@ -88,11 +90,11 @@ async function getMasterKey(): Promise<CryptoKey> {
         resolve
       )
     })
-    console.log(" Key stored successfully")
+    logger.log(" Key stored successfully")
 
     return key
   } catch (error) {
-    console.error(" Error getting master key:", error)
+    logger.error(" Error getting master key:", error)
     throw new Error(
       "Failed to initialize encryption key: " +
         (error instanceof Error ? error.message : String(error))
@@ -129,7 +131,7 @@ export async function encrypt(text: string): Promise<string> {
       throw new Error("Failed to get encryption key")
     }
 
-    console.log(" Key obtained:", key.type, key.algorithm)
+    logger.log(" Key obtained:", key.type, key.algorithm)
     const iv = generateIV()
 
     const encryptedData = await crypto.subtle.encrypt(
@@ -147,7 +149,7 @@ export async function encrypt(text: string): Promise<string> {
 
     return arrayBufferToBase64(combined.buffer)
   } catch (error) {
-    console.error("Encryption error:", error)
+    logger.error("Encryption error:", error)
     throw new Error("Failed to encrypt data")
   }
 }
@@ -173,7 +175,7 @@ export async function decrypt(encryptedText: string): Promise<string> {
     const decoder = new TextDecoder()
     return decoder.decode(decryptedData)
   } catch (error) {
-    console.error("Decryption error:", error)
+    logger.error("Decryption error:", error)
     throw new Error("Failed to decrypt data")
   }
 }
@@ -185,21 +187,21 @@ export async function testCrypto(): Promise<boolean> {
     const decrypted = await decrypt(encrypted)
 
     const success = testString === decrypted
-    console.log("Crypto test:", success ? " PASSED" : " FAILED")
-    console.log("Original:", testString)
-    console.log("Encrypted:", encrypted.substring(0, 50) + "...")
-    console.log("Decrypted:", decrypted)
+    logger.log("Crypto test:", success ? " PASSED" : " FAILED")
+    logger.log("Original:", testString)
+    logger.log("Encrypted:", encrypted.substring(0, 50) + "...")
+    logger.log("Decrypted:", decrypted)
 
     return success
   } catch (error) {
-    console.error("Crypto test failed:", error)
+    logger.error("Crypto test failed:", error)
     return false
   }
 }
 
 export async function clearEncryptionKey(): Promise<void> {
   await chrome.storage.local.remove(ENCRYPTION_KEY_STORAGE_KEY)
-  console.warn(
+  logger.warn(
     "Encryption key cleared. All encrypted data is now unrecoverable."
   )
 }

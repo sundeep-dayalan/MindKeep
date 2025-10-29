@@ -3,6 +3,7 @@ import { env, pipeline } from "@xenova/transformers"
 
 import { NOTE_TITLE_GENERATION_SYSTEM_PROMPT } from "~lib/prompts"
 import type { ScoredCategory } from "~types/response"
+import { logger } from "~utils/logger"
 
 import * as NanoService from "./gemini-nano-service"
 import { executePrompt, type PromptOptions } from "./gemini-nano-service"
@@ -21,12 +22,12 @@ export class EmbeddingPipeline {
 
   static async getInstance(): Promise<FeatureExtractionPipeline> {
     if (this.instance === null) {
-      console.log("Initializing embedding pipeline...")
+      logger.log("Initializing embedding pipeline...")
       this.instance = (await pipeline(
         this.task,
         this.model
       )) as FeatureExtractionPipeline
-      console.log("Embedding pipeline initialized")
+      logger.log("Embedding pipeline initialized")
     }
     return this.instance
   }
@@ -37,8 +38,8 @@ export class EmbeddingPipeline {
       const pipelineStartTime = performance.now()
       const pipeline = await this.getInstance()
       const pipelineTime = performance.now() - pipelineStartTime
-      console.log(
-        `⏱ [Embedding] Pipeline initialization: ${pipelineTime.toFixed(2)}ms`
+      logger.log(
+        ` [Embedding] Pipeline initialization: ${pipelineTime.toFixed(2)}ms`
       )
 
       const embeddingStartTime = performance.now()
@@ -47,26 +48,24 @@ export class EmbeddingPipeline {
         normalize: true
       })
       const embeddingTime = performance.now() - embeddingStartTime
-      console.log(
-        `⏱ [Embedding] Generation time: ${embeddingTime.toFixed(2)}ms`
-      )
+      logger.log(` [Embedding] Generation time: ${embeddingTime.toFixed(2)}ms`)
 
       const conversionStartTime = performance.now()
       const embedding = Array.from(output.data) as number[]
       const conversionTime = performance.now() - conversionStartTime
-      console.log(
-        `⏱ [Embedding] Tensor to array conversion: ${conversionTime.toFixed(2)}ms`
+      logger.log(
+        ` [Embedding] Tensor to array conversion: ${conversionTime.toFixed(2)}ms`
       )
 
       const totalTime = performance.now() - startTime
-      console.log(
-        `⏱ [Embedding] TOTAL time: ${totalTime.toFixed(2)}ms (${embedding.length} dimensions)`
+      logger.log(
+        ` [Embedding] TOTAL time: ${totalTime.toFixed(2)}ms (${embedding.length} dimensions)`
       )
 
       return embedding
     } catch (error) {
       const totalTime = performance.now() - startTime
-      console.error(
+      logger.error(
         ` [Embedding] Failed after ${totalTime.toFixed(2)}ms:`,
         error
       )
@@ -87,7 +86,7 @@ export async function generateBatchEmbeddings(
     const embeddings = await Promise.all(embeddingPromises)
     return embeddings
   } catch (error) {
-    console.error("Error generating batch embeddings:", error)
+    logger.error("Error generating batch embeddings:", error)
     throw new Error("Failed to generate batch embeddings")
   }
 }
@@ -150,7 +149,7 @@ function optimizeContentForAI(
 
   const optimized = `${beginning}\n...[content truncated for AI processing]...\n${ending}`
 
-  console.log(
+  logger.log(
     `[AI Optimizer] Reduced content: ${content.length} → ${optimized.length} chars (${((optimized.length / content.length) * 100).toFixed(1)}% of original)`
   )
 
@@ -162,7 +161,7 @@ export async function generateTitle(
   noteContent: string
 ): Promise<string> {
   const startTime = performance.now()
-  console.log(` [Generate Title] Starting title generation...`)
+  logger.log(` [Generate Title] Starting title generation...`)
 
   try {
     const textToProcess = titleContent.trim() || noteContent.trim()
@@ -203,7 +202,7 @@ export async function generateTitle(
       temperature: 0.5,
       topK: 1,
       onDownloadProgress: ({ loaded, total }) => {
-        console.log(`Model downloading: ${Math.round((loaded / total) * 100)}%`)
+        logger.log(`Model downloading: ${Math.round((loaded / total) * 100)}%`)
       },
 
       signal: signal,
@@ -211,21 +210,21 @@ export async function generateTitle(
       omitResponseConstraintInput: false
     }
 
-    console.log("Executing prompt to extract title...")
+    logger.log("Executing prompt to extract title...")
     const jsonResponse = await executePrompt(mainPrompt, options)
 
     const titleData = JSON.parse(jsonResponse)
 
-    console.log(" Successfully extracted title data:")
-    console.log(titleData)
+    logger.log(" Successfully extracted title data:")
+    logger.log(titleData)
 
     const totalTime = performance.now() - startTime
-    console.log(` [Generate Title] TOTAL time: ${totalTime.toFixed(2)}ms`)
+    logger.log(` [Generate Title] TOTAL time: ${totalTime.toFixed(2)}ms`)
 
     return titleData.generatedTitle.trim()
   } catch (error) {
     const totalTime = performance.now() - startTime
-    console.warn(
+    logger.warn(
       ` [Generate Title] Could not generate title after ${totalTime.toFixed(2)}ms, falling back to original.`,
       error
     )
@@ -236,7 +235,7 @@ export async function generateTitle(
 
 export async function generateCategory(noteContent: string): Promise<string> {
   const startTime = performance.now()
-  console.log(` [Generate Category] Starting category generation...`)
+  logger.log(` [Generate Category] Starting category generation...`)
 
   try {
     if (!noteContent.trim()) {
@@ -290,21 +289,21 @@ Return a JSON object with the category name.`
       omitResponseConstraintInput: false
     }
 
-    console.log("Executing prompt to generate category...")
+    logger.log("Executing prompt to generate category...")
     const jsonResponse = await executePrompt(mainPrompt, options)
 
     const categoryData = JSON.parse(jsonResponse)
 
-    console.log(" Successfully generated category:")
-    console.log(categoryData)
+    logger.log(" Successfully generated category:")
+    logger.log(categoryData)
 
     const totalTime = performance.now() - startTime
-    console.log(` [Generate Category] TOTAL time: ${totalTime.toFixed(2)}ms`)
+    logger.log(` [Generate Category] TOTAL time: ${totalTime.toFixed(2)}ms`)
 
     return categoryData.generatedCategory.trim()
   } catch (error) {
     const totalTime = performance.now() - startTime
-    console.warn(
+    logger.warn(
       ` [Generate Category] Could not generate category after ${totalTime.toFixed(2)}ms, falling back to default.`,
       error
     )
@@ -339,27 +338,27 @@ export async function getRelevantCategories(
   availableCategories: string[]
 ): Promise<ScoredCategory[]> {
   const startTime = performance.now()
-  console.log(` [Get Categories] Starting category suggestion (embeddings)...`)
+  logger.log(` [Get Categories] Starting category suggestion (embeddings)...`)
 
   try {
     const textToProcess = `${titleContent.trim()} ${noteContent.trim()}`
 
     if (!textToProcess.trim() || availableCategories.length === 0) {
-      console.log("No content or categories available for analysis.")
+      logger.log("No content or categories available for analysis.")
       return []
     }
 
     const noteEmbeddingStart = performance.now()
     const noteEmbedding = await generateEmbedding(textToProcess)
-    console.log(
-      `⏱ [Get Categories] Note embedding: ${(performance.now() - noteEmbeddingStart).toFixed(2)}ms`
+    logger.log(
+      ` [Get Categories] Note embedding: ${(performance.now() - noteEmbeddingStart).toFixed(2)}ms`
     )
 
     const categoryEmbeddingsStart = performance.now()
     const categoryEmbeddings =
       await generateBatchEmbeddings(availableCategories)
-    console.log(
-      `⏱ [Get Categories] Category embeddings (${availableCategories.length}): ${(performance.now() - categoryEmbeddingsStart).toFixed(2)}ms`
+    logger.log(
+      ` [Get Categories] Category embeddings (${availableCategories.length}): ${(performance.now() - categoryEmbeddingsStart).toFixed(2)}ms`
     )
 
     const similarityStart = performance.now()
@@ -375,8 +374,8 @@ export async function getRelevantCategories(
         }
       }
     )
-    console.log(
-      `⏱ [Get Categories] Similarity calculation: ${(performance.now() - similarityStart).toFixed(2)}ms`
+    logger.log(
+      ` [Get Categories] Similarity calculation: ${(performance.now() - similarityStart).toFixed(2)}ms`
     )
 
     const sortedCategories = scoredCategories.sort(
@@ -384,8 +383,8 @@ export async function getRelevantCategories(
     )
 
     const totalTime = performance.now() - startTime
-    console.log(` [Get Categories] TOTAL time: ${totalTime.toFixed(2)}ms`)
-    console.log(
+    logger.log(` [Get Categories] TOTAL time: ${totalTime.toFixed(2)}ms`)
+    logger.log(
       ` Top categories:`,
       sortedCategories
         .slice(0, 5)
@@ -395,7 +394,7 @@ export async function getRelevantCategories(
     return sortedCategories
   } catch (error) {
     const totalTime = performance.now() - startTime
-    console.warn(
+    logger.warn(
       ` [Get Categories] Could not generate categories after ${totalTime.toFixed(2)}ms.`,
       error
     )

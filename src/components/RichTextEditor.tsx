@@ -22,6 +22,7 @@ import {
 } from "react"
 
 import { tiptapToMarkdown } from "~util/tiptap-to-markdown"
+import { logger } from "~utils/logger"
 
 interface RichTextEditorProps {
   initialContent?: string
@@ -179,7 +180,7 @@ export const RichTextEditor = forwardRef<
               editor.commands.setContent(content)
             }
           } catch (error) {
-            console.error("Error setting content:", error)
+            logger.error("Error setting content:", error)
           }
         }
       },
@@ -200,7 +201,7 @@ export const RichTextEditor = forwardRef<
             editor.commands.setContent(initialContent)
           }
         } catch (error) {
-          console.error("Error setting initial content:", error)
+          logger.error("Error setting initial content:", error)
         }
       }
     }, [initialContent, editor])

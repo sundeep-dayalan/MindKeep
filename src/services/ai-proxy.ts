@@ -1,4 +1,5 @@
 import * as aiService from "~services/ai-service"
+import { logger } from "~utils/logger"
 
 function isContentScript(): boolean {
   try {
@@ -13,10 +14,10 @@ function isContentScript(): boolean {
 
 export async function generateEmbedding(text: string): Promise<number[]> {
   if (isContentScript()) {
-    console.warn(
-      "⚠️  [AI Proxy] Embedding generation not supported in content scripts due to Chrome MV3 limitations"
+    logger.warn(
+      " [AI Proxy] Embedding generation not supported in content scripts due to Chrome MV3 limitations"
     )
-    console.warn("⚠️  [AI Proxy] Use title-only search instead")
+    logger.warn(" [AI Proxy] Use title-only search instead")
     throw new Error(
       "Embedding generation not available in content script context. Use title-only search instead."
     )

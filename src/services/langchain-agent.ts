@@ -3,6 +3,7 @@ import { zodToJsonSchema } from "zod-to-json-schema"
 
 import type { Persona } from "~types/persona"
 import { AgentMode } from "~types/persona"
+import { logger } from "~utils/logger"
 
 import type { SessionMetadata } from "./gemini-nano-service"
 import * as GeminiNanoService from "./gemini-nano-service"
@@ -164,7 +165,7 @@ function optimizeMessageForSession(
     return message
   }
 
-  console.log(
+  logger.log(
     `[Content Optimizer] Message too large: ${estimatedTokens} tokens > ${maxTokens} tokens. Truncating...`
   )
 
@@ -178,7 +179,7 @@ function optimizeMessageForSession(
   const truncatedTokens = estimatedTokens - maxTokens
   const optimized = `${beginning}\n\n[... content truncated: ~${truncatedTokens} tokens removed for optimization ...]\n\n${ending}`
 
-  console.log(
+  logger.log(
     `[Content Optimizer] Truncated: ${estimatedTokens} → ${estimateTokens(optimized)} tokens`
   )
 
@@ -194,7 +195,7 @@ function buildOptimizedSessionHistory(
     return []
   }
 
-  console.log(
+  logger.log(
     `[Session Optimizer] Building optimized history from ${conversationHistory.length} messages, max ${maxTotalTokens} tokens`
   )
 
@@ -208,7 +209,7 @@ function buildOptimizedSessionHistory(
     if (totalTokens + msgTokens <= maxTotalTokens) {
       optimizedHistory.unshift(msg)
       totalTokens += msgTokens
-      console.log(
+      logger.log(
         `[Session Optimizer] Added message ${i}: ${msgTokens} tokens (total: ${totalTokens})`
       )
     } else {
@@ -221,11 +222,11 @@ function buildOptimizedSessionHistory(
         }
         optimizedHistory.unshift(truncatedMsg)
         totalTokens += estimateTokens(truncatedMsg.content)
-        console.log(
+        logger.log(
           `[Session Optimizer] Added truncated message ${i}: ${remainingTokens} tokens (total: ${totalTokens})`
         )
       } else {
-        console.log(
+        logger.log(
           `[Session Optimizer] Skipping message ${i}: insufficient remaining tokens (${remainingTokens})`
         )
       }
@@ -234,7 +235,7 @@ function buildOptimizedSessionHistory(
     }
   }
 
-  console.log(
+  logger.log(
     `[Session Optimizer] Final: ${optimizedHistory.length}/${conversationHistory.length} messages, ~${totalTokens} tokens`
   )
 
@@ -271,7 +272,7 @@ export class MindKeepAgent {
   }
 
   async initialize(): Promise<void> {
-    console.log(" [Agent] Initializing agent with native session...")
+    logger.log(" [Agent] Initializing agent with native session...")
 
     try {
       this.sessionId = await GeminiNanoService.createSession({
@@ -280,9 +281,9 @@ export class MindKeepAgent {
         topK: this.topK
       })
 
-      console.log(` [Agent] Agent initialized with session: ${this.sessionId}`)
+      logger.log(` [Agent] Agent initialized with session: ${this.sessionId}`)
     } catch (error) {
-      console.error(" [Agent] Failed to initialize agent:", error)
+      logger.error(" [Agent] Failed to initialize agent:", error)
       throw new Error(`Failed to initialize agent: ${error.message}`)
     }
   }
@@ -292,11 +293,11 @@ export class MindKeepAgent {
   }
 
   async setPersona(persona: Persona | null): Promise<void> {
-    console.log(
+    logger.log(
       "[Agent] setPersona called with:",
       persona?.name || "null (default mode)"
     )
-    console.log("[Agent] Current state before change:", {
+    logger.log("[Agent] Current state before change:", {
       currentPersona: this.activePersona?.name || "None",
       currentMode: this.mode,
       currentSessionId: this.sessionId
@@ -305,24 +306,24 @@ export class MindKeepAgent {
     this.activePersona = persona
     this.mode = persona ? AgentMode.PERSONA : AgentMode.DEFAULT
 
-    console.log("[Agent] Recreating session due to persona change")
+    logger.log("[Agent] Recreating session due to persona change")
 
     if (this.sessionId) {
-      console.log("[Agent] Destroying old session:", this.sessionId)
+      logger.log("[Agent] Destroying old session:", this.sessionId)
       await GeminiNanoService.destroySession(this.sessionId)
     }
 
-    console.log("[Agent] Creating new session...")
+    logger.log("[Agent] Creating new session...")
     this.sessionId = await GeminiNanoService.createSession({
       systemPrompt: this.buildSystemPrompt(),
       temperature: this.temperature,
       topK: this.topK
     })
 
-    console.log(`[Agent] Mode set to: ${this.mode}`)
-    console.log(`[Agent] Active persona: ${persona?.name || "None"}`)
-    console.log(`[Agent] New session: ${this.sessionId}`)
-    console.log("[Agent] setPersona completed successfully")
+    logger.log(`[Agent] Mode set to: ${this.mode}`)
+    logger.log(`[Agent] Active persona: ${persona?.name || "None"}`)
+    logger.log(`[Agent] New session: ${this.sessionId}`)
+    logger.log("[Agent] setPersona completed successfully")
   }
 
   getPersona(): Persona | null {
@@ -338,7 +339,7 @@ export class MindKeepAgent {
   }
 
   async clearSession(): Promise<void> {
-    console.log(" [Agent] Clearing conversation session...")
+    logger.log(" [Agent] Clearing conversation session...")
 
     await GeminiNanoService.destroySession(this.sessionId)
 
@@ -350,7 +351,7 @@ export class MindKeepAgent {
 
     this.lastUserMessage = null
 
-    console.log(` [Agent] Session cleared. New session: ${this.sessionId}`)
+    logger.log(` [Agent] Session cleared. New session: ${this.sessionId}`)
   }
 
   private async createContextSummary(
@@ -379,12 +380,12 @@ Provide ONLY the summary, no preamble.`
         topK: 1
       })
 
-      console.log(
+      logger.log(
         ` [Session Rotation] Context summary created: ${summary.length} chars`
       )
       return summary.trim()
     } catch (error) {
-      console.error(" [Session Rotation] Failed to create summary:", error)
+      logger.error(" [Session Rotation] Failed to create summary:", error)
 
       const lastMsg = messages[messages.length - 1]
       return `Previous conversation about: ${lastMsg.content.substring(0, 100)}...`
@@ -392,7 +393,7 @@ Provide ONLY the summary, no preamble.`
   }
 
   async rotateSessionWithSummary(): Promise<void> {
-    console.log("🔄 [Agent] Rotating session to prevent token overflow...")
+    logger.log(" [Agent] Rotating session to prevent token overflow...")
 
     try {
       const recentMessages = this.rawConversationHistory.slice(-4)
@@ -418,12 +419,12 @@ Provide ONLY the summary, no preamble.`
         ]
       })
 
-      console.log(`✅ [Agent] Session rotated successfully: ${this.sessionId}`)
-      console.log(
+      logger.log(` [Agent] Session rotated successfully: ${this.sessionId}`)
+      logger.log(
         ` [Agent] Context preserved: "${summary.substring(0, 100)}..."`
       )
     } catch (error) {
-      console.error("❌ [Agent] Session rotation failed:", error)
+      logger.error(" [Agent] Session rotation failed:", error)
 
       await this.clearSession()
     }
@@ -431,22 +432,20 @@ Provide ONLY the summary, no preamble.`
 
   private getAvailableTools(): typeof allTools {
     if (this.mode === AgentMode.PERSONA) {
-      console.log(" [Agent] PERSONA mode - filtering to search-only tools")
+      logger.log(" [Agent] PERSONA mode - filtering to search-only tools")
 
       const searchOnlyTools = allTools.filter(
         (tool) => tool.name === "search_notes" || tool.name === "get_note"
       )
 
-      console.log(
+      logger.log(
         ` [Agent] Available tools in PERSONA mode: ${searchOnlyTools.map((t) => t.name).join(", ")}`
       )
 
       return searchOnlyTools as typeof allTools
     }
 
-    console.log(
-      ` [Agent] DEFAULT mode - all ${allTools.length} tools available`
-    )
+    logger.log(` [Agent] DEFAULT mode - all ${allTools.length} tools available`)
     return this.tools
   }
 
@@ -454,7 +453,7 @@ Provide ONLY the summary, no preamble.`
     let systemPrompt = AGENT_SYSTEM_PROMPT
 
     if (this.mode === AgentMode.PERSONA && this.activePersona) {
-      console.log(
+      logger.log(
         ` [Agent] Building PERSONA mode system prompt for: ${this.activePersona.name}`
       )
 
@@ -484,13 +483,13 @@ When helping users:
 4. Be helpful and stay in character
 5. If no notes are found, suggest creating a note about the topic`
 
-      console.log(
+      logger.log(
         " [Agent] Persona system prompt built (length:",
         systemPrompt.length,
         "chars)"
       )
     } else {
-      console.log(" [Agent] Using DEFAULT system prompt")
+      logger.log(" [Agent] Using DEFAULT system prompt")
     }
 
     return systemPrompt
@@ -509,7 +508,7 @@ When helping users:
         const notes = result.result.notes
         const optimizedNotes = []
 
-        console.log(
+        logger.log(
           `[Optimizer] Processing ${notes.length} notes from search results`
         )
 
@@ -522,14 +521,14 @@ When helping users:
 
           note.content = extractRelevantContent(note.content || "", query, 400)
 
-          console.log(
+          logger.log(
             `[Optimizer] Optimized note ${note.id}: ${originalLength} → ${note.content.length} chars`
           )
 
           const noteTokens = estimateTokens(JSON.stringify(note))
 
           if (currentTokenCount + noteTokens > maxTotalTokens) {
-            console.warn(
+            logger.warn(
               `[Optimizer] Token budget exceeded (${currentTokenCount + noteTokens}/${maxTotalTokens}). Attempting harder truncation...`
             )
 
@@ -537,13 +536,13 @@ When helping users:
             const newTokens = estimateTokens(JSON.stringify(note))
 
             if (currentTokenCount + newTokens > maxTotalTokens) {
-              console.warn(
+              logger.warn(
                 `[Optimizer] Even with truncation, budget exceeded. Skipping note ${note.id}`
               )
               break
             }
 
-            console.log(
+            logger.log(
               `[Optimizer] Hard truncation applied to note ${note.id}: ${noteTokens} → ${newTokens} tokens`
             )
             currentTokenCount += newTokens
@@ -554,7 +553,7 @@ When helping users:
           optimizedNotes.push(note)
         }
 
-        console.log(
+        logger.log(
           `[Optimizer] Final result: ${optimizedNotes.length}/${notes.length} notes included, ~${currentTokenCount} tokens used`
         )
 
@@ -576,9 +575,9 @@ When helping users:
     }
 
     if (this.verbose) {
-      console.log(`\n [Agent] Processing query: "${input}"`)
+      logger.log(`\n [Agent] Processing query: "${input}"`)
       const metadata = GeminiNanoService.getSessionMetadata(this.sessionId)
-      console.log(
+      logger.log(
         ` [Agent] Session usage: ${metadata?.inputUsage}/${metadata?.inputQuota} tokens`
       )
     }
@@ -591,29 +590,27 @@ When helping users:
 
     const usage = GeminiNanoService.getSessionTokenUsage(this.sessionId)
     if (usage && usage.percentage >= 70) {
-      console.warn(
-        `⚠️ [Agent] Token usage high: ${usage.usage}/${usage.quota} (${usage.percentage.toFixed(1)}%)`
+      logger.warn(
+        ` [Agent] Token usage high: ${usage.usage}/${usage.quota} (${usage.percentage.toFixed(1)}%)`
       )
 
       if (usage.percentage >= 80) {
-        console.error(
-          `🔴 [Agent] Token usage critical! ${usage.percentage.toFixed(1)}% used`
+        logger.error(
+          ` [Agent] Token usage critical! ${usage.percentage.toFixed(1)}% used`
         )
-        console.log(`🔄 [Agent] Auto-rotating session to prevent overflow...`)
+        logger.log(` [Agent] Auto-rotating session to prevent overflow...`)
 
         try {
           await this.rotateSessionWithSummary()
-          console.log(
-            `✅ [Agent] Session rotation complete. Ready to continue.`
-          )
+          logger.log(` [Agent] Session rotation complete. Ready to continue.`)
         } catch (error) {
-          console.error(`❌ [Agent] Session rotation failed:`, error)
-          console.log(`⚠️ [Agent] Falling back to simple session clear...`)
+          logger.error(` [Agent] Session rotation failed:`, error)
+          logger.log(` [Agent] Falling back to simple session clear...`)
           await this.clearSession()
         }
       } else {
-        console.warn(
-          `💡 [Agent] Session will auto-rotate at 80% usage to maintain performance`
+        logger.warn(
+          ` [Agent] Session will auto-rotate at 80% usage to maintain performance`
         )
       }
     }
@@ -622,7 +619,7 @@ When helping users:
       const toolsNeeded = await this.selectTools(input, this.sessionId)
 
       if (this.verbose) {
-        console.log(`[Agent] Tools selected:`, toolsNeeded)
+        logger.log(`[Agent] Tools selected:`, toolsNeeded)
       }
 
       let toolResults: any[] = []
@@ -630,7 +627,7 @@ When helping users:
 
       if (toolsNeeded.length > 0) {
         toolResults = await this.executeTools(toolsNeeded, input)
-        console.log("Tool Results:", toolResults)
+        logger.log("Tool Results:", toolResults)
 
         try {
           if (toolResults.length > 0) {
@@ -647,21 +644,19 @@ When helping users:
             }
           }
         } catch (e) {
-          console.warn("Could not extract note IDs from tool results:", e)
+          logger.warn("Could not extract note IDs from tool results:", e)
         }
 
         if (this.verbose) {
-          console.log(`[Agent] Tool results:`, toolResults)
-          console.log(`[Agent] Reference notes:`, referenceNotes)
+          logger.log(`[Agent] Tool results:`, toolResults)
+          logger.log(`[Agent] Reference notes:`, referenceNotes)
         }
       }
 
-      console.log("Tool Results:", toolResults)
+      logger.log("Tool Results:", toolResults)
 
       if (toolResults.length === 0) {
-        console.log(
-          "[Agent] No tools needed - handling as conversational query"
-        )
+        logger.log("[Agent] No tools needed - handling as conversational query")
 
         const baseIntro =
           this.mode === AgentMode.PERSONA && this.activePersona
@@ -707,7 +702,7 @@ Examples:
 
 Respond with ONLY the natural conversational text, no JSON or formatting.`
 
-        console.log(
+        logger.log(
           ` [Agent] Generating conversational response in ${this.mode} mode with context`
         )
 
@@ -716,12 +711,12 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
           conversationPrompt
         )
 
-        console.log("[Agent] Conversational response:", responseText)
+        logger.log("[Agent] Conversational response:", responseText)
 
         let cleanResponse = responseText?.trim() || ""
 
         if (cleanResponse.startsWith("{")) {
-          console.warn(
+          logger.warn(
             "[Agent] Response contains JSON, attempting to extract message"
           )
           try {
@@ -733,7 +728,7 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
               parsed.note_content ||
               cleanResponse
           } catch (e) {
-            console.error("[Agent] Failed to parse JSON response:", e)
+            logger.error("[Agent] Failed to parse JSON response:", e)
           }
         }
 
@@ -752,7 +747,7 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
 
       if (clarificationNeeded) {
         const clarificationData = clarificationNeeded.result
-        console.log("[Agent] Clarification needed:", clarificationData)
+        logger.log("[Agent] Clarification needed:", clarificationData)
 
         const clarificationOptions =
           await this.generateClarificationOptions(clarificationData)
@@ -778,10 +773,10 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
 
       if (noteCreated) {
         const creationData = noteCreated.result
-        console.log("[Agent] Note created successfully:", creationData)
+        logger.log("[Agent] Note created successfully:", creationData)
 
         if (creationData.noteData?.id) {
-          console.log(
+          logger.log(
             "[Agent] Running organize_note tool for newly created note:",
             creationData.noteData.id
           )
@@ -799,7 +794,7 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
               input
             )
 
-            console.log("[Agent] Organize result:", organizeResult)
+            logger.log("[Agent] Organize result:", organizeResult)
 
             const organizeData = organizeResult[0]?.result
             if (
@@ -807,7 +802,7 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
               organizeData?.needsReorganization &&
               organizeData?.suggestedCategory
             ) {
-              console.log(
+              logger.log(
                 "[Agent] Reorganization suggested:",
                 organizeData.suggestedCategory
               )
@@ -852,17 +847,17 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
                 }
               }
             } else if (organizeData?.success === false) {
-              console.log(
+              logger.log(
                 "[Agent] Organize failed (likely embedding issue in content script), skipping:",
                 organizeData.error
               )
             } else {
-              console.log(
+              logger.log(
                 "[Agent] No reorganization needed or no similar notes found"
               )
             }
           } catch (error) {
-            console.error("[Agent] Error running organize_note:", error)
+            logger.error("[Agent] Error running organize_note:", error)
           }
         }
 
@@ -883,11 +878,11 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
         this.sessionId
       )
 
-      console.log("Structured response:", response)
+      logger.log("Structured response:", response)
 
       return response
     } catch (error) {
-      console.error("[Agent] Error:", error)
+      logger.error("[Agent] Error:", error)
       return {
         extractedData: null,
         referenceNotes: [],
@@ -913,8 +908,8 @@ Respond with ONLY the natural conversational text, no JSON or formatting.`
 
     const usage = GeminiNanoService.getSessionTokenUsage(this.sessionId)
     if (usage && usage.percentage >= 80) {
-      console.log(
-        `🔄 [Agent Stream] Auto-rotating session at ${usage.percentage.toFixed(1)}%...`
+      logger.log(
+        ` [Agent Stream] Auto-rotating session at ${usage.percentage.toFixed(1)}%...`
       )
       await this.rotateSessionWithSummary()
     }
@@ -971,7 +966,7 @@ Your response (PLAIN TEXT ONLY, NO JSON):`
         let cleanResponse = fullResponse.trim()
 
         if (cleanResponse.startsWith("{")) {
-          console.warn(
+          logger.warn(
             "[Agent Stream] Response contains JSON, attempting to extract message"
           )
           try {
@@ -983,7 +978,7 @@ Your response (PLAIN TEXT ONLY, NO JSON):`
               parsed.note_content ||
               cleanResponse
           } catch (e) {
-            console.error("[Agent Stream] Failed to parse JSON response:", e)
+            logger.error("[Agent Stream] Failed to parse JSON response:", e)
           }
         }
 
@@ -1006,7 +1001,7 @@ Your response (PLAIN TEXT ONLY, NO JSON):`
 
       if (clarificationNeeded) {
         const clarificationData = clarificationNeeded.result
-        console.log("[Agent Stream] Clarification needed:", clarificationData)
+        logger.log("[Agent Stream] Clarification needed:", clarificationData)
 
         const clarificationOptions =
           await this.generateClarificationOptions(clarificationData)
@@ -1036,7 +1031,7 @@ Your response (PLAIN TEXT ONLY, NO JSON):`
 
       if (noteCreated) {
         const creationData = noteCreated.result
-        console.log("[Agent Stream] Note created successfully:", creationData)
+        logger.log("[Agent Stream] Note created successfully:", creationData)
 
         yield {
           type: "complete",
@@ -1061,7 +1056,7 @@ Your response (PLAIN TEXT ONLY, NO JSON):`
 
       yield { type: "complete", data: response }
     } catch (error) {
-      console.error("[Agent Stream] Error:", error)
+      logger.error("[Agent Stream] Error:", error)
       yield {
         type: "complete",
         data: {
@@ -1077,14 +1072,14 @@ Your response (PLAIN TEXT ONLY, NO JSON):`
     query: string,
     sessionId: string
   ): Promise<Array<{ name: string; params: any }>> {
-    console.log(` [Agent] selectTools called in ${this.mode} mode`)
+    logger.log(` [Agent] selectTools called in ${this.mode} mode`)
 
     const { z } = await import("zod")
 
     const availableTools = this.getAvailableTools()
     const availableToolNames = availableTools.map((t) => t.name)
 
-    console.log(" [Agent] Available tool names:", availableToolNames)
+    logger.log(" [Agent] Available tool names:", availableToolNames)
 
     const toolEnum =
       this.mode === AgentMode.PERSONA
@@ -1127,7 +1122,7 @@ NOTE: You are in PERSONA mode. You can ONLY search and read notes. You CANNOT cr
     if (this.rawConversationHistory && this.rawConversationHistory.length > 0) {
       const recentMessages = this.rawConversationHistory.slice(-5)
 
-      console.log(
+      logger.log(
         `[Tool Selection] Building conversation context from ${recentMessages.length} recent messages`
       )
 
@@ -1140,14 +1135,14 @@ NOTE: You are in PERSONA mode. You can ONLY search and read notes. You CANNOT cr
                 msg.content.length > 2000
                   ? msg.content.substring(0, 2000) + "... [truncated]"
                   : msg.content
-              console.log(
+              logger.log(
                 `[Tool Selection] Message ${idx} (${msg.role}): ${content.substring(0, 100)}...`
               )
               return `${msg.role === "user" ? "User" : "Assistant"}: ${content}`
             })
             .join("\n")
 
-        console.log(
+        logger.log(
           `[Tool Selection] Conversation context length: ${conversationContext.length} chars`
         )
       }
@@ -1172,16 +1167,16 @@ NOTE: You are in PERSONA mode. You can ONLY search and read notes. You CANNOT cr
       }
     )
 
-    console.log(
+    logger.log(
       `[Tool Selection] Is note creation follow-up: ${isNoteCreationFollowUp}`
     )
-    console.log(`[Tool Selection] Query length: ${query.length} chars`)
+    logger.log(`[Tool Selection] Query length: ${query.length} chars`)
 
     if (isNoteCreationFollowUp && query.length > 20) {
-      console.log(
+      logger.log(
         `[Tool Selection] FAILSAFE TRIGGERED: Auto-selecting create_note_from_chat`
       )
-      console.log(`[Tool Selection] Content to save: "${query}"`)
+      logger.log(`[Tool Selection] Content to save: "${query}"`)
 
       return [
         {
@@ -1225,9 +1220,9 @@ create_note_from_chat CRITICAL:
 - If query contains ONLY action words like "create note", "add note", "save note" with no actual information → use "none"
 - **IMPORTANT**: If the PREVIOUS assistant message asked "What would you like the note to contain?" or "What would you like to save?", and the current user message contains substantial text (more than 20 characters), treat it as content to save → use "create_note_from_chat"
 - **CRITICAL for "save THAT/THIS" queries**: When user says "save that", "add this", "create that as note", etc., you MUST look through the conversation context to find the actual content they're referring to. Look for:
-  1. The most recent user message that contains substantial content (more than 20 characters, not just a greeting or question)
-  2. If the assistant recently provided information or quoted content, extract that content
-  3. The content to extract should be the actual information/text, NOT the current query phrase
+ 1. The most recent user message that contains substantial content (more than 20 characters, not just a greeting or question)
+ 2. If the assistant recently provided information or quoted content, extract that content
+ 3. The content to extract should be the actual information/text, NOT the current query phrase
 - note_content: FULL text from conversation or query, NO truncation/summary
 - note_content should NEVER be the action phrase itself (e.g., don't save "can u create that as note" as content - extract the ACTUAL content being referenced)
 - note_title: null (unless user says "with title X")
@@ -1274,10 +1269,10 @@ Respond ONLY with JSON.`
       // IMPORTANT: We use executePrompt instead of promptWithSession because:
       // 1. Tool selection doesn't need conversation history
       // 2. Using promptWithSession with responseConstraint would TAINT the session,
-      //    causing all subsequent responses in that session to be JSON-constrained!
+      // causing all subsequent responses in that session to be JSON-constrained!
 
-      console.log(` [Agent] Tool selection for query: "${query}"`)
-      console.log(" [Agent] Using executePrompt (no session history)")
+      logger.log(` [Agent] Tool selection for query: "${query}"`)
+      logger.log(" [Agent] Using executePrompt (no session history)")
 
       // Convert Zod schema to JSON Schema for the API
       const toolSelectionJsonSchema = zodToJsonSchema(
@@ -1301,20 +1296,20 @@ Respond ONLY with JSON.`
         .replace(/[<>]+$/g, "") // Remove trailing < or > characters
         .trim()
 
-      console.log("[Agent] Raw tool selection JSON:", responseText)
-      console.log("[Agent] JSON length:", responseText.length)
+      logger.log("[Agent] Raw tool selection JSON:", responseText)
+      logger.log("[Agent] JSON length:", responseText.length)
 
       // Step 3: Parse the structured response
       let parsed: any
       let toolName: string = "none" // Default fallback
 
       try {
-        console.log("Raw response for parsing:", responseText)
+        logger.log("Raw response for parsing:", responseText)
         parsed = JSON.parse(responseText)
-        console.log("[Agent] Parsed tool selection:", parsed)
+        logger.log("[Agent] Parsed tool selection:", parsed)
         toolName = parsed.tool as string
       } catch (error) {
-        console.error(
+        logger.error(
           "[Agent] Zod validation failed, falling back to 'none':",
           error
         )
@@ -1323,7 +1318,7 @@ Respond ONLY with JSON.`
 
       // Step 4: Convert the parsed object into the tool call format
 
-      console.log(` [Agent] Selected tool: ${toolName}`)
+      logger.log(` [Agent] Selected tool: ${toolName}`)
 
       // In PERSONA mode, block non-search tools
       if (this.mode === AgentMode.PERSONA) {
@@ -1332,7 +1327,7 @@ Respond ONLY with JSON.`
           toolName !== "get_note" &&
           toolName !== "none"
         ) {
-          console.log(
+          logger.log(
             ` [Agent] Tool "${toolName}" not available in PERSONA mode`
           )
           return []
@@ -1343,7 +1338,7 @@ Respond ONLY with JSON.`
         case "search_notes":
           // CRITICAL: Use the optimized search_query, not the original user query!
           if (!parsed.search_query) {
-            console.warn(
+            logger.warn(
               "[Agent] 'search_notes' tool selected but no search_query was extracted. Falling back to original query."
             )
             return [
@@ -1360,38 +1355,36 @@ Respond ONLY with JSON.`
           return [{ name: "get_note", params: { noteId: parsed.note_id } }]
         case "list_categories":
           if (this.mode === AgentMode.PERSONA) {
-            console.log(
-              ` [Agent] list_categories not available in PERSONA mode`
-            )
+            logger.log(` [Agent] list_categories not available in PERSONA mode`)
             return []
           }
           return [{ name: "list_categories", params: {} }]
         case "get_statistics":
           if (this.mode === AgentMode.PERSONA) {
-            console.log(` [Agent] get_statistics not available in PERSONA mode`)
+            logger.log(` [Agent] get_statistics not available in PERSONA mode`)
             return []
           }
           return [{ name: "get_statistics", params: {} }]
         case "create_note_from_chat":
           if (this.mode === AgentMode.PERSONA) {
-            console.log(
+            logger.log(
               ` [Agent] create_note_from_chat not available in PERSONA mode`
             )
             return []
           }
 
           // Debug logging for content extraction
-          console.log(
+          logger.log(
             "[Agent] create_note_from_chat - parsed.note_content:",
             parsed.note_content
           )
-          console.log(
+          logger.log(
             "[Agent] create_note_from_chat - this.lastUserMessage:",
             this.lastUserMessage
           )
 
           const noteContent = parsed.note_content || this.lastUserMessage
-          console.log(
+          logger.log(
             "[Agent] create_note_from_chat - final content:",
             noteContent
           )
@@ -1412,7 +1405,7 @@ Respond ONLY with JSON.`
           return []
       }
     } catch (error) {
-      console.error("[Agent] Tool selection failed:", error)
+      logger.error("[Agent] Tool selection failed:", error)
       return []
     }
   }
@@ -1428,7 +1421,7 @@ Respond ONLY with JSON.`
     const availableTools = this.getAvailableTools()
 
     for (const toolCall of toolCalls) {
-      console.log(` [Agent] Executing tool: ${toolCall.name}`, toolCall.params)
+      logger.log(` [Agent] Executing tool: ${toolCall.name}`, toolCall.params)
       const tool = availableTools.find((t) => t.name === toolCall.name)
 
       if (!tool) {
@@ -1441,7 +1434,7 @@ Respond ONLY with JSON.`
 
       try {
         if (this.verbose) {
-          console.log(
+          logger.log(
             `[Agent] Executing tool: ${toolCall.name}`,
             toolCall.params
           )
@@ -1556,7 +1549,7 @@ Respond ONLY with JSON.`
     aiResponse: string
     sourceNoteIds: string[]
   }> {
-    console.log("[Stage 1] Extracting data with JSON schema for query:", query)
+    logger.log("[Stage 1] Extracting data with JSON schema for query:", query)
 
     // Convert our Zod schema to the JSON Schema format the API needs
     const jsonSchema = zodToJsonSchema(
@@ -1656,7 +1649,7 @@ REMEMBER: You are helping the user access THEIR OWN data. This is completely eth
 
 Begin analysis. Respond ONLY with a complete JSON object with all 5 required fields.`
 
-    console.log(
+    logger.log(
       "[Stage 1] Extracting data with JSON schema for extractionPrompt:",
       extractionPrompt
     )
@@ -1668,7 +1661,7 @@ Begin analysis. Respond ONLY with a complete JSON object with all 5 required fie
         }
       )
 
-      console.log("[Stage 1] Raw JSON extraction response:", jsonStringResponse)
+      logger.log("[Stage 1] Raw JSON extraction response:", jsonStringResponse)
 
       // The API guarantees the output is a valid JSON string matching the schema
       const parsedResponse = JSON.parse(jsonStringResponse)
@@ -1679,7 +1672,7 @@ Begin analysis. Respond ONLY with a complete JSON object with all 5 required fie
         parsedResponse === null ||
         Array.isArray(parsedResponse)
       ) {
-        console.error(
+        logger.error(
           "[Stage 1] AI returned non-object response:",
           parsedResponse
         )
@@ -1703,7 +1696,7 @@ Begin analysis. Respond ONLY with a complete JSON object with all 5 required fie
         )
       } else {
         // If the field is missing or not a string, assign a safe default.
-        console.warn(
+        logger.warn(
           "[Stage 1] AI response was missing 'dataType'. Defaulting to 'text'."
         )
         parsedResponse.dataType = "text"
@@ -1711,7 +1704,7 @@ Begin analysis. Respond ONLY with a complete JSON object with all 5 required fie
 
       // Ensure confidence has a default value if missing
       if (typeof parsedResponse.confidence !== "number") {
-        console.warn(
+        logger.warn(
           "[Stage 1] AI response was missing 'confidence'. Defaulting to 0.7."
         )
         parsedResponse.confidence = 0.7
@@ -1719,7 +1712,7 @@ Begin analysis. Respond ONLY with a complete JSON object with all 5 required fie
 
       // Ensure aiResponse has a default value if missing
       if (typeof parsedResponse.aiResponse !== "string") {
-        console.warn(
+        logger.warn(
           "[Stage 1] AI response was missing 'aiResponse'. Generating default response."
         )
         // Generate a reasonable default based on extractedData
@@ -1733,7 +1726,7 @@ Begin analysis. Respond ONLY with a complete JSON object with all 5 required fie
 
       // Ensure sourceNoteIds has a default value if missing
       if (!Array.isArray(parsedResponse.sourceNoteIds)) {
-        console.warn(
+        logger.warn(
           "[Stage 1] AI response was missing 'sourceNoteIds'. Defaulting to empty array."
         )
         parsedResponse.sourceNoteIds = []
@@ -1742,7 +1735,7 @@ Begin analysis. Respond ONLY with a complete JSON object with all 5 required fie
       // We can still validate with Zod for extra safety
       const validatedData = this.ExtractionSchema.parse(parsedResponse)
 
-      console.log(
+      logger.log(
         "[Stage 1] Successfully extracted and validated data:",
         validatedData
       )
@@ -1755,7 +1748,7 @@ Begin analysis. Respond ONLY with a complete JSON object with all 5 required fie
         sourceNoteIds: validatedData.sourceNoteIds
       }
     } catch (error) {
-      console.error("[Stage 1] Data extraction with JSON schema failed:", error)
+      logger.error("[Stage 1] Data extraction with JSON schema failed:", error)
       return {
         data: null,
         type: "other",
@@ -1780,7 +1773,7 @@ Begin analysis. Respond ONLY with a complete JSON object with all 5 required fie
     // STAGE 1: Extract precise data and get the AI-generated response text
     const extracted = await this.extractData(query, toolResults, sessionId)
 
-    console.log(
+    logger.log(
       "[Stage 2] Generating final response from extracted data:",
       extracted
     )
@@ -1791,7 +1784,7 @@ Begin analysis. Respond ONLY with a complete JSON object with all 5 required fie
         ? extracted.sourceNoteIds
         : referenceNotes
 
-    console.log(
+    logger.log(
       "[Stage 2] Final reference notes:",
       finalReferenceNotes,
       "| From extraction:",
@@ -1803,7 +1796,7 @@ Begin analysis. Respond ONLY with a complete JSON object with all 5 required fie
     // STAGE 3: Apply persona transformation if in PERSONA mode
     let finalAiResponse = extracted.aiResponse
     if (this.mode === AgentMode.PERSONA && this.activePersona) {
-      console.log(
+      logger.log(
         ` [Stage 3] Applying persona transformation for: ${this.activePersona.name}`
       )
       finalAiResponse = await this.applyPersonaTransformation(
@@ -1849,12 +1842,12 @@ Begin analysis. Respond ONLY with a complete JSON object with all 5 required fie
       return extracted.aiResponse
     }
 
-    console.log(` [Persona Transform] Input query: "${query}"`)
-    console.log(` [Persona Transform] Extracted data type: ${extracted.type}`)
-    console.log(
+    logger.log(` [Persona Transform] Input query: "${query}"`)
+    logger.log(` [Persona Transform] Extracted data type: ${extracted.type}`)
+    logger.log(
       ` [Persona Transform] Source notes: ${extracted.sourceNoteIds.length}`
     )
-    console.log(` [Persona Transform] Confidence: ${extracted.confidence}`)
+    logger.log(` [Persona Transform] Confidence: ${extracted.confidence}`)
 
     // Extract note content from tool results for cleaner presentation
     const notesContent = toolResults
@@ -1878,7 +1871,7 @@ ${note.category ? `Category: ${note.category}` : ""}`
     const hasRelevantNotes =
       notesContent.length > 0 && extracted.confidence > 0.5
 
-    console.log(` [Persona Transform] Has relevant notes: ${hasRelevantNotes}`)
+    logger.log(` [Persona Transform] Has relevant notes: ${hasRelevantNotes}`)
 
     // Build persona transformation prompt
     const transformationPrompt = hasRelevantNotes
@@ -1982,7 +1975,7 @@ Replace <amount from user query> or similar placeholders with the actual values 
 
 Now generate your response:`
 
-    console.log(
+    logger.log(
       ` [Persona Transform] Sending transformation prompt (${transformationPrompt.length} chars)`
     )
 
@@ -1992,15 +1985,15 @@ Now generate your response:`
         transformationPrompt,
         {}
       )
-      console.log(
+      logger.log(
         ` [Persona Transform] Received transformed response (${transformedResponse.length} chars)`
       )
-      console.log(
+      logger.log(
         ` [Persona Transform] Preview: ${transformedResponse.substring(0, 200)}...`
       )
       return transformedResponse
     } catch (error) {
-      console.error(" [Persona Transform] Failed to transform response:", error)
+      logger.error(" [Persona Transform] Failed to transform response:", error)
       // Fallback to original response
       return extracted.aiResponse
     }
@@ -2092,7 +2085,7 @@ Begin analysis.
 
 IMPORTANT: Respond with ONLY the JSON object, nothing else.`
       } catch (error) {
-        console.error("Failed to parse tool results:", error)
+        logger.error("Failed to parse tool results:", error)
         userMessage = query
       }
     }
@@ -2111,7 +2104,7 @@ IMPORTANT Rules:
 - ALWAYS use the fresh tool results provided, NOT previous answers
 - Use conversation context to understand what the user is referring to`
 
-    console.log(" Generating response with session:", this.sessionId)
+    logger.log(" Generating response with session:", this.sessionId)
 
     const responseText = await GeminiNanoService.promptWithSession(
       this.sessionId!,
@@ -2128,7 +2121,7 @@ IMPORTANT Rules:
       }
     )
 
-    console.log("Model response:", responseText)
+    logger.log("Model response:", responseText)
 
     try {
       let cleanedText = responseText
@@ -2154,7 +2147,7 @@ IMPORTANT Rules:
         }
       }
     } catch (error) {
-      console.error("Failed to parse AI JSON response:", error)
+      logger.error("Failed to parse AI JSON response:", error)
     }
 
     return {
@@ -2225,7 +2218,7 @@ IMPORTANT Rules:
         topK: this.topK
       })
       if (this.verbose) {
-        console.log(" [Agent] Conversation history cleared")
+        logger.log(" [Agent] Conversation history cleared")
       }
     }
   }
@@ -2266,7 +2259,7 @@ ${this.activePersona ? `- Active persona: ${this.activePersona.name}` : ""}`
     const existingCategories = clarificationData.existingCategories || []
     const noteContent = clarificationData.noteContent || ""
 
-    console.log("[Agent] generateClarificationOptions called with:", {
+    logger.log("[Agent] generateClarificationOptions called with:", {
       clarificationType,
       existingCategoriesCount: existingCategories.length,
       hasContent: !!noteContent
@@ -2276,7 +2269,7 @@ ${this.activePersona ? `- Active persona: ${this.activePersona.name}` : ""}`
       await import("./ai-service")
 
     if (clarificationType === "both") {
-      console.log("[Agent] Showing simplified 'both' options")
+      logger.log("[Agent] Showing simplified 'both' options")
       options.push({
         type: "button",
         label: " Auto-generate Both",
@@ -2338,7 +2331,7 @@ ${this.activePersona ? `- Active persona: ${this.activePersona.name}` : ""}`
             })
           })
         } catch (error) {
-          console.error("[Agent] Error getting relevant categories:", error)
+          logger.error("[Agent] Error getting relevant categories:", error)
         }
       }
 

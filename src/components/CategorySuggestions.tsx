@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react"
 
 import { getRelevantCategories } from "~services/ai-service"
 import type { ScoredCategory } from "~types/response"
+import { logger } from "~utils/logger"
 
 interface CategorySuggestionsProps {
   noteTitle: string
@@ -108,7 +109,7 @@ export function CategorySuggestions({
         setSuggestions(filteredResults)
       } catch (err) {
         if (!isMounted) return
-        console.error("Error fetching category suggestions:", err)
+        logger.error("Error fetching category suggestions:", err)
         setError("Could not fetch suggestions")
         setSuggestions([])
       } finally {

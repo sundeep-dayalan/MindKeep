@@ -1,3 +1,5 @@
+import { logger } from "~utils/logger"
+
 export interface ManagedInputField {
   element: HTMLInputElement | HTMLTextAreaElement | HTMLElement
   iconElement: HTMLElement | null
@@ -28,7 +30,7 @@ export class InputFieldManager {
 
     this.setupMutationObserver()
 
-    console.log("📋 [InputFieldManager] Initialized")
+    logger.log(" [InputFieldManager] Initialized")
   }
 
   private scanExistingFields() {
@@ -55,7 +57,7 @@ export class InputFieldManager {
           input.getAttribute("role") === "search" ||
           input.getAttribute("aria-label")?.toLowerCase().includes("search"))
       ) {
-        console.log("⏭️  [InputFieldManager] Skipping search field:", input)
+        logger.log("⏭ [InputFieldManager] Skipping search field:", input)
         return
       }
 
@@ -64,8 +66,8 @@ export class InputFieldManager {
       )
     })
 
-    console.log(
-      `✅ [InputFieldManager] Registered ${this.fields.size} existing fields`
+    logger.log(
+      ` [InputFieldManager] Registered ${this.fields.size} existing fields`
     )
   }
 
@@ -126,7 +128,7 @@ export class InputFieldManager {
       characterData: false
     })
 
-    console.log("👁️  [InputFieldManager] MutationObserver active")
+    logger.log(" [InputFieldManager] MutationObserver active")
   }
 
   private isValidInputField(element: HTMLElement): boolean {
@@ -188,8 +190,8 @@ export class InputFieldManager {
     element: HTMLInputElement | HTMLTextAreaElement | HTMLElement
   ) {
     if (this.fields.has(element)) {
-      console.log(
-        "⏭️  [InputFieldManager] Field already registered, skipping:",
+      logger.log(
+        "⏭ [InputFieldManager] Field already registered, skipping:",
         element.tagName
       )
       return
@@ -206,8 +208,8 @@ export class InputFieldManager {
     this.fields.set(element, field)
 
     const focusHandler = () => {
-      console.log(
-        "🔔 [InputFieldManager] FOCUS EVENT FIRED for:",
+      logger.log(
+        " [InputFieldManager] FOCUS EVENT FIRED for:",
         element.tagName,
         element.getAttribute("type")
       )
@@ -219,8 +221,8 @@ export class InputFieldManager {
     }
 
     const blurHandler = () => {
-      console.log(
-        "🔔 [InputFieldManager] BLUR EVENT FIRED for:",
+      logger.log(
+        " [InputFieldManager] BLUR EVENT FIRED for:",
         element.tagName,
         element.getAttribute("type")
       )
@@ -234,8 +236,8 @@ export class InputFieldManager {
     element.addEventListener("focus", focusHandler)
     element.addEventListener("blur", blurHandler)
 
-    console.log(
-      "➕ [InputFieldManager] Registered field:",
+    logger.log(
+      " [InputFieldManager] Registered field:",
       element.tagName,
       element.getAttribute("type")
     )
@@ -250,22 +252,22 @@ export class InputFieldManager {
     }
 
     this.fields.delete(element)
-    console.log("➖ [InputFieldManager] Unregistered field:", element.tagName)
+    logger.log(" [InputFieldManager] Unregistered field:", element.tagName)
   }
 
   private handleFieldFocus(field: ManagedInputField) {
-    console.log(
-      "🟢 [InputFieldManager] handleFieldFocus called for:",
+    logger.log(
+      " [InputFieldManager] handleFieldFocus called for:",
       field.element.tagName
     )
     field.isActive = true
     this.updateCursorInfo(field)
 
     if (this.focusListener) {
-      console.log("🟢 [InputFieldManager] Calling focusListener callback")
+      logger.log(" [InputFieldManager] Calling focusListener callback")
       this.focusListener(field)
     } else {
-      console.log("❌ [InputFieldManager] No focusListener registered!")
+      logger.log(" [InputFieldManager] No focusListener registered!")
     }
   }
 
@@ -346,7 +348,7 @@ export class InputFieldManager {
       const inputEvent = new Event("input", { bubbles: true })
       element.dispatchEvent(inputEvent)
 
-      console.log("✍️  [InputFieldManager] Inserted text at cursor position")
+      logger.log(" [InputFieldManager] Inserted text at cursor position")
     } else if (this.isContentEditable(element)) {
       element.focus()
 
@@ -354,15 +356,15 @@ export class InputFieldManager {
         const success = document.execCommand("insertText", false, text)
 
         if (success) {
-          console.log(
-            "✍️  [InputFieldManager] Inserted text into contenteditable using execCommand"
+          logger.log(
+            " [InputFieldManager] Inserted text into contenteditable using execCommand"
           )
         } else {
           throw new Error("execCommand failed")
         }
       } catch (error) {
-        console.log(
-          "⚠️ [InputFieldManager] execCommand failed, using fallback method"
+        logger.log(
+          " [InputFieldManager] execCommand failed, using fallback method"
         )
         const selection = window.getSelection()
         if (selection && selection.rangeCount > 0) {
@@ -384,8 +386,8 @@ export class InputFieldManager {
           })
           element.dispatchEvent(inputEvent)
 
-          console.log(
-            "✍️  [InputFieldManager] Inserted text into contenteditable using fallback"
+          logger.log(
+            " [InputFieldManager] Inserted text into contenteditable using fallback"
           )
         }
       }
@@ -427,8 +429,8 @@ export class InputFieldManager {
       const inputEvent = new Event("input", { bubbles: true })
       element.dispatchEvent(inputEvent)
 
-      console.log(
-        "🔄 [InputFieldManager] Replaced text",
+      logger.log(
+        " [InputFieldManager] Replaced text",
         replaceAll ? "(entire content)" : "(selection or cursor)"
       )
     } else if (this.isContentEditable(element)) {
@@ -458,7 +460,7 @@ export class InputFieldManager {
         this.insertTextAtCursor(field, text)
       }
 
-      console.log("🔄 [InputFieldManager] Replaced text in contenteditable")
+      logger.log(" [InputFieldManager] Replaced text in contenteditable")
     }
   }
 
@@ -484,6 +486,6 @@ export class InputFieldManager {
     }
 
     this.fields.clear()
-    console.log("🧹 [InputFieldManager] Cleaned up")
+    logger.log(" [InputFieldManager] Cleaned up")
   }
 }

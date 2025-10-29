@@ -1,6 +1,8 @@
 import { DynamicStructuredTool } from "@langchain/core/tools"
 import { z } from "zod"
 
+import { logger } from "~utils/logger"
+
 import * as aiService from "./ai-proxy"
 import type { Note } from "./db-proxy"
 import * as dbService from "./db-proxy"
@@ -99,7 +101,7 @@ export const searchNotesTool = new DynamicStructuredTool({
   schema: SearchNotesSchema,
   func: async ({ query, limit = 5 }) => {
     try {
-      console.log(`[Tool: search_notes] Hybrid search for: "${query}"`)
+      logger.log(`[Tool: search_notes] Hybrid search for: "${query}"`)
 
       let vectorResults = []
       let embedding: number[] | null = null
@@ -108,17 +110,17 @@ export const searchNotesTool = new DynamicStructuredTool({
         embedding = await aiService.EmbeddingPipeline.generateEmbedding(query)
         vectorResults = await dbService.searchNotesByVector(embedding, limit)
       } catch (embeddingError) {
-        console.warn(
+        logger.warn(
           `[Tool: search_notes] Vector search unavailable: ${embeddingError.message}`
         )
-        console.warn(`[Tool: search_notes] Falling back to title-only search`)
+        logger.warn(`[Tool: search_notes] Falling back to title-only search`)
       }
 
       const titleResults = await dbService.searchNotesByTitle(query)
 
       const allResults = new Map<string, any>()
 
-      console.log(
+      logger.log(
         `[Tool: search_notes] Found ${vectorResults.length} vector results and ${titleResults.length} title results`
       )
 
@@ -164,7 +166,7 @@ export const searchNotesTool = new DynamicStructuredTool({
         notes: finalResults.slice(0, limit)
       })
     } catch (error) {
-      console.error("[Tool: search_notes] Error:", error)
+      logger.error("[Tool: search_notes] Error:", error)
       return JSON.stringify({
         success: false,
         error: `Failed to search notes: ${error.message}`
@@ -180,7 +182,7 @@ export const getNoteTool = new DynamicStructuredTool({
   schema: GetNoteSchema,
   func: async ({ noteId }) => {
     try {
-      console.log(`[Tool: get_note] Retrieving note: ${noteId}`)
+      logger.log(`[Tool: get_note] Retrieving note: ${noteId}`)
 
       const note = await dbService.getNote(noteId)
 
@@ -208,7 +210,7 @@ export const getNoteTool = new DynamicStructuredTool({
         }
       })
     } catch (error) {
-      console.error("[Tool: get_note] Error:", error)
+      logger.error("[Tool: get_note] Error:", error)
       return JSON.stringify({
         success: false,
         error: `Failed to retrieve note: ${error.message}`
@@ -224,7 +226,7 @@ export const createNoteTool = new DynamicStructuredTool({
   schema: CreateNoteSchema,
   func: async ({ title, content, category = "general" }) => {
     try {
-      console.log(`[Tool: create_note] Creating note: "${title}"`)
+      logger.log(`[Tool: create_note] Creating note: "${title}"`)
 
       return JSON.stringify({
         success: true,
@@ -236,7 +238,7 @@ export const createNoteTool = new DynamicStructuredTool({
         }
       })
     } catch (error) {
-      console.error("[Tool: create_note] Error:", error)
+      logger.error("[Tool: create_note] Error:", error)
       return JSON.stringify({
         success: false,
         error: `Failed to create note: ${error.message}`
@@ -252,7 +254,7 @@ export const updateNoteTool = new DynamicStructuredTool({
   schema: UpdateNoteSchema,
   func: async ({ noteId, title, content, category }) => {
     try {
-      console.log(`[Tool: update_note] Updating note: ${noteId}`)
+      logger.log(`[Tool: update_note] Updating note: ${noteId}`)
 
       const existingNote = await dbService.getNote(noteId)
       if (!existingNote) {
@@ -268,7 +270,7 @@ export const updateNoteTool = new DynamicStructuredTool({
         updates: { noteId, title, content, category }
       })
     } catch (error) {
-      console.error("[Tool: update_note] Error:", error)
+      logger.error("[Tool: update_note] Error:", error)
       return JSON.stringify({
         success: false,
         error: `Failed to update note: ${error.message}`
@@ -284,7 +286,7 @@ export const deleteNoteTool = new DynamicStructuredTool({
   schema: DeleteNoteSchema,
   func: async ({ noteId }) => {
     try {
-      console.log(`[Tool: delete_note] Deleting note: ${noteId}`)
+      logger.log(`[Tool: delete_note] Deleting note: ${noteId}`)
 
       const note = await dbService.getNote(noteId)
       if (!note) {
@@ -301,7 +303,7 @@ export const deleteNoteTool = new DynamicStructuredTool({
         message: `Successfully deleted note: "${note.title}"`
       })
     } catch (error) {
-      console.error("[Tool: delete_note] Error:", error)
+      logger.error("[Tool: delete_note] Error:", error)
       return JSON.stringify({
         success: false,
         error: `Failed to delete note: ${error.message}`
@@ -317,7 +319,7 @@ export const listCategoriesTool = new DynamicStructuredTool({
   schema: ListCategoriesSchema,
   func: async () => {
     try {
-      console.log(`[Tool: list_categories] Listing all categories`)
+      logger.log(`[Tool: list_categories] Listing all categories`)
 
       const categories = await dbService.getAllCategories()
 
@@ -326,7 +328,7 @@ export const listCategoriesTool = new DynamicStructuredTool({
         categories: categories
       })
     } catch (error) {
-      console.error("[Tool: list_categories] Error:", error)
+      logger.error("[Tool: list_categories] Error:", error)
       return JSON.stringify({
         success: false,
         error: `Failed to list categories: ${error.message}`
@@ -342,7 +344,7 @@ export const getStatisticsTool = new DynamicStructuredTool({
   schema: GetStatisticsSchema,
   func: async () => {
     try {
-      console.log(`[Tool: get_statistics] Retrieving database statistics`)
+      logger.log(`[Tool: get_statistics] Retrieving database statistics`)
 
       const stats = await dbService.getDatabaseStatistics()
 
@@ -370,7 +372,7 @@ export const getStatisticsTool = new DynamicStructuredTool({
         }
       })
     } catch (error) {
-      console.error("[Tool: get_statistics] Error:", error)
+      logger.error("[Tool: get_statistics] Error:", error)
       return JSON.stringify({
         success: false,
         error: `Failed to get statistics: ${error.message}`
@@ -396,7 +398,7 @@ export const createNoteFromChatTool = new DynamicStructuredTool({
   schema: CreateNoteFromChatSchema,
   func: async ({ content, title, category, skipClarification = false }) => {
     try {
-      console.log(
+      logger.log(
         `[Tool: create_note_from_chat] Creating note from chat with params:`,
         { content, title, category, skipClarification }
       )
@@ -407,13 +409,10 @@ export const createNoteFromChatTool = new DynamicStructuredTool({
         category: !category
       }
 
-      console.log(
-        `[Tool: create_note_from_chat] Missing params:`,
-        missingParams
-      )
+      logger.log(`[Tool: create_note_from_chat] Missing params:`, missingParams)
 
       if (missingParams.content) {
-        console.error(
+        logger.error(
           "[Tool: create_note_from_chat] Content is missing! This should have been extracted by the agent."
         )
         return JSON.stringify({
@@ -467,7 +466,7 @@ export const createNoteFromChatTool = new DynamicStructuredTool({
             embedding: embedding
           })
 
-          console.log(
+          logger.log(
             `[Tool: create_note_from_chat] Note created successfully with ID: ${createdNote.id}`
           )
 
@@ -483,7 +482,7 @@ export const createNoteFromChatTool = new DynamicStructuredTool({
             }
           })
         } catch (error) {
-          console.error(
+          logger.error(
             "[Tool: create_note_from_chat] Failed to create note:",
             error
           )
@@ -504,7 +503,7 @@ export const createNoteFromChatTool = new DynamicStructuredTool({
         }
       })
     } catch (error) {
-      console.error("[Tool: create_note_from_chat] Error:", error)
+      logger.error("[Tool: create_note_from_chat] Error:", error)
       return JSON.stringify({
         success: false,
         error: `Failed to create note from chat: ${error.message}`
@@ -524,7 +523,7 @@ export const organizeNoteTool = new DynamicStructuredTool({
   schema: OrganizeNoteSchema,
   func: async ({ noteId, suggestedCategory }) => {
     try {
-      console.log(
+      logger.log(
         `[Tool: organize_note] Organizing note: ${noteId}, suggested: ${suggestedCategory}`
       )
 
@@ -536,7 +535,7 @@ export const organizeNoteTool = new DynamicStructuredTool({
         })
       }
 
-      console.log(
+      logger.log(
         `[Tool: organize_note] Found note: "${note.title}" in category "${note.category}"`
       )
 
@@ -547,7 +546,7 @@ export const organizeNoteTool = new DynamicStructuredTool({
       const embedding = await aiService.generateEmbedding(searchQuery)
       const similarNotes = await dbService.searchNotesByVector(embedding, 10)
 
-      console.log(
+      logger.log(
         `[Tool: organize_note] Found ${similarNotes.length} similar notes`
       )
 
@@ -567,7 +566,7 @@ export const organizeNoteTool = new DynamicStructuredTool({
         categoryGroups.get(category)!.push(result)
       })
 
-      console.log(
+      logger.log(
         `[Tool: organize_note] Category groups:`,
         Array.from(categoryGroups.keys())
       )
@@ -575,7 +574,7 @@ export const organizeNoteTool = new DynamicStructuredTool({
       categoryGroups.delete(note.category)
 
       if (categoryGroups.size === 0) {
-        console.log(
+        logger.log(
           `[Tool: organize_note] No similar notes found in other categories`
         )
         return JSON.stringify({
@@ -597,7 +596,7 @@ export const organizeNoteTool = new DynamicStructuredTool({
         }
       })
 
-      console.log(
+      logger.log(
         `[Tool: organize_note] Best matching category: "${bestCategory}" with ${maxCount} notes`
       )
 
@@ -617,7 +616,7 @@ export const organizeNoteTool = new DynamicStructuredTool({
         message: `Hey! I found that there's an existing category called "${bestCategory}" with ${maxCount} related note${maxCount > 1 ? "s" : ""}:\n\n${relatedTitles}\n\nWould you like to move the note "${note.title}" from "${note.category}" to "${bestCategory}" to keep related notes organized together?`
       })
     } catch (error) {
-      console.error("[Tool: organize_note] Error:", error)
+      logger.error("[Tool: organize_note] Error:", error)
       return JSON.stringify({
         success: false,
         error: `Failed to organize note: ${error.message}`
@@ -636,7 +635,7 @@ export const confirmOrganizeNoteTool = new DynamicStructuredTool({
   schema: ConfirmOrganizeNoteSchema,
   func: async ({ noteId, targetCategory, userConfirmed }) => {
     try {
-      console.log(
+      logger.log(
         `[Tool: confirm_organize_note] User ${userConfirmed ? "confirmed" : "declined"} moving note ${noteId} to ${targetCategory}`
       )
 
@@ -649,9 +648,7 @@ export const confirmOrganizeNoteTool = new DynamicStructuredTool({
       }
 
       if (!userConfirmed) {
-        console.log(
-          `[Tool: confirm_organize_note] User declined reorganization`
-        )
+        logger.log(`[Tool: confirm_organize_note] User declined reorganization`)
         return JSON.stringify({
           success: true,
           action: "declined",
@@ -659,7 +656,7 @@ export const confirmOrganizeNoteTool = new DynamicStructuredTool({
         })
       }
 
-      console.log(
+      logger.log(
         `[Tool: confirm_organize_note] Moving note from "${note.category}" to "${targetCategory}"`
       )
 
@@ -674,7 +671,7 @@ export const confirmOrganizeNoteTool = new DynamicStructuredTool({
         })
       }
 
-      console.log(
+      logger.log(
         `[Tool: confirm_organize_note] Successfully moved note to "${targetCategory}"`
       )
 
@@ -689,7 +686,7 @@ export const confirmOrganizeNoteTool = new DynamicStructuredTool({
         }
       })
     } catch (error) {
-      console.error("[Tool: confirm_organize_note] Error:", error)
+      logger.error("[Tool: confirm_organize_note] Error:", error)
       return JSON.stringify({
         success: false,
         error: `Failed to confirm organization: ${error.message}`

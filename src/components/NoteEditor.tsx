@@ -7,6 +7,7 @@ import {
 } from "~components/RichTextEditor"
 import { generateTitle, summarizeText } from "~services/ai-service"
 import { markdownToTipTapHTML } from "~util/markdown-to-tiptap"
+import { logger } from "~utils/logger"
 
 interface NoteEditorProps {
   title: string
@@ -61,7 +62,7 @@ export function NoteEditor({
     }
 
     const startTime = performance.now()
-    console.log(" [UI] Starting title generation...")
+    logger.log(" [UI] Starting title generation...")
 
     setIsGeneratingTitle(true)
     try {
@@ -69,12 +70,10 @@ export function NoteEditor({
       onTitleChange(generatedTitle)
 
       const totalTime = performance.now() - startTime
-      console.log(
-        `⏱ [UI] Title generation completed: ${totalTime.toFixed(2)}ms`
-      )
+      logger.log(` [UI] Title generation completed: ${totalTime.toFixed(2)}ms`)
     } catch (error) {
       const totalTime = performance.now() - startTime
-      console.error(
+      logger.error(
         ` [UI] Title generation failed after ${totalTime.toFixed(2)}ms:`,
         error
       )
@@ -101,7 +100,7 @@ export function NoteEditor({
     }
 
     const startTime = performance.now()
-    console.log(" [UI] Starting content summarization...")
+    logger.log(" [UI] Starting content summarization...")
 
     setIsSummarizing(true)
     try {
@@ -112,12 +111,12 @@ export function NoteEditor({
       editorRef.current?.setContent(richHTML)
 
       const totalTime = performance.now() - startTime
-      console.log(
-        `⏱ [UI] Content summarization completed: ${totalTime.toFixed(2)}ms`
+      logger.log(
+        ` [UI] Content summarization completed: ${totalTime.toFixed(2)}ms`
       )
     } catch (error) {
       const totalTime = performance.now() - startTime
-      console.error(
+      logger.error(
         ` [UI] Content summarization failed after ${totalTime.toFixed(2)}ms:`,
         error
       )

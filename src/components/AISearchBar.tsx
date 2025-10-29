@@ -17,6 +17,7 @@ import {
   saveChatMessages
 } from "~util/session-storage"
 import { tiptapToMarkdown } from "~util/tiptap-to-markdown"
+import { logger } from "~utils/logger"
 
 function getTimeBasedGreeting(): string {
   const hour = new Date().getHours()
@@ -193,13 +194,13 @@ export function AISearchBar({
       try {
         const storedMessages = await loadChatMessages()
         if (storedMessages.length > 0) {
-          console.log(
-            `🔄 [AISearchBar] Restored ${storedMessages.length} messages from session storage`
+          logger.log(
+            ` [AISearchBar] Restored ${storedMessages.length} messages from session storage`
           )
           setMessages(storedMessages)
         }
       } catch (error) {
-        console.error("Failed to load messages from storage:", error)
+        logger.error("Failed to load messages from storage:", error)
       } finally {
         setIsLoadingFromStorage(false)
       }
@@ -214,7 +215,7 @@ export function AISearchBar({
     }
 
     saveChatMessages(messages).catch((error) => {
-      console.error("Failed to save messages to storage:", error)
+      logger.error("Failed to save messages to storage:", error)
     })
   }, [messages, isLoadingFromStorage])
 
@@ -249,9 +250,9 @@ export function AISearchBar({
         setCopiedMessageId(null)
       }, 2000)
 
-      console.log("📋 [AISearchBar] Message copied to clipboard")
+      logger.log(" [AISearchBar] Message copied to clipboard")
     } catch (error) {
-      console.error("❌ [AISearchBar] Failed to copy message:", error)
+      logger.error(" [AISearchBar] Failed to copy message:", error)
     }
   }
 
@@ -259,20 +260,20 @@ export function AISearchBar({
     persona: Persona | null,
     isManualChange: boolean = true
   ) => {
-    console.log(
+    logger.log(
       "[AISearchBar] handlePersonaChange called:",
       persona?.name || "Default Mode",
       isManualChange ? "(manual)" : "(auto-restored)"
     )
 
     try {
-      console.log("[AISearchBar] Getting global agent with persona...")
+      logger.log("[AISearchBar] Getting global agent with persona...")
       const agent = await getGlobalAgent(persona)
 
-      console.log("[AISearchBar] Verifying persona was set...")
+      logger.log("[AISearchBar] Verifying persona was set...")
       const currentPersona = agent.getPersona()
       const currentMode = agent.getMode()
-      console.log("[AISearchBar] Agent state after initialization:", {
+      logger.log("[AISearchBar] Agent state after initialization:", {
         personaName: currentPersona?.name || "None",
         mode: currentMode,
         sessionId: agent.getSessionId()
@@ -281,7 +282,7 @@ export function AISearchBar({
       const currentId = currentPersona?.id || null
       const newId = persona?.id || null
       if (currentId !== newId) {
-        console.log("[AISearchBar] Persona mismatch, calling setPersona()...")
+        logger.log("[AISearchBar] Persona mismatch, calling setPersona()...")
         await agent.setPersona(persona)
       }
 
@@ -301,14 +302,14 @@ export function AISearchBar({
         setMessages([systemMessage])
       }
 
-      console.log("[AISearchBar] Agent persona updated successfully")
+      logger.log("[AISearchBar] Agent persona updated successfully")
     } catch (error) {
-      console.error("[AISearchBar] Error updating agent persona:", error)
+      logger.error("[AISearchBar] Error updating agent persona:", error)
     }
   }
 
   const handleClearChat = async () => {
-    console.log(" [AISearchBar] Clearing chat...")
+    logger.log(" [AISearchBar] Clearing chat...")
 
     setMessages([])
 
@@ -329,7 +330,7 @@ export function AISearchBar({
 
     setCurrentInputLength(0)
 
-    console.log(" [AISearchBar] Chat cleared (including session storage)")
+    logger.log(" [AISearchBar] Chat cleared (including session storage)")
   }
 
   const checkTokenUsage = async () => {
@@ -345,19 +346,19 @@ export function AISearchBar({
         if (usage) {
           setTokenUsage(usage)
 
-          console.log(
+          logger.log(
             ` [Token Usage] ${usage.usage}/${usage.quota} tokens (${usage.percentage.toFixed(1)}% used) - ${(usage.quota - usage.usage).toFixed(0)} remaining`
           )
 
           if (usage.percentage >= 80) {
-            console.warn(
+            logger.warn(
               ` [Token Warning] Approaching token limit! ${usage.percentage.toFixed(1)}% used`
             )
           }
         }
       }
     } catch (error) {
-      console.error("Failed to check token usage:", error)
+      logger.error("Failed to check token usage:", error)
     }
   }
 
@@ -389,8 +390,8 @@ export function AISearchBar({
       const projectedTotal = tokenUsage.usage + estimatedInputTokens + 500
 
       if (currentUsagePercent >= COMPACTION_THRESHOLD) {
-        console.log(
-          `🔄 [Token Management] Session at ${(currentUsagePercent * 100).toFixed(1)}% - auto-compaction recommended`
+        logger.log(
+          ` [Token Management] Session at ${(currentUsagePercent * 100).toFixed(1)}% - auto-compaction recommended`
         )
         return {
           valid: true,
@@ -418,12 +419,12 @@ export function AISearchBar({
 
     const validation = validateInputSize(query)
     if (!validation.valid) {
-      console.warn("Input validation failed:", validation.reason)
+      logger.warn("Input validation failed:", validation.reason)
 
       const errorMessage: Message = {
         id: `ai-validation-error-${Date.now()}`,
         type: "ai",
-        content: `⚠️ ${validation.reason}`,
+        content: ` ${validation.reason}`,
         timestamp: Date.now()
       }
       setMessages((prev) => [...prev, errorMessage])
@@ -438,8 +439,8 @@ export function AISearchBar({
       const compactionPercent = (
         (validation.compactionThreshold || 0) * 100
       ).toFixed(1)
-      console.log(
-        `🔄 [Auto-Compaction] Session at ${compactionPercent}% usage - compacting now...`
+      logger.log(
+        ` [Auto-Compaction] Session at ${compactionPercent}% usage - compacting now...`
       )
 
       const compactionNotice: Message = {
@@ -462,8 +463,8 @@ export function AISearchBar({
         }
         setMessages((prev) => [...prev, successMessage])
 
-        console.log(
-          `✅ [Auto-Compaction] Session compacted successfully. Ready to continue.`
+        logger.log(
+          ` [Auto-Compaction] Session compacted successfully. Ready to continue.`
         )
 
         const { getSessionTokenUsage } = await import(
@@ -474,13 +475,13 @@ export function AISearchBar({
           const newUsage = getSessionTokenUsage(sessionId)
           if (newUsage) {
             setTokenUsage(newUsage)
-            console.log(
+            logger.log(
               ` [Token Usage] After compaction: ${newUsage.usage}/${newUsage.quota} tokens (${newUsage.percentage.toFixed(1)}%)`
             )
           }
         }
       } catch (error) {
-        console.error(`❌ [Auto-Compaction] Failed:`, error)
+        logger.error(` [Auto-Compaction] Failed:`, error)
 
         const fallbackMessage: Message = {
           id: `compaction-fallback-${Date.now()}`,
@@ -505,7 +506,7 @@ export function AISearchBar({
             }
           }
         } catch (clearError) {
-          console.error(`❌ [Session Clear] Failed:`, clearError)
+          logger.error(` [Session Clear] Failed:`, clearError)
         }
       }
     }
@@ -514,7 +515,7 @@ export function AISearchBar({
       setLastSubmittedContentJSON(contentJSON)
 
       if (pendingManualInput.type && pendingManualInput.pendingNoteData) {
-        console.log("Processing manual input:", pendingManualInput.type, query)
+        logger.log("Processing manual input:", pendingManualInput.type, query)
 
         if (pendingManualInput.type === "category") {
           await handleClarificationOption(
@@ -571,15 +572,15 @@ export function AISearchBar({
         let didReceiveChunks = false
         const handleStreamChunk = (chunk: string) => {
           if (isFirstChunk) {
-            console.log(`📡 [Streaming] First chunk received, starting stream`)
+            logger.log(` [Streaming] First chunk received, starting stream`)
             setIsStreaming(true)
             isFirstChunk = false
             didReceiveChunks = true
           }
 
           accumulatedText += chunk
-          console.log(
-            `📡 [Streaming] Chunk received (${chunk.length} chars), total: ${accumulatedText.length}`
+          logger.log(
+            ` [Streaming] Chunk received (${chunk.length} chars), total: ${accumulatedText.length}`
           )
 
           setMessages((prev) =>
@@ -614,7 +615,7 @@ export function AISearchBar({
             aiResponse.referenceNotes &&
             aiResponse.referenceNotes.length > 0
           ) {
-            console.log("Fetching reference notes:", aiResponse.referenceNotes)
+            logger.log("Fetching reference notes:", aiResponse.referenceNotes)
             const { getNote } = await import("~services/db-service")
             const notePromises = aiResponse.referenceNotes.map((noteId) =>
               getNote(noteId)
@@ -623,7 +624,7 @@ export function AISearchBar({
             fullReferenceNotes = notes.filter(
               (note): note is Note => note !== null
             )
-            console.log("Fetched full reference notes:", fullReferenceNotes)
+            logger.log("Fetched full reference notes:", fullReferenceNotes)
           }
 
           const aiMessage: Message = {
@@ -636,8 +637,8 @@ export function AISearchBar({
             referenceNotes: fullReferenceNotes
           }
 
-          console.log(
-            "🔍 [AISearchBar] Creating AI message with clarifications:",
+          logger.log(
+            " [AISearchBar] Creating AI message with clarifications:",
             {
               hasClarificationOptions: !!aiResponse.clarificationOptions,
               clarificationCount: aiResponse.clarificationOptions?.length || 0,
@@ -657,7 +658,7 @@ export function AISearchBar({
           }
 
           if (aiResponse.noteCreated && onNoteCreated) {
-            console.log("Note created, calling onNoteCreated callback")
+            logger.log("Note created, calling onNoteCreated callback")
             onNoteCreated()
           }
 
@@ -679,7 +680,7 @@ export function AISearchBar({
           await checkTokenUsage()
         }
       } catch (error) {
-        console.error("Search error:", error)
+        logger.error("Search error:", error)
 
         setMessages((prev) => prev.filter((m) => m.id !== streamingMessageId))
 
@@ -704,7 +705,7 @@ export function AISearchBar({
     messageId?: string
   ) => {
     const callId = `${action}-${Date.now()}`
-    console.log(`[${callId}] Clarification option selected:`, {
+    logger.log(`[${callId}] Clarification option selected:`, {
       action,
       value,
       pendingNoteData,
@@ -716,19 +717,19 @@ export function AISearchBar({
     }
 
     if (!pendingNoteData) {
-      console.error(`[${callId}] No pending note data found`)
+      logger.error(`[${callId}] No pending note data found`)
       setIsInputDisabled(false)
       return
     }
 
     if (isSearching) {
-      console.warn(
+      logger.warn(
         `[${callId}] Already processing clarification, ignoring duplicate call`
       )
       return
     }
 
-    console.log(`[${callId}] Setting isSearching to true`)
+    logger.log(`[${callId}] Setting isSearching to true`)
     setIsSearching(true)
 
     try {
@@ -1119,7 +1120,7 @@ export function AISearchBar({
         }
 
         case "confirm_organize": {
-          console.log(`[${callId}] Organization confirmation:`, value)
+          logger.log(`[${callId}] Organization confirmation:`, value)
 
           const userMessage: Message = {
             id: `user-${Date.now()}`,
@@ -1163,7 +1164,7 @@ export function AISearchBar({
         }
 
         default:
-          console.warn("Unknown clarification action:", action)
+          logger.warn("Unknown clarification action:", action)
           setIsInputDisabled(false)
           setIsSearching(false)
           return
@@ -1171,14 +1172,14 @@ export function AISearchBar({
 
       if (finalTitle && finalCategory && noteContent) {
         const noteCreationId = `note-${Date.now()}`
-        console.log(`[${callId}] [${noteCreationId}] Creating note with:`, {
+        logger.log(`[${callId}] [${noteCreationId}] Creating note with:`, {
           finalTitle,
           finalCategory,
           noteContent: noteContent.substring(0, 100) + "..."
         })
 
         const saveStartTime = performance.now()
-        console.log(
+        logger.log(
           `[${noteCreationId}] [AI Chat] Creating new note via agent...`
         )
 
@@ -1186,8 +1187,8 @@ export function AISearchBar({
         const { generateEmbedding } = await import("~services/ai-service")
         const embedding = await generateEmbedding(noteContent)
         const embeddingTime = performance.now() - embeddingStartTime
-        console.log(
-          `⏱ [AI Chat] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embedding.length} dimensions)`
+        logger.log(
+          ` [AI Chat] Embedding generation: ${embeddingTime.toFixed(2)}ms (${embedding.length} dimensions)`
         )
 
         let sourceUrl: string | undefined
@@ -1198,12 +1199,12 @@ export function AISearchBar({
           })
           sourceUrl = tabs[0]?.url
         } catch (e) {
-          console.warn("Could not get tab URL:", e)
+          logger.warn("Could not get tab URL:", e)
         }
 
         let contentJSONString: string
         if (lastSubmittedContentJSON && noteContent) {
-          console.log(" Extracting relevant portion from rich content JSON...")
+          logger.log(" Extracting relevant portion from rich content JSON...")
 
           const fullMarkdown = tiptapToMarkdown(lastSubmittedContentJSON)
 
@@ -1211,7 +1212,7 @@ export function AISearchBar({
             fullMarkdown.includes(noteContent) &&
             fullMarkdown.length > noteContent.length
           ) {
-            console.log(
+            logger.log(
               " Agent extracted partial content, filtering TipTap nodes..."
             )
 
@@ -1239,19 +1240,19 @@ export function AISearchBar({
                 type: "doc",
                 content: filteredNodes
               })
-              console.log(
+              logger.log(
                 ` Filtered to ${filteredNodes.length} nodes (removed prompt)`
               )
             } else {
               contentJSONString = JSON.stringify(lastSubmittedContentJSON)
-              console.log(" Filtering failed, using full content")
+              logger.log(" Filtering failed, using full content")
             }
           } else {
-            console.log(" Content matches exactly, using full rich JSON")
+            logger.log(" Content matches exactly, using full rich JSON")
             contentJSONString = JSON.stringify(lastSubmittedContentJSON)
           }
         } else {
-          console.log(" No rich content found, converting plain text to JSON")
+          logger.log(" No rich content found, converting plain text to JSON")
           const contentJSON = {
             type: "doc",
             content: noteContent
@@ -1283,8 +1284,8 @@ export function AISearchBar({
           }
         })
         const messageTime = performance.now() - messageStartTime
-        console.log(
-          `⏱ [AI Chat] Background processing (encrypt + DB): ${messageTime.toFixed(2)}ms`
+        logger.log(
+          ` [AI Chat] Background processing (encrypt + DB): ${messageTime.toFixed(2)}ms`
         )
 
         if (!response.success) {
@@ -1292,8 +1293,8 @@ export function AISearchBar({
         }
 
         const totalTime = performance.now() - saveStartTime
-        console.log(` [AI Chat] TOTAL save time: ${totalTime.toFixed(2)}ms`)
-        console.log(
+        logger.log(` [AI Chat] TOTAL save time: ${totalTime.toFixed(2)}ms`)
+        logger.log(
           ` [AI Chat] Breakdown: Embedding=${embeddingTime.toFixed(2)}ms, Background=${messageTime.toFixed(2)}ms`
         )
 
@@ -1313,7 +1314,7 @@ export function AISearchBar({
 
         const noteId = response.note?.id
         if (noteId) {
-          console.log(
+          logger.log(
             `[${callId}] Running organize_note tool for newly created note:`,
             noteId
           )
@@ -1328,13 +1329,13 @@ export function AISearchBar({
             })
 
             const organizeData = JSON.parse(organizeResult)
-            console.log(`[${callId}] Organize result:`, organizeData)
+            logger.log(`[${callId}] Organize result:`, organizeData)
 
             if (
               organizeData.needsReorganization &&
               organizeData.suggestedCategory
             ) {
-              console.log(
+              logger.log(
                 `[${callId}] Reorganization suggested:`,
                 organizeData.suggestedCategory
               )
@@ -1379,19 +1380,19 @@ export function AISearchBar({
               setIsSearching(false)
               return
             } else {
-              console.log(
+              logger.log(
                 `[${callId}] No reorganization needed or no similar notes found`
               )
             }
           } catch (error) {
-            console.error(`[${callId}] Error running organize_note:`, error)
+            logger.error(`[${callId}] Error running organize_note:`, error)
           }
         }
 
         setIsInputDisabled(false)
       }
     } catch (error) {
-      console.error("Error handling clarification:", error)
+      logger.error("Error handling clarification:", error)
       const errorMessage: Message = {
         id: `ai-error-${Date.now()}`,
         type: "ai",
@@ -1673,8 +1674,8 @@ export function AISearchBar({
                           <div className="plasmo-flex plasmo-flex-wrap plasmo-gap-2">
                             {message.clarificationOptions.map((option, idx) => {
                               if (idx === 0) {
-                                console.log(
-                                  "🎨 [AISearchBar] Rendering clarification buttons for message:",
+                                logger.log(
+                                  " [AISearchBar] Rendering clarification buttons for message:",
                                   {
                                     messageId: message.id,
                                     optionCount:

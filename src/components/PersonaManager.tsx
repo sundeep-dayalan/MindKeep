@@ -9,6 +9,7 @@ import {
 } from "~services/db-service"
 import { executePrompt } from "~services/gemini-nano-service"
 import type { Persona, PersonaInput } from "~types/persona"
+import { logger } from "~utils/logger"
 
 interface PersonaManagerProps {
   onPersonaActivated?: (persona: Persona | null) => void
@@ -43,16 +44,16 @@ export function PersonaManager({
   })
 
   useEffect(() => {
-    console.log(" [PersonaManager] Component mounted, loading personas")
+    logger.log(" [PersonaManager] Component mounted, loading personas")
     loadPersonas()
   }, [])
 
   const loadPersonas = async () => {
-    console.log(" [PersonaManager] loadPersonas called")
+    logger.log(" [PersonaManager] loadPersonas called")
     setLoading(true)
     try {
       const allPersonas = await getAllPersonas()
-      console.log(` [PersonaManager] Loaded ${allPersonas.length} personas`)
+      logger.log(` [PersonaManager] Loaded ${allPersonas.length} personas`)
 
       const sortedPersonas = allPersonas.sort(
         (a, b) => b.createdAt - a.createdAt
@@ -60,14 +61,14 @@ export function PersonaManager({
 
       setPersonas(sortedPersonas)
     } catch (error) {
-      console.error(" [PersonaManager] Error loading personas:", error)
+      logger.error(" [PersonaManager] Error loading personas:", error)
     } finally {
       setLoading(false)
     }
   }
 
   const handleCreate = () => {
-    console.log(" [PersonaManager] handleCreate - opening create form")
+    logger.log(" [PersonaManager] handleCreate - opening create form")
     setFormData({
       name: "",
       description: "",
@@ -79,7 +80,7 @@ export function PersonaManager({
   }
 
   const handleEdit = (persona: Persona) => {
-    console.log(" [PersonaManager] handleEdit for persona:", persona.name)
+    logger.log(" [PersonaManager] handleEdit for persona:", persona.name)
     setFormData({
       name: persona.name,
       description: persona.description,
@@ -91,7 +92,7 @@ export function PersonaManager({
   }
 
   const handleSave = async () => {
-    console.log(" [PersonaManager] handleSave called with data:", formData)
+    logger.log(" [PersonaManager] handleSave called with data:", formData)
 
     if (!formData.name.trim()) {
       alert("Please enter a persona name")
@@ -135,22 +136,22 @@ export function PersonaManager({
     setLoading(true)
     try {
       if (editingPersona) {
-        console.log(
+        logger.log(
           " [PersonaManager] Updating existing persona:",
           editingPersona.id
         )
         await updatePersona(editingPersona.id, formData)
       } else {
-        console.log(" [PersonaManager] Creating new persona")
+        logger.log(" [PersonaManager] Creating new persona")
         await addPersona(formData)
       }
 
       await loadPersonas()
       setIsCreating(false)
       setEditingPersona(null)
-      console.log(" [PersonaManager] Persona saved successfully")
+      logger.log(" [PersonaManager] Persona saved successfully")
     } catch (error) {
-      console.error(" [PersonaManager] Error saving persona:", error)
+      logger.error(" [PersonaManager] Error saving persona:", error)
       alert("Failed to save persona. Please try again.")
     } finally {
       setLoading(false)
@@ -158,7 +159,7 @@ export function PersonaManager({
   }
 
   const handleDelete = async (persona: Persona) => {
-    console.log(" [PersonaManager] handleDelete for persona:", persona.name)
+    logger.log(" [PersonaManager] handleDelete for persona:", persona.name)
 
     if (persona.isDefault) {
       alert("Cannot delete default personas")
@@ -173,7 +174,7 @@ export function PersonaManager({
     try {
       const success = await deletePersona(persona.id)
       if (success) {
-        console.log(" [PersonaManager] Persona deleted successfully")
+        logger.log(" [PersonaManager] Persona deleted successfully")
         await loadPersonas()
 
         if (persona.isActive && onPersonaActivated) {
@@ -183,7 +184,7 @@ export function PersonaManager({
         alert("Failed to delete persona")
       }
     } catch (error) {
-      console.error(" [PersonaManager] Error deleting persona:", error)
+      logger.error(" [PersonaManager] Error deleting persona:", error)
       alert("Failed to delete persona. Please try again.")
     } finally {
       setLoading(false)
@@ -192,7 +193,7 @@ export function PersonaManager({
 
   const handleActivate = async (persona: Persona | null) => {
     const personaId = persona?.id || null
-    console.log(" [PersonaManager] handleActivate for persona ID:", personaId)
+    logger.log(" [PersonaManager] handleActivate for persona ID:", personaId)
 
     setLoading(true)
     try {
@@ -203,12 +204,12 @@ export function PersonaManager({
         onPersonaActivated(persona)
       }
 
-      console.log(
+      logger.log(
         " [PersonaManager] Persona activated:",
         persona?.name || "None (default mode)"
       )
     } catch (error) {
-      console.error(" [PersonaManager] Error activating persona:", error)
+      logger.error(" [PersonaManager] Error activating persona:", error)
       alert("Failed to activate persona. Please try again.")
     } finally {
       setLoading(false)
@@ -216,13 +217,13 @@ export function PersonaManager({
   }
 
   const handleCancel = () => {
-    console.log("[PersonaManager] handleCancel - closing form")
+    logger.log("[PersonaManager] handleCancel - closing form")
     setIsCreating(false)
     setEditingPersona(null)
   }
 
   const handleGenerateTitle = async () => {
-    console.log("🤖 [PersonaManager] handleGenerateTitle called")
+    logger.log(" [PersonaManager] handleGenerateTitle called")
 
     if (!formData.context.trim() && !formData.description.trim()) {
       alert(
@@ -248,7 +249,7 @@ ${truncatedInput}
 
 Return only the name. Examples: "Email Writer", "Movie Critic", "Code Helper"`
 
-      console.log("🤖 [PersonaManager] Generating title with prompt:", prompt)
+      logger.log(" [PersonaManager] Generating title with prompt:", prompt)
       const generatedTitle = await executePrompt(prompt)
 
       const cleanTitle = generatedTitle.trim().replace(/^["']|["']$/g, "")
@@ -256,13 +257,13 @@ Return only the name. Examples: "Email Writer", "Movie Critic", "Code Helper"`
       setFormData((prev) => ({ ...prev, name: cleanTitle }))
 
       const totalTime = performance.now() - startTime
-      console.log(
-        `⏱️ [PersonaManager] Title generation completed: ${totalTime.toFixed(2)}ms`
+      logger.log(
+        ` [PersonaManager] Title generation completed: ${totalTime.toFixed(2)}ms`
       )
     } catch (error) {
       const totalTime = performance.now() - startTime
-      console.error(
-        `❌ [PersonaManager] Title generation failed after ${totalTime.toFixed(2)}ms:`,
+      logger.error(
+        ` [PersonaManager] Title generation failed after ${totalTime.toFixed(2)}ms:`,
         error
       )
       const errorMessage = error.message || "Failed to generate title"
@@ -282,7 +283,7 @@ Return only the name. Examples: "Email Writer", "Movie Critic", "Code Helper"`
   }
 
   const handleGenerateDescription = async () => {
-    console.log("🤖 [PersonaManager] handleGenerateDescription called")
+    logger.log(" [PersonaManager] handleGenerateDescription called")
 
     // Check if we have any input to work with
     if (!formData.context.trim() && !formData.name.trim()) {
@@ -311,8 +312,8 @@ ${truncatedInput}
 
 Return only the description sentence.`
 
-      console.log(
-        "🤖 [PersonaManager] Generating description with prompt:",
+      logger.log(
+        " [PersonaManager] Generating description with prompt:",
         prompt
       )
       const generatedDescription = await executePrompt(prompt)
@@ -323,13 +324,13 @@ Return only the description sentence.`
       setFormData((prev) => ({ ...prev, description: cleanDescription }))
 
       const totalTime = performance.now() - startTime
-      console.log(
-        `⏱️ [PersonaManager] Description generation completed: ${totalTime.toFixed(2)}ms`
+      logger.log(
+        ` [PersonaManager] Description generation completed: ${totalTime.toFixed(2)}ms`
       )
     } catch (error) {
       const totalTime = performance.now() - startTime
-      console.error(
-        `❌ [PersonaManager] Description generation failed after ${totalTime.toFixed(2)}ms:`,
+      logger.error(
+        ` [PersonaManager] Description generation failed after ${totalTime.toFixed(2)}ms:`,
         error
       )
       const errorMessage = error.message || "Failed to generate description"
@@ -349,7 +350,7 @@ Return only the description sentence.`
   }
 
   const handleGenerateContext = async () => {
-    console.log("🤖 [PersonaManager] handleGenerateContext called")
+    logger.log(" [PersonaManager] handleGenerateContext called")
 
     // Check if we have any input to work with
     if (
@@ -391,7 +392,7 @@ Write 3-5 concise paragraphs covering:
 
 Keep it focused and actionable. No markdown headers, just clear paragraphs.`
 
-      console.log("🤖 [PersonaManager] Generating context with prompt:", prompt)
+      logger.log(" [PersonaManager] Generating context with prompt:", prompt)
       const generatedContext = await executePrompt(prompt)
 
       // Clean up the response
@@ -400,13 +401,13 @@ Keep it focused and actionable. No markdown headers, just clear paragraphs.`
       setFormData((prev) => ({ ...prev, context: cleanContext }))
 
       const totalTime = performance.now() - startTime
-      console.log(
-        `⏱️ [PersonaManager] Context generation completed: ${totalTime.toFixed(2)}ms`
+      logger.log(
+        ` [PersonaManager] Context generation completed: ${totalTime.toFixed(2)}ms`
       )
     } catch (error) {
       const totalTime = performance.now() - startTime
-      console.error(
-        `❌ [PersonaManager] Context generation failed after ${totalTime.toFixed(2)}ms:`,
+      logger.error(
+        ` [PersonaManager] Context generation failed after ${totalTime.toFixed(2)}ms:`,
         error
       )
       const errorMessage =
@@ -437,9 +438,7 @@ Keep it focused and actionable. No markdown headers, just clear paragraphs.`
           </h2>
           <button
             onClick={handleCancel}
-            className="plasmo-text-gray-400 hover:plasmo-text-gray-600 plasmo-transition-colors">
-            ✕
-          </button>
+            className="plasmo-text-gray-400 hover:plasmo-text-gray-600 plasmo-transition-colors"></button>
         </div>
 
         <div className="plasmo-flex-1 plasmo-overflow-y-auto plasmo-p-6 plasmo-space-y-5 plasmo-bg-white">

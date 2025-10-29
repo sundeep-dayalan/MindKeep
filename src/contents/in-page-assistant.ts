@@ -12,6 +12,7 @@ import {
   calculateModalPosition,
   setupPositionTracking
 } from "~content/position-calculator"
+import { logger } from "~utils/logger"
 
 import "./in-page-assistant.css"
 
@@ -29,46 +30,46 @@ let activeChatModal: {
 } | null = null
 
 const handleFieldFocus = (field: ManagedInputField) => {
-  console.log("🎯 [InPageAssistant] handleFieldFocus called!")
-  console.log("🎯 [InPageAssistant] Field element:", field.element)
-  console.log("🎯 [InPageAssistant] Field has icon?", !!field.iconElement)
-  console.log("🎯 [InPageAssistant] Icon element:", field.iconElement)
+  logger.log(" [InPageAssistant] handleFieldFocus called!")
+  logger.log(" [InPageAssistant] Field element:", field.element)
+  logger.log(" [InPageAssistant] Field has icon?", !!field.iconElement)
+  logger.log(" [InPageAssistant] Icon element:", field.iconElement)
 
   if (!field.iconElement) {
-    console.log("🎯 [InPageAssistant] Creating icon...")
+    logger.log(" [InPageAssistant] Creating icon...")
     const icon = createInjectedIcon(field.element, () => openChatModal(field))
-    console.log("🎯 [InPageAssistant] Icon created:", icon)
-    console.log("🎯 [InPageAssistant] Icon display style:", icon.style.display)
-    console.log("🎯 [InPageAssistant] Icon parent:", icon.parentElement)
+    logger.log(" [InPageAssistant] Icon created:", icon)
+    logger.log(" [InPageAssistant] Icon display style:", icon.style.display)
+    logger.log(" [InPageAssistant] Icon parent:", icon.parentElement)
 
     if (icon.style.display === "none") {
-      console.log(
-        "🎯 [InPageAssistant] Icon placeholder created, retrying after delay..."
+      logger.log(
+        " [InPageAssistant] Icon placeholder created, retrying after delay..."
       )
 
       setTimeout(() => {
         if (field.isActive && !field.iconElement) {
-          console.log("🎯 [InPageAssistant] Retrying icon creation...")
+          logger.log(" [InPageAssistant] Retrying icon creation...")
           const retryIcon = createInjectedIcon(field.element, () =>
             openChatModal(field)
           )
           if (retryIcon.style.display !== "none") {
             fieldManager?.attachIcon(field, retryIcon)
-            console.log("🎯 [InPageAssistant] Icon created on retry")
+            logger.log(" [InPageAssistant] Icon created on retry")
           }
         }
       }, 100)
     } else {
       fieldManager?.attachIcon(field, icon)
-      console.log("🎯 [InPageAssistant] Icon attached to field")
-      console.log(
-        "🎯 [InPageAssistant] Field icon element after attach:",
+      logger.log(" [InPageAssistant] Icon attached to field")
+      logger.log(
+        " [InPageAssistant] Field icon element after attach:",
         field.iconElement
       )
     }
   } else {
-    console.log("🎯 [InPageAssistant] Icon already exists, skipping creation")
-    console.log("🎯 [InPageAssistant] Existing icon visibility:", {
+    logger.log(" [InPageAssistant] Icon already exists, skipping creation")
+    logger.log(" [InPageAssistant] Existing icon visibility:", {
       display: field.iconElement.style.display,
       opacity: field.iconElement.style.opacity,
       parent: field.iconElement.parentElement
@@ -77,7 +78,7 @@ const handleFieldFocus = (field: ManagedInputField) => {
 }
 
 const handleFieldBlur = (field: ManagedInputField) => {
-  console.log("🔄 [InPageAssistant] Field blurred")
+  logger.log(" [InPageAssistant] Field blurred")
 
   setTimeout(() => {
     if (field.iconElement && !field.isActive) {
@@ -88,18 +89,18 @@ const handleFieldBlur = (field: ManagedInputField) => {
 }
 
 const openChatModal = (field: ManagedInputField) => {
-  console.log("💬 [InPageAssistant] Opening chat modal")
+  logger.log(" [InPageAssistant] Opening chat modal")
 
   const isInIframe = window.self !== window.top
-  console.log("🖼️  [InPageAssistant] Running in iframe:", isInIframe)
+  logger.log(" [InPageAssistant] Running in iframe:", isInIframe)
 
   closeActiveChat()
 
   const modalDimensions = { width: 400, height: 500 }
   const position = calculateModalPosition(field.element, modalDimensions)
 
-  console.log("📍 [InPageAssistant] Calculated position:", position)
-  console.log("📏 [InPageAssistant] Viewport:", {
+  logger.log(" [InPageAssistant] Calculated position:", position)
+  logger.log(" [InPageAssistant] Viewport:", {
     width: window.innerWidth,
     height: window.innerHeight
   })
@@ -119,8 +120,8 @@ const openChatModal = (field: ManagedInputField) => {
     adjustedPosition.top = Math.max(10, adjustedPosition.top)
     adjustedPosition.left = Math.max(10, adjustedPosition.left)
 
-    console.log(
-      "📍 [InPageAssistant] Adjusted position for iframe:",
+    logger.log(
+      " [InPageAssistant] Adjusted position for iframe:",
       adjustedPosition
     )
     position.top = adjustedPosition.top
@@ -177,12 +178,12 @@ const openChatModal = (field: ManagedInputField) => {
     cleanup: cleanupTracking
   }
 
-  console.log("✅ [InPageAssistant] Chat modal opened")
+  logger.log(" [InPageAssistant] Chat modal opened")
 }
 
 const closeActiveChat = () => {
   if (activeChatModal) {
-    console.log("🔒 [InPageAssistant] Closing chat modal")
+    logger.log(" [InPageAssistant] Closing chat modal")
 
     activeChatModal.cleanup()
 
@@ -195,8 +196,8 @@ const closeActiveChat = () => {
 }
 
 const handleInsert = (field: ManagedInputField, text: string) => {
-  console.log(
-    "📝 [InPageAssistant] Inserting text:",
+  logger.log(
+    " [InPageAssistant] Inserting text:",
     text.substring(0, 50) + "..."
   )
 
@@ -206,10 +207,10 @@ const handleInsert = (field: ManagedInputField, text: string) => {
 
   if (hasSelection) {
     fieldManager.replaceText(field, text, false)
-    console.log("✅ [InPageAssistant] Replaced selected text")
+    logger.log(" [InPageAssistant] Replaced selected text")
   } else {
     fieldManager.insertTextAtCursor(field, text)
-    console.log("✅ [InPageAssistant] Inserted at cursor")
+    logger.log(" [InPageAssistant] Inserted at cursor")
   }
 
   field.element.style.transition = "background-color 0.3s ease"
@@ -236,49 +237,47 @@ const handleHighlightEvent = (event: CustomEvent) => {
   }
 }
 
-console.log(
-  "🚀🚀🚀 [InPageAssistant] Script loaded! Document ready state:",
+logger.log(
+  " [InPageAssistant] Script loaded! Document ready state:",
   document.readyState
 )
 
 function init() {
-  console.log("✅ [InPageAssistant] DOM ready, starting initialization")
-  console.log("📍 [InPageAssistant] Current URL:", window.location.href)
-  console.log("📍 [InPageAssistant] Document body exists:", !!document.body)
+  logger.log(" [InPageAssistant] DOM ready, starting initialization")
+  logger.log(" [InPageAssistant] Current URL:", window.location.href)
+  logger.log(" [InPageAssistant] Document body exists:", !!document.body)
 
   try {
     fieldManager = new InputFieldManager()
-    console.log("✅ [InPageAssistant] InputFieldManager created")
+    logger.log(" [InPageAssistant] InputFieldManager created")
 
     fieldManager.initialize({
       onFieldFocus: handleFieldFocus,
       onFieldBlur: handleFieldBlur
     })
-    console.log("✅ [InPageAssistant] InputFieldManager initialized")
+    logger.log(" [InPageAssistant] InputFieldManager initialized")
 
     window.addEventListener(
       "mindkeep-highlight-insert",
       handleHighlightEvent as EventListener
     )
 
-    console.log("✅✅✅ [InPageAssistant] Initialization complete!")
+    logger.log(" [InPageAssistant] Initialization complete!")
   } catch (error) {
-    console.error("❌ [InPageAssistant] Initialization error:", error)
+    logger.error(" [InPageAssistant] Initialization error:", error)
   }
 }
 
 if (document.readyState === "loading") {
-  console.log("⏳ [InPageAssistant] Waiting for DOMContentLoaded...")
+  logger.log(" [InPageAssistant] Waiting for DOMContentLoaded...")
   document.addEventListener("DOMContentLoaded", init)
 } else {
-  console.log(
-    "✅ [InPageAssistant] DOM already ready, initializing immediately"
-  )
+  logger.log(" [InPageAssistant] DOM already ready, initializing immediately")
   init()
 }
 
 window.addEventListener("beforeunload", () => {
-  console.log("🧹 [InPageAssistant] Page unloading, cleaning up")
+  logger.log(" [InPageAssistant] Page unloading, cleaning up")
   if (fieldManager) {
     fieldManager.destroy()
     fieldManager = null
