@@ -183,6 +183,13 @@ export const RichTextEditor = forwardRef<
               // Already an object (TipTap JSON)
               editor.commands.setContent(content, { emitUpdate: false })
             }
+
+            // Manually trigger the onUpdate callback to ensure state is synced
+            if (onUpdate) {
+              const json = editor.getJSON()
+              const markdown = tiptapToMarkdown(json)
+              onUpdate(markdown, json)
+            }
           } catch (error) {
             logger.error(" [RichTextEditor] Error setting content:", error)
           }
