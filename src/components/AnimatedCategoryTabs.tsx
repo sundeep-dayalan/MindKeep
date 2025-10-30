@@ -38,7 +38,7 @@ export function AnimatedCategoryTabs({
       value: "all",
       count: allNotesCount,
       content: (
-        <div className="plasmo-w-full plasmo-h-full ">
+        <div className="plasmo-w-full plasmo-h-full plasmo-px-2">
           <NotesContent
             notes={getNotesForCategory("all")}
             loading={loading}
@@ -55,7 +55,7 @@ export function AnimatedCategoryTabs({
         value: category,
         count: categoryNotes.length,
         content: (
-          <div className="plasmo-w-full plasmo-h-full plasmo-pt-2">
+          <div className="plasmo-w-full plasmo-h-full plasmo-pt-2 plasmo-px-2">
             <NotesContent
               notes={categoryNotes}
               loading={loading}
@@ -168,14 +168,16 @@ function NotesContent({
   })
 
   return (
-    <BentoGrid
-      items={bentoItems}
-      gridCols={2}
-      rowHeight={75}
-      classNames={{
-        container: "plasmo-gap-3",
-        elementContainer: "plasmo-p-0 plasmo-m-0"
-      }}
-    />
+    <div className="plasmo-pb-[250px]">
+      <BentoGrid
+        items={bentoItems}
+        gridCols={2}
+        rowHeight={75}
+        classNames={{
+          container: "plasmo-gap-3",
+          elementContainer: "plasmo-p-0 plasmo-m-0"
+        }}
+      />
+    </div>
   )
 }
