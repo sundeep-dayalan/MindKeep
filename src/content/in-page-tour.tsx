@@ -208,7 +208,13 @@ export function useInPageTourState(tourKey: string) {
 
   const skipTour = useCallback(() => {
     logger.log(`🎯 [In-Page Tour] Skipping ${tourKey} tour`)
-    setRunTour(false)
+    try {
+      localStorage.setItem(`mindkeep_inpage_tour_${tourKey}`, "true")
+      setHasCompletedTour(true)
+      setRunTour(false)
+    } catch (error) {
+      logger.error("Error saving in-page tour skip state:", error)
+    }
   }, [tourKey])
 
   const resetTour = useCallback(() => {

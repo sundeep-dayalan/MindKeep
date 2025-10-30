@@ -128,27 +128,20 @@ const openChatModal = (field: ManagedInputField) => {
     position.left = adjustedPosition.left
   }
 
-  const fieldContent = fieldManager?.getFieldContent(field) || ""
-
   const modalContainer = document.createElement("div")
   modalContainer.id = "mindkeep-in-page-chat"
   modalContainer.style.cssText =
-    "position: fixed; z-index: 999999; pointer-events: none;"
+    "position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 999999; pointer-events: auto;"
   document.body.appendChild(modalContainer)
 
   const root = createRoot(modalContainer)
 
   root.render(
-    React.createElement(
-      "div",
-      { style: { pointerEvents: "auto" } },
-      React.createElement(InPageChatModal, {
-        position: position,
-        onClose: () => closeActiveChat(),
-        onInsert: (text: string) => handleInsert(field, text),
-        inputFieldContent: fieldContent
-      })
-    )
+    React.createElement(InPageChatModal, {
+      position: position,
+      onClose: () => closeActiveChat(),
+      onInsert: (text: string) => handleInsert(field, text)
+    })
   )
 
   const cleanupTracking = setupPositionTracking(
@@ -157,16 +150,11 @@ const openChatModal = (field: ManagedInputField) => {
     modalDimensions,
     (newPosition) => {
       root.render(
-        React.createElement(
-          "div",
-          { style: { pointerEvents: "auto" } },
-          React.createElement(InPageChatModal, {
-            position: newPosition,
-            onClose: () => closeActiveChat(),
-            onInsert: (text: string) => handleInsert(field, text),
-            inputFieldContent: fieldContent
-          })
-        )
+        React.createElement(InPageChatModal, {
+          position: newPosition,
+          onClose: () => closeActiveChat(),
+          onInsert: (text: string) => handleInsert(field, text)
+        })
       )
     }
   )

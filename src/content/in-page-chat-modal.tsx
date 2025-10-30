@@ -189,37 +189,47 @@ export function InPageChatModal({
   return (
     <>
       <div
-        ref={modalRef}
-        style={containerStyle}
-        onMouseDown={handleDragStart}
-        data-tour="in-page-modal">
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          pointerEvents: "none"
+        }}>
         <div
-          style={{
-            background: "rgba(255, 255, 255, 0.1)",
-            backdropFilter: "blur(20px)",
-            WebkitBackdropFilter: "blur(20px)",
-            borderRadius: "16px",
-            boxShadow:
-              "0 20px 60px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(226, 232, 240, 0.5)",
-            display: "flex",
-            flexDirection: "column",
-            height: "100%",
-            overflow: "visible",
-            border: "1px solid rgba(255, 255, 255, 0.3)"
-          }}>
-          {/* Main content */}
+          ref={modalRef}
+          style={containerStyle}
+          onMouseDown={handleDragStart}
+          data-tour="in-page-modal">
           <div
-            style={{ flex: 1, overflow: "visible", padding: "16px" }}
-            data-tour="in-page-ai-search">
-            <AISearchBar
-              placeholder="Ask me anything..."
-              onSearch={handleAISearch}
-              onStartTour={startTour}
-              maxInputHeight="2.5em"
-              personaDropdownUpward={false}
-              enableInsertMode={!!onInsert}
-              onInsert={onInsert}
-            />
+            style={{
+              background: "rgba(255, 255, 255, 0.1)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+              borderRadius: "16px",
+              boxShadow:
+                "0 20px 60px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(226, 232, 240, 0.5)",
+              display: "flex",
+              flexDirection: "column",
+              height: "100%",
+              overflow: "visible",
+              border: "1px solid rgba(255, 255, 255, 0.3)"
+            }}>
+            {/* Main content */}
+            <div
+              style={{ flex: 1, overflow: "visible", padding: "16px" }}
+              data-tour="in-page-ai-search">
+              <AISearchBar
+                placeholder="Ask me anything..."
+                onSearch={handleAISearch}
+                onStartTour={startTour}
+                maxInputHeight="2.5em"
+                personaDropdownUpward={false}
+                enableInsertMode={!!onInsert}
+                onInsert={onInsert}
+              />
+            </div>
           </div>
         </div>
       </div>
