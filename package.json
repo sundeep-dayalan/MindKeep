@@ -1,12 +1,11 @@
 {
   "name": "mind-keep",
   "displayName": "Mind keep",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "MindKeep is a revolutionary Chrome extension that functions as a user's personal AI assistant and \"second brain.\" It provides two primary interfaces: a lightning-fast Command Palette for retrieval and action, and an integrated Side Panel for note management and organization. It leverages Google's built-in Gemini Nano API to allow users to save, connect, and recall information, with all processing happening 100% on the user's local machine to ensure absolute privacy.",
   "author": "Sundeep Dayalan",
   "scripts": {
-    "dev": "plasmo dev && node fix-manifest.js",
-    "build": "plasmo build && node fix-manifest.js && node setup-offscreen.js",
+    "build": "plasmo dev && node fix-manifest.js",
     "package": "plasmo package && node fix-manifest.js && node setup-offscreen.js",
     "format": "prettier --write ."
   },
