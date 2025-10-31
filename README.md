@@ -23,6 +23,22 @@ To use MindKeep, you _must_ enable the required Chrome flags:
 
 ## Installation
 
+### **Option 1: Easy Install (Recommended)**
+
+A pre-built package is available for download in the **Releases** section of this repository.
+
+1.  **[Click here to go to the latest Release]** **(PASTE LINK TO YOUR NEW GITHUB RELEASE HERE)**
+2.  Download the `mindkeep-v1.zip` file
+3.  Unzip the file. (You will have a folder named `mindkeep-v1`).
+4.  **Load the Extension in Chrome:**
+    - Go to `chrome://extensions` in your browser.
+    - Enable **"Developer mode"** (using the toggle in the top-right).
+    - Click the **"Load unpacked"** button.
+    - Select the unzipped `mindkeep-v1` folder.
+5.  Pin the extension and you're ready to go!
+
+### **Option 2: Build from Source Code**
+
 1.  **[Download this repository](https://github.com/sundeep-dayalan/MindKeep/archive/refs/heads/main.zip)** and unzip it.
 2.  **Open Terminal:** Open your terminal or command prompt and navigate into the unzipped project folder (e.g., `cd MindKeep-main`).
 
@@ -32,20 +48,22 @@ To use MindKeep, you _must_ enable the required Chrome flags:
     pnpm install
     ```
 
-4.  **Build the Extension:** Run the following command to create a production build of the extension.
+4.  **Build the Extension:** Run the following command to create the extension.
 
     ```bash
     pnpm run build
     ```
 
-    This will create a new folder named `build/chrome-mv3-prod` containing the ready-to-install extension.
+    This will create a new folder named `build/chrome-mv3-dev` containing the ready-to-install extension.
+
+    _Note: Currently instructions will build dev version for judges to evaluate deeply. Extensively tested with Macbook M4 pro with Google chrome Version 141.0.7390.123_
 
 5.  **Load the Extension in Chrome:**
 
     - Go to `chrome://extensions` in your browser.
     - Enable **"Developer mode"** (using the toggle in the top-right).
     - Click the **"Load unpacked"** button.
-    - Select the **`build/chrome-mv3-prod`** folder that was just created (do _not_ select the main project folder).
+    - Select the **`build/chrome-mv3-dev`** folder that was just created (do _not_ select the main project folder).
 
 6.  **Pin the Extension:** MindKeep will be installed! Click the puzzle icon in your toolbar and pin the MindKeep icon for easy access.
 
