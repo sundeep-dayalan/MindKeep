@@ -85,17 +85,38 @@ When you ask, "What was that AWS key for the production server?" MindKeep doesn'
 - **📋 Context Menu Saving:** Right-click any selected text to save it directly to MindKeep, preserving formatting and the source URL.
 - **🔐 Encrypted Storage:** All your notes are encrypted at rest in your browser's IndexedDB using the **Web Crypto API (AES-GCM)**.
 
-## 🛠️ Technology Stack
+## 🛠️ Core Technologies & APIs Used
 
-| Component               | Technology                               | Purpose                                   |
-| :---------------------- | :--------------------------------------- | :---------------------------------------- |
-| **AI Model**            | **Google Gemini Nano** (via `chrome.ai`) | Local language understanding & generation |
-| **Embedding**           | **Transformers.js**                      | Convert text to semantic vectors locally  |
-| **Storage**             | Dexie.js + IndexedDB                     | Fast, encrypted local database            |
-| **Encryption**          | Web Crypto API                           | Secure content encryption at rest         |
-| **Editor**              | TipTap                                   | Rich text editing with markdown support   |
-| **UI Framework**        | React 18 + Tailwind CSS                  | Modern, responsive interface              |
-| **Extension Framework** | Plasmo                                   | Chrome extension development              |
+This project was built by deeply integrating Chrome's new built-in AI APIs with a modern, local-first tech stack.
+
+### 1. Google Chrome Built-in AI (Gemini Nano)
+
+We use the full suite of available on-device models, each for a specific purpose:
+
+- **Prompt API (`LanguageModel`):** This is the core "brain" of MindKeep. We don't just execute simple prompts; we use `LanguageModel.create()` to build a robust, stateful **session management system**. This allows for conversational follow-ups, token usage tracking (with warnings at 90% quota), and a "Persona" system built on top of `systemPrompt`. This powers the In-Page Assistant and Semantic Q&A features.
+
+- **Summarizer API (`Summarizer`):** This API is used to automatically generate "AI-Suggested Titles" for new notes. When you paste a large block of text and leave the title blank, the Summarizer API creates a concise headline, saving you time.
+
+- **Rewriter API (`Rewriter`):** Integrated directly into the In-Page Assistant. This allows you to highlight text in any
+  web form and instantly rewrite it to be "more-formal," "more-casual," "shorter," or "longer," streamlining your writing workflow.
+
+### 2. Local-First & Privacy Stack
+
+To guarantee 100% privacy, no data ever leaves the user's machine.
+
+- **Transformers.js:** This library is the key to our private semantic search. When a note is saved, we use Transformers.js to generate 384-dimensional vector embeddings _locally in the browser_. These vectors are stored alongside the notes.
+
+- **Web Crypto API (`AES-GCM`):** We don't just store data locally; we **encrypt it at rest**. This native browser API is used to encrypt all note content before it's saved to IndexedDB, ensuring your private data is unreadable outside the extension.
+
+- **Dexie.js (IndexedDB):** A high-performance wrapper for IndexedDB that manages the local database of encrypted notes and their (unencrypted) vector embeddings, allowing for fast and efficient vector similarity search.
+
+### 3. Extension & UI Frameworks
+
+- **Plasmo:** A modern, battery-packed framework for building the Chrome extension.
+- **React 18 & Tailwind CSS:** For building a responsive, clean, and modern user interface.
+- **TipTap:** A headless, "pro-mirror" style rich-text editor that provides a beautiful writing experience.
+
+---
 
 ## 🔄 How It Works
 
