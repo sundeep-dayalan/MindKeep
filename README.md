@@ -27,7 +27,7 @@ To use MindKeep, you _must_ enable the required Chrome flags:
 
 A pre-built package is available for download in the **Releases** section of this repository.
 
-1.  **[Click here to go to the latest Release]** **(PASTE LINK TO YOUR NEW GITHUB RELEASE HERE)**
+1.  Visit **([MindKeep v1 - Submission Build for Google Chrome Built-in AI Challenge 2025](https://github.com/sundeep-dayalan/MindKeep/releases/tag/v1))**
 2.  Download the `mindkeep-v1.zip` file
 3.  Unzip the file. (You will have a folder named `mindkeep-v1`).
 4.  **Load the Extension in Chrome:**
